@@ -1,0 +1,17 @@
+# Example 3 (docs/02-algorithms.md §6): no LFA, no RLFA, TI-LFA needs an Adj-SID.
+# Source S, destination E, protect link S–E.
+# Expected: P={A,B}, Q={C}, no PQ; TI-LFA [Prefix B, Adj B->C, Prefix E] -> labels 16004, 24005, 16002.
+name: Five-node ring, high-metric B-C - TI-LFA needs Adj-SID
+srgb_base: 16000
+nodes:
+  - { id: S, sid: 1 }
+  - { id: E, sid: 2 }
+  - { id: A, sid: 3 }
+  - { id: B, sid: 4 }
+  - { id: C, sid: 5 }
+links:
+  - { a: S, b: E, metric: 1 }
+  - { a: E, b: C, metric: 1 }
+  - { a: C, b: B, metric: 10, adj_sid_ab: 24006, adj_sid_ba: 24005 }   # a=C, b=B, so B->C is adj_sid_ba
+  - { a: B, b: A, metric: 1 }
+  - { a: A, b: S, metric: 1 }

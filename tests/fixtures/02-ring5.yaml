@@ -1,0 +1,18 @@
+# Example 2 (docs/02-algorithms.md §6): no LFA, Remote LFA works.
+# Source S, destination E, protect link S–E.
+# Expected: P={A,B}, extended P={A,B,C}, Q={B,C}, PQ={B,C}, chosen PQ=B;
+# TI-LFA [Prefix B, Prefix E] -> labels 16004, 16002.
+name: Five-node ring - RLFA works
+srgb_base: 16000
+nodes:
+  - { id: S, sid: 1 }
+  - { id: E, sid: 2 }
+  - { id: A, sid: 3 }
+  - { id: B, sid: 4 }
+  - { id: C, sid: 5 }
+links:
+  - { a: S, b: E, metric: 1 }
+  - { a: E, b: C, metric: 1 }
+  - { a: C, b: B, metric: 1 }
+  - { a: B, b: A, metric: 1 }
+  - { a: A, b: S, metric: 1 }

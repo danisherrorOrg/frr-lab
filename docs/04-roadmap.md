@@ -7,7 +7,7 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 - [x] Vite + React + TypeScript (strict) project
 - [x] Vitest, ESLint, Prettier, Tailwind
 - [x] GitHub Actions: lint → typecheck → test → build
-- [ ] Copy `examples/*.yaml` into the test fixtures
+- [x] Copy `examples/*.yaml` into the test fixtures
 
 ## Phase 1 – Engine core: graph + SPF (2–3 days)
 - [ ] `types.ts` (from `03-architecture.md` §4)
