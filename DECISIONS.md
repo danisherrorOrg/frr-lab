@@ -119,3 +119,10 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Other options considered:** a single CSV with a summary block on top (awkward to open in a spreadsheet); testing the worker only in a browser (slow, needs Playwright).
 - **No new dependencies.**
 - **Status:** Accepted. D16's open item (maximum-metric links in normal SPF) is still open; moved to the UI work.
+
+### D20 – UI libraries: Cytoscape.js, Zustand, Testing Library (2026-10-30)
+- **Why:** Cytoscape.js (D3) and Zustand are the picks in `docs/03-architecture.md` §2. Cytoscape ships its own TypeScript types. The UI smoke test (`docs/05-testing.md` §1) uses Testing Library on jsdom, so it runs in Vitest with no browser.
+- **Tooling added:** `cytoscape`, `zustand` (runtime); `@testing-library/react`, `@testing-library/dom`, `@testing-library/user-event`, `jsdom` (dev-only).
+- **Undo / redo:** written by hand in the store (a past/future stack of topologies, max 100) instead of the `zundo` middleware. It's about 30 lines and only the topology needs history, not the selection or results.
+- **Other options considered:** React Flow (rejected in D3), Redux Toolkit (more code for the same job), Playwright for the smoke test (slow, needs a browser; kept for later).
+- **Status:** Accepted.
