@@ -38,15 +38,15 @@ clear "done when".
 
 ### Types and YAML
 - [x] `src/engine/types.ts`: copy the types from `docs/03-architecture.md` §4
-- [ ] Tests for `io/yaml.ts`: valid file loads; each rule below gives a clear error
-- [ ] `src/io/yaml.ts`: load + save with js-yaml **safe schema** (no custom tags)
-  - [ ] unique node ids
-  - [ ] unique SID indices
-  - [ ] links point to existing nodes
-  - [ ] metrics are integers 1–16,777,215
-  - [ ] no self-loops, no parallel links
-  - [ ] `metric_ba` defaults to `metric`; `srgb_base` defaults to 16000
-  - [ ] warning (not error) if the graph is disconnected
+- [x] Tests for `io/yaml.ts`: valid file loads; each rule below gives a clear error
+- [x] `src/io/yaml.ts`: load + save with js-yaml **safe schema** (no custom tags)
+  - [x] unique node ids
+  - [x] unique SID indices
+  - [x] links point to existing nodes
+  - [x] metrics are integers 1–16,777,215
+  - [x] no self-loops, no parallel links
+  - [x] `metric_ba` defaults to `metric`; `srgb_base` defaults to 16000
+  - [x] warning (not error) if the graph is disconnected
 - [ ] `src/engine/graph.ts`: build the adjacency list from a `Topology`
 
 ### SPF

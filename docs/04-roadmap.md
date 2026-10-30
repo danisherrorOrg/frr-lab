@@ -11,7 +11,7 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 
 ## Phase 1 – Engine core: graph + SPF (2–3 days)
 - [x] `types.ts` (from `03-architecture.md` §4)
-- [ ] `io/yaml.ts`: load + validate (all rules in §5)
+- [x] `io/yaml.ts`: load + validate (all rules in §5)
 - [ ] `spf.ts`: forward Dijkstra with all predecessors (ECMP) and first-hop sets
 - [ ] Reverse SPF
 - [ ] All-pairs distance table + "all shortest paths avoid link" helper (`02-algorithms.md` §1.5)

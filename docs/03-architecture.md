@@ -130,7 +130,7 @@ srgb_base: 16000          # optional, default 16000
 nodes:
   - { id: S, sid: 1 }
   - { id: E, sid: 2 }
-  - { id: C, sid: 3, name: "Core-3" }
+  - { id: C, sid: 3, name: "Core-3", pos: { x: 120, y: 40 } }  # name, pos optional
 links:
   - { a: S, b: E, metric: 1 }                 # same metric both ways
   - { a: E, b: C, metric: 10, metric_ba: 20 } # different reverse metric
