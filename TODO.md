@@ -37,7 +37,7 @@ clear "done when".
 ## Phase 1 – Engine core: graph + SPF (2–3 days)
 
 ### Types and YAML
-- [ ] `src/engine/types.ts`: copy the types from `docs/03-architecture.md` §4
+- [x] `src/engine/types.ts`: copy the types from `docs/03-architecture.md` §4
 - [ ] Tests for `io/yaml.ts`: valid file loads; each rule below gives a clear error
 - [ ] `src/io/yaml.ts`: load + save with js-yaml **safe schema** (no custom tags)
   - [ ] unique node ids

@@ -10,7 +10,7 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 - [x] Copy `examples/*.yaml` into the test fixtures
 
 ## Phase 1 – Engine core: graph + SPF (2–3 days)
-- [ ] `types.ts` (from `03-architecture.md` §4)
+- [x] `types.ts` (from `03-architecture.md` §4)
 - [ ] `io/yaml.ts`: load + validate (all rules in §5)
 - [ ] `spf.ts`: forward Dijkstra with all predecessors (ECMP) and first-hop sets
 - [ ] Reverse SPF
