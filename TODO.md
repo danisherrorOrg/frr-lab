@@ -50,8 +50,8 @@ clear "done when".
 - [x] `src/engine/graph.ts`: build the adjacency list from a `Topology`
 
 ### SPF
-- [ ] Tests first: line, triangle, square with ECMP, asymmetric metrics, disconnected graph, 2-node graph
-- [ ] `spf.ts` forward Dijkstra: distance, **all** predecessors, first-hop set (§1.1)
+- [x] Tests first: line, triangle, square with ECMP, asymmetric metrics, disconnected graph, 2-node graph
+- [x] `spf.ts` forward Dijkstra: distance, **all** predecessors, first-hop set (§1.1)
 - [ ] Reverse SPF (§1.2)
 - [ ] All-pairs distance table, cached by topology version (§1.3)
 - [ ] `avoidsLink(X, Y, S, E)` helper using the strict inequality (§1.5, D6)
