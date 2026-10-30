@@ -1,0 +1,21 @@
+# Example 5: a leaf-spine fabric, two spines and four leaves, all metrics 10.
+# From L1: leaves are ECMP-protected; a spine has no LFA, Remote LFA uses a PQ leaf,
+# and TI-LFA gives [Prefix L2, Prefix SP1].
+name: Leaf-spine fabric
+srgb_base: 16000
+nodes:
+  - { id: SP1, sid: 1, pos: { x: 150, y: 0 } }
+  - { id: SP2, sid: 2, pos: { x: 350, y: 0 } }
+  - { id: L1, sid: 11, pos: { x: 0, y: 200 } }
+  - { id: L2, sid: 12, pos: { x: 166, y: 200 } }
+  - { id: L3, sid: 13, pos: { x: 333, y: 200 } }
+  - { id: L4, sid: 14, pos: { x: 500, y: 200 } }
+links:
+  - { a: L1, b: SP1, metric: 10 }
+  - { a: L1, b: SP2, metric: 10 }
+  - { a: L2, b: SP1, metric: 10 }
+  - { a: L2, b: SP2, metric: 10 }
+  - { a: L3, b: SP1, metric: 10 }
+  - { a: L3, b: SP2, metric: 10 }
+  - { a: L4, b: SP1, metric: 10 }
+  - { a: L4, b: SP2, metric: 10 }

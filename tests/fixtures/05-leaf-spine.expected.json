@@ -1,0 +1,65 @@
+{
+  "$comment": "Expected engine results for Example 5 (docs/02-algorithms.md §6, docs/05-testing.md §2). Only the fields listed here are checked. null means 'none'. PQ leaves tie at cost 20 via SP2; lowest id L2 wins (D17).",
+  "fixture": "05-leaf-spine.yaml",
+  "source": "L1",
+  "results": [
+    {
+      "dest": "SP1",
+      "cost": 10,
+      "nextHops": ["SP1"],
+      "protections": [
+        {
+          "protectedLink": { "from": "L1", "to": "SP1" },
+          "ecmpProtected": false,
+          "lfa": {
+            "candidates": [
+              {
+                "neighbor": "SP2",
+                "loopFree": false,
+                "downstream": false,
+                "nodeProtecting": false,
+                "cost": 30
+              }
+            ],
+            "best": null
+          },
+          "rlfa": {
+            "pSpace": ["SP2"],
+            "extPSpace": ["L2", "L3", "L4", "SP2"],
+            "qSpace": ["L2", "L3", "L4"],
+            "pq": ["L2", "L3", "L4"],
+            "exitVia": { "L2": "SP2", "L3": "SP2", "L4": "SP2" },
+            "best": "L2",
+            "plainPSpaceOnly": { "pq": [], "best": null }
+          },
+          "tilfa": {
+            "path": ["L1", "SP2", "L2", "SP1"],
+            "segments": [
+              { "kind": "prefix", "node": "L2", "label": 16012 },
+              { "kind": "prefix", "node": "SP1", "label": 16001 }
+            ],
+            "labelStack": [16012, 16001],
+            "extraLabels": 1
+          }
+        }
+      ]
+    },
+    {
+      "dest": "L2",
+      "cost": 20,
+      "nextHops": ["SP1", "SP2"],
+      "protections": [
+        {
+          "protectedLink": { "from": "L1", "to": "SP1" },
+          "ecmpProtected": true,
+          "lfa": { "best": "SP2" }
+        },
+        {
+          "protectedLink": { "from": "L1", "to": "SP2" },
+          "ecmpProtected": true,
+          "lfa": { "best": "SP1" }
+        }
+      ]
+    }
+  ]
+}

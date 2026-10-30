@@ -1,0 +1,24 @@
+# Example 4: a small ISP core. Two PE routers hang off a four-router core with a
+# diagonal P1-P4 whose metric differs per direction (20 one way, 40 back).
+# From PE1: PE2 is ECMP-protected; P4 has an LFA (P1) only because of the asymmetric link;
+# P1, P2 and P3 have no LFA but Remote LFA works; TI-LFA to P1 starts with an Adj-SID:
+# [Adj P2->P1, Prefix P1] -> labels 24000, 16001.
+name: Small ISP core
+srgb_base: 16000
+nodes:
+  - { id: PE1, sid: 11, pos: { x: 0, y: 150 } }
+  - { id: P1, sid: 1, pos: { x: 150, y: 50 } }
+  - { id: P2, sid: 2, pos: { x: 150, y: 250 } }
+  - { id: P3, sid: 3, pos: { x: 350, y: 50 } }
+  - { id: P4, sid: 4, pos: { x: 350, y: 250 } }
+  - { id: PE2, sid: 12, pos: { x: 500, y: 150 } }
+links:
+  - { a: PE1, b: P1, metric: 10 }
+  - { a: PE1, b: P2, metric: 10 }
+  - { a: P1, b: P2, metric: 30 }
+  - { a: P1, b: P3, metric: 10 }
+  - { a: P2, b: P4, metric: 10 }
+  - { a: P3, b: P4, metric: 30 }
+  - { a: P1, b: P4, metric: 20, metric_ba: 40 }
+  - { a: P3, b: PE2, metric: 10 }
+  - { a: P4, b: PE2, metric: 10 }

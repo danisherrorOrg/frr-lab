@@ -5,7 +5,13 @@ import { computeForSource } from '../../src/engine/index'
 import type { Topology } from '../../src/engine/types'
 import { loadFixture } from '../helpers'
 
-const FIXTURES = ['01-square.yaml', '02-ring5.yaml', '03-ring5-highmetric.yaml']
+const FIXTURES = [
+  '01-square.yaml',
+  '02-ring5.yaml',
+  '03-ring5-highmetric.yaml',
+  '04-isp-core.yaml',
+  '05-leaf-spine.yaml',
+]
 
 /** JSON null means "none": drop it here, and list where it was so the test can check it's absent. */
 function splitNulls(x: unknown, path: string[] = [], nulls: string[][] = []): unknown {
@@ -73,6 +79,15 @@ describe('computeForSource: worked examples', () => {
       (x) => x.dest === 'E',
     )
     expect(r?.protections[0]?.rlfa).toMatchObject({ extended: false, pq: ['B'], best: 'B' })
+  })
+
+  it.each([
+    ['04-isp-core.yaml', 'PE1', 'P1'],
+    ['05-leaf-spine.yaml', 'L1', 'SP1'],
+  ])('%s: plain P-space finds no PQ node, extended P-space does', (file, s, d) => {
+    const r = computeForSource(loadFixture(file), s, { extended: false }).find((x) => x.dest === d)
+    expect(r?.protections[0]?.rlfa.pq).toEqual([])
+    expect(r?.protections[0]?.rlfa.best).toBeUndefined()
   })
 
   it('01-square: RLFA is not needed when an LFA exists, so no PQ node is chosen', () => {

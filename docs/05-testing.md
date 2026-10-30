@@ -18,6 +18,8 @@ The engine is the product. If its answers are wrong, the tool teaches wrong thin
 | `01-square` | S / D / S–E | N (node-protecting, downstream) | – (not needed) | `[Prefix D]` | `16000+sid(D)` |
 | `02-ring5` | S / E / S–E | none | {B, C}, chosen B | `[Prefix B, Prefix E]` | `16004, 16002`* |
 | `03-ring5-highmetric` | S / E / S–E | none | none | `[Prefix B, Adj B→C, Prefix E]` | `16004, 24005, 16002` |
+| `04-isp-core` | PE1 / P1 / PE1–P1 | none | {PE2} (extended, exit via P2), chosen PE2 | `[Adj P2→P1, Prefix P1]` | `24000, 16001` |
+| `05-leaf-spine` | L1 / SP1 / L1–SP1 | none | {L2, L3, L4} (extended, exit via SP2), chosen L2 | `[Prefix L2, Prefix SP1]` | `16012, 16001` |
 
 \* With SID indices from the YAML files (S=1, E=2, A=3, B=4, C=5).
 
@@ -27,6 +29,8 @@ Also check P and Q sets:
 
 These numbers were checked with a throwaway Python script on 2026-10-29 (not part of the repo).
 - `03-ring5-highmetric`: P = {A, B}, extended P = {A, B}, Q = {C}
+- `04-isp-core` (PE1, link PE1–P1): P = {P2, P4}, extended P = {P2, P4, PE2}, Q = {P3, PE2}. P4 via P2 has LFA P1 (only because P1→P4 costs 20 but P4→P1 costs 40); PE2 is ECMP-protected.
+- `05-leaf-spine` (L1, link L1–SP1): P = {SP2}, extended P = {SP2, L2, L3, L4}, Q = {L2, L3, L4}. Every leaf is ECMP-protected.
 
 ## 3. Property tests (random connected graphs, 4–30 nodes, metrics 1–20)
 1. **SPF:** `dist(X,Y) ≤ c(X,Z) + dist(Z,Y)` for every edge X→Z (triangle rule); `dist(X,X) = 0`.

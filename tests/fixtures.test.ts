@@ -24,7 +24,7 @@ interface ExpectedFile {
   fixture: string
   results: {
     protections: {
-      tilfa: { segments: { label: number }[]; labelStack: number[]; extraLabels: number }
+      tilfa?: { segments: { label: number }[]; labelStack: number[]; extraLabels: number }
     }[]
   }[]
 }
@@ -38,6 +38,7 @@ describe('expected results files', () => {
     expect(expected.fixture).toBe(file)
     for (const result of expected.results) {
       for (const { tilfa } of result.protections) {
+        if (tilfa === undefined) continue
         expect(tilfa.labelStack).toEqual(tilfa.segments.map((s) => s.label))
         expect(tilfa.extraLabels).toBe(tilfa.labelStack.length - 1)
       }

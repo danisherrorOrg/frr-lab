@@ -1,0 +1,95 @@
+{
+  "$comment": "Expected engine results for Example 4 (docs/02-algorithms.md §6, docs/05-testing.md §2). Only the fields listed here are checked. null means 'none'. Hand-checked: dist(P2,P1)=20 (P2-PE1-P1) is not < dist(P2,PE1)+dist(PE1,P1)=10+10, so no LFA.",
+  "fixture": "04-isp-core.yaml",
+  "source": "PE1",
+  "results": [
+    {
+      "dest": "P1",
+      "cost": 10,
+      "nextHops": ["P1"],
+      "protections": [
+        {
+          "protectedLink": { "from": "PE1", "to": "P1" },
+          "ecmpProtected": false,
+          "lfa": {
+            "candidates": [
+              {
+                "neighbor": "P2",
+                "loopFree": false,
+                "downstream": false,
+                "nodeProtecting": false,
+                "cost": 30
+              }
+            ],
+            "best": null
+          },
+          "rlfa": {
+            "pSpace": ["P2", "P4"],
+            "extPSpace": ["P2", "P4", "PE2"],
+            "qSpace": ["P3", "PE2"],
+            "pq": ["PE2"],
+            "exitVia": { "PE2": "P2" },
+            "best": "PE2",
+            "plainPSpaceOnly": { "pq": [], "best": null }
+          },
+          "tilfa": {
+            "path": ["PE1", "P2", "P1"],
+            "segments": [
+              { "kind": "adj", "from": "P2", "to": "P1", "label": 24000 },
+              { "kind": "prefix", "node": "P1", "label": 16001 }
+            ],
+            "labelStack": [24000, 16001],
+            "extraLabels": 1
+          }
+        }
+      ]
+    },
+    {
+      "dest": "P4",
+      "cost": 20,
+      "nextHops": ["P2"],
+      "protections": [
+        {
+          "protectedLink": { "from": "PE1", "to": "P2" },
+          "ecmpProtected": false,
+          "lfa": {
+            "candidates": [
+              {
+                "neighbor": "P1",
+                "loopFree": true,
+                "downstream": false,
+                "nodeProtecting": true,
+                "cost": 30
+              }
+            ],
+            "best": "P1"
+          },
+          "rlfa": { "needed": false, "best": null },
+          "tilfa": {
+            "path": ["PE1", "P1", "P4"],
+            "segments": [{ "kind": "prefix", "node": "P4", "label": 16004 }],
+            "labelStack": [16004],
+            "extraLabels": 0
+          }
+        }
+      ]
+    },
+    {
+      "dest": "PE2",
+      "cost": 30,
+      "nextHops": ["P1", "P2"],
+      "protections": [
+        {
+          "protectedLink": { "from": "PE1", "to": "P1" },
+          "ecmpProtected": true,
+          "lfa": { "best": "P2" }
+        },
+        {
+          "protectedLink": { "from": "PE1", "to": "P2" },
+          "ecmpProtected": true,
+          "lfa": { "best": "P1" }
+        }
+      ]
+    }
+  ]
+}
