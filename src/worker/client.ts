@@ -1,6 +1,6 @@
 import type { ComputeOptions, CoverageReport } from '../engine/index'
 import type { DestinationResult, NodeId, Topology } from '../engine/types'
-import type { EngineRequest, EngineResponse } from './protocol'
+import { handleRequest, type EngineRequest, type EngineResponse } from './protocol'
 
 /** The parts of a Worker the client uses, so tests can pass a fake. */
 export interface WorkerLike {
@@ -44,8 +44,33 @@ export function createEngineWorker(): WorkerLike {
   }) as unknown as WorkerLike
 }
 
+/**
+ * Runs the engine on the main thread with the same messages, on a later tick.
+ * Used where Worker doesn't exist (jsdom in tests); results are identical.
+ */
+export function createInlineWorker(): WorkerLike {
+  const listeners: ((ev: { data: EngineResponse }) => void)[] = []
+  let stopped = false
+  return {
+    postMessage: (msg) =>
+      void setTimeout(() =>
+        handleRequest(msg, (data) => {
+          if (!stopped) for (const fn of listeners) fn({ data })
+        }),
+      ),
+    addEventListener: (_type, fn) => void listeners.push(fn),
+    terminate: () => {
+      stopped = true
+    },
+  }
+}
+
+/** The real worker when the browser has one, else the inline stand-in. */
+export const createDefaultWorker = (): WorkerLike =>
+  typeof Worker === 'undefined' ? createInlineWorker() : createEngineWorker()
+
 /** Promise-based calls into the engine worker. Requests are matched to answers by id. */
-export function createEngineClient(worker: WorkerLike = createEngineWorker()): EngineClient {
+export function createEngineClient(worker: WorkerLike = createDefaultWorker()): EngineClient {
   let nextId = 1
   const pending = new Map<number, Pending>()
 

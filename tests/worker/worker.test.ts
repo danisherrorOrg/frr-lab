@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeCoverage, computeForSource } from '../../src/engine/index'
-import { createEngineClient, type WorkerLike } from '../../src/worker/client'
+import { createEngineClient, createInlineWorker, type WorkerLike } from '../../src/worker/client'
 import { handleRequest, type EngineRequest, type EngineResponse } from '../../src/worker/protocol'
 import { loadFixture } from '../helpers'
 
@@ -76,5 +76,18 @@ describe('createEngineClient', () => {
     client.terminate()
     expect(worker.terminated).toBe(true)
     await expect(call).rejects.toThrow('stopped')
+  })
+})
+
+describe('createInlineWorker', () => {
+  it('gives the same results as the engine, without a real Worker', async () => {
+    const client = createEngineClient(createInlineWorker())
+    expect(await client.computeForSource(ring(), 'S')).toEqual(computeForSource(ring(), 'S'))
+  })
+
+  it('is the default where Worker does not exist (Node, jsdom)', async () => {
+    expect(typeof Worker).toBe('undefined')
+    const client = createEngineClient()
+    expect(await client.computeForSource(ring(), 'S')).toHaveLength(4)
   })
 })
