@@ -1,6 +1,7 @@
 import { MAX_METRIC, type LfaCheck, type LfaResult } from './lfa'
 import type { RlfaResult } from './rlfa'
-import type { ExplainStep, NodeId } from './types'
+import type { SegmentCheck, TilfaResult } from './tilfa'
+import type { ExplainStep, NodeId, Segment } from './types'
 
 const mark = (ok: boolean) => (ok ? '✓' : '✗')
 const num = (x: number) => (Number.isFinite(x) ? String(x) : '∞')
@@ -201,4 +202,103 @@ function bestPqStep(result: RlfaResult, { d, lfaBest }: RlfaContext): ExplainSte
       ? `Best PQ node: ${p} (cost dist(${s},${p}) = ${best.cost}${lowest}). Tunnel to ${p}, which forwards normally to ${e}`
       : `Best PQ node: ${p} via ${best.exitVia} (cost c(${s},${best.exitVia})+dist(${best.exitVia},${p}) = ${best.cSN}+${best.distNY} = ${best.cost}${lowest}). Tunnel to ${p}, sent out through ${best.exitVia}`
   return { rule: 'Best PQ node', text, ok: true, rfc }
+}
+
+const segmentName = (x: Segment) =>
+  x.kind === 'prefix' ? `Prefix-SID(${x.node})` : `Adj-SID(${x.from}→${x.to})`
+
+/**
+ * Turns a TI-LFA result into steps: the post-convergence path, each step of the
+ * greedy walk (why this router, or why an Adj-SID), the clean-up rules, and the
+ * final label stack. Example:
+ * "From B, C: dist(B,C)=4 matches path cost 10 ✗; avoids S–E: … ✗".
+ */
+export function explainTilfa(result: TilfaResult): ExplainStep[] {
+  const { s, d, e } = result
+  if (result.partitioned || result.path === undefined || result.segments === undefined) {
+    return [
+      {
+        rule: 'Post-convergence path',
+        text: `${d} can’t be reached once ${s}–${e} fails: unprotected (the network is partitioned)`,
+        ok: false,
+        rfc: 'RFC 9855 §3',
+      },
+    ]
+  }
+
+  const steps: ExplainStep[] = [
+    {
+      rule: 'Post-convergence path',
+      text: `Post-convergence path with ${s}–${e} removed: ${result.path.join(' → ')} (cost ${num(result.cost ?? Infinity)})`,
+      ok: true,
+      rfc: 'RFC 9855 §3',
+    },
+  ]
+
+  for (const w of result.walk) {
+    // The algorithm tries the furthest router first, so the failed check comes first.
+    if (w.rejected !== undefined) {
+      steps.push({
+        rule: 'TI-LFA walk',
+        text: `From ${w.from}, ${w.rejected.node}: ${checkText(w.rejected, result)}`,
+        ok: false,
+        rfc: 'RFC 9855 §5',
+      })
+    }
+    if (w.segment.kind === 'prefix' && w.accepted !== undefined) {
+      steps.push({
+        rule: 'TI-LFA walk',
+        text: `From ${w.from}, ${w.accepted.node}: ${checkText(w.accepted, result)} → ${segmentName(w.segment)}`,
+        ok: true,
+        rfc: 'RFC 9855 §5',
+      })
+    } else if (w.segment.kind === 'adj') {
+      steps.push({
+        rule: 'TI-LFA walk',
+        text: `From ${w.from}: no router further along can be reached with a prefix-SID, so ${segmentName(w.segment)} forces the link ${w.segment.from}→${w.segment.to}`,
+        ok: true,
+        rfc: 'RFC 9855 §5.3',
+      })
+    }
+  }
+
+  const n1 = result.path[1]!
+  if (result.dropped !== undefined) {
+    steps.push({
+      rule: 'TI-LFA clean-up',
+      text: `Dropped ${segmentName(result.dropped)}: ${n1} is the first hop, so sending out of ${s}–${n1} already gets there`,
+      ok: true,
+      rfc: 'RFC 9855 §5.1',
+    })
+  }
+
+  const rawLast = result.rawSegments?.at(-1)
+  if (rawLast === undefined || rawLast.kind !== 'prefix' || rawLast.node !== d) {
+    steps.push({
+      rule: 'TI-LFA destination label',
+      text: `Added Prefix-SID(${d}): the destination’s own label stays under the repair list`,
+      ok: true,
+      rfc: 'RFC 9855 §7.1',
+    })
+  }
+
+  const extra = result.extraLabels ?? 0
+  steps.push({
+    rule: 'TI-LFA segment list',
+    text: `Segment list [${result.segments.map(segmentName).join(', ')}] → labels ${(result.labelStack ?? []).join(', ')} (top first, before PHP): ${extra} extra label${extra === 1 ? '' : 's'}, sent out via ${n1}`,
+    ok: true,
+    rfc: 'RFC 9855 §5',
+  })
+  return steps
+}
+
+/** "(a) same cost as the repair path; (b) all normal paths avoid S–E" with the numbers. */
+function checkText(c: SegmentCheck, { s, e, cSE }: TilfaResult): string {
+  const xy = `dist(${c.from},${c.node})=${num(c.distXY)}`
+  const sum = c.distXS + cSE + c.distEY
+  return (
+    `${xy} matches path cost ${num(c.pathCost)} ${mark(c.onPath)}; ` +
+    `avoids ${s}–${e}: ${xy} < dist(${c.from},${s})+c(${s},${e})+dist(${e},${c.node}) = ` +
+    `${num(c.distXS)}+${cSE}+${num(c.distEY)} = ${num(sum)} ${mark(c.avoids)}`
+  )
 }
