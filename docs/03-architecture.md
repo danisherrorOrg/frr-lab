@@ -110,7 +110,9 @@ interface Protection {          // for one (S, D, protected link S–E)
   protectedLink: { from: NodeId; to: NodeId };
   ecmpProtected: boolean;
   lfa:   { candidates: LfaCandidate[]; best?: NodeId };
-  rlfa:  { pSpace: NodeId[]; extPSpace: NodeId[]; qSpace: NodeId[]; pq: NodeId[]; best?: NodeId };
+  rlfa:  { pSpace: NodeId[]; extPSpace: NodeId[]; qSpace: NodeId[]; pq: NodeId[];
+           exitVia: Record<NodeId, NodeId>;  // PQ node → neighbor to send through (D11)
+           extended: boolean; needed: boolean; best?: NodeId };  // needed = false when an LFA exists
   tilfa: { path?: NodeId[]; segments?: Segment[]; labelStack?: number[]; extraLabels?: number };
   explain: ExplainStep[];
 }

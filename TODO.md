@@ -80,16 +80,16 @@ clear "done when".
 ## Phase 3 – Remote LFA (2 days)
 
 - [x] Re-read RFC 7490 §5.2–5.4; confirm P-space, extended P-space (§5.2.1) and Q-space (§5.3) rules; log the result in `DECISIONS.md` (closes the check in D5)
-- [ ] Tests first: Example 2 (P={A,B}, ext P={A,B,C}, Q={B,C}, PQ={B,C}, chosen B); Example 3 (P={A,B}, ext P={A,B}, Q={C}, no PQ)
-- [ ] `rlfa.ts`: P-space of S
-- [ ] Extended P-space via each other neighbor N, remembering the exit neighbor (D11)
-- [ ] Q-space of E using **reverse** distances
-- [ ] PQ = (extended) P ∩ Q (S and E never in any space, D17)
-- [ ] Best PQ: lowest cost from S to the PQ node → lowest router ID (RFC 7490 §5.2.2, D17)
-- [ ] Plain-P-space toggle (option on the compute call)
-- [ ] Only run RLFA when there's no LFA (but still return the spaces for teaching)
+- [x] Tests first: Example 2 (P={A,B}, ext P={A,B,C}, Q={B,C}, PQ={B,C}, chosen B); Example 3 (P={A,B}, ext P={A,B}, Q={C}, no PQ)
+- [x] `rlfa.ts`: P-space of S
+- [x] Extended P-space via each other neighbor N, remembering the exit neighbor (D11)
+- [x] Q-space of E using **reverse** distances
+- [x] PQ = (extended) P ∩ Q (S and E never in any space, D17)
+- [x] Best PQ: lowest cost from S to the PQ node → lowest router ID (RFC 7490 §5.2.2, D17)
+- [x] Plain-P-space toggle (option on the compute call)
+- [x] Only run RLFA when there's no LFA (but still return the spaces for teaching)
 - [ ] Explain steps for each P/Q check with numbers
-- [ ] Asymmetric-metric test (Q-space must differ from a forward-SPF answer)
+- [x] Asymmetric-metric test (Q-space must differ from a forward-SPF answer)
 - [ ] Property test: S's path to PQ avoids S–E, PQ's path to E avoids S–E (item 3)
 
 **Done when:** Example 2 and 3 RLFA results match `05-testing.md` §2 exactly.

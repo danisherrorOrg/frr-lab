@@ -63,11 +63,19 @@ export interface Protection {
   protectedLink: { from: NodeId; to: NodeId }
   ecmpProtected: boolean
   lfa: { candidates: LfaCandidate[]; best?: NodeId }
+  /** RFC 7490 link protection. S and E never appear in any space (D17). */
   rlfa: {
     pSpace: NodeId[]
     extPSpace: NodeId[]
     qSpace: NodeId[]
+    /** (extended) P ∩ Q, depending on `extended`. */
     pq: NodeId[]
+    /** PQ nodes reached only through a neighbor's P-space → the neighbor to send through (D11). */
+    exitVia: Record<NodeId, NodeId>
+    /** True when PQ uses extended P-space (the default, D5). */
+    extended: boolean
+    /** False when an LFA already protects D: no tunnel is used, the spaces are only shown. */
+    needed: boolean
     best?: NodeId
   }
   tilfa: {
