@@ -65,10 +65,10 @@ clear "done when".
 ## Phase 2 – LFA (1–2 days)
 
 - [x] Re-read RFC 5286 §3–4; note anything that differs from `02-algorithms.md` §2 in `DECISIONS.md`
-- [ ] Tests first: Example 1 (N is node-protecting, downstream LFA); Example 2 (no LFA)
-- [ ] `lfa.ts`: Inequality 1 (loop-free), 2 (downstream), 3 (node-protecting) for each neighbor N ≠ E
-- [ ] Candidate cost `c(S,N) + dist(N,D)`
-- [ ] Best-LFA choice: node-protecting → downstream → lowest cost → lowest router ID (D7)
+- [x] Tests first: Example 1 (N is node-protecting, downstream LFA); Example 2 (no LFA)
+- [x] `lfa.ts`: Inequality 1 (loop-free), 2 (downstream), 3 (node-protecting) for each neighbor N ≠ E
+- [x] Candidate cost `c(S,N) + dist(N,D)`
+- [x] Best-LFA choice: node-protecting → downstream → lowest cost → lowest router ID (D7)
 - [ ] ECMP-protected detection (§1.4) + test with an ECMP square
 - [ ] `explain.ts`: LFA steps with real numbers, e.g. `dist(A,E)=2 < 1+1=2 ✗`, with RFC section
 - [ ] Property test: every reported LFA reaches D without passing S (`05-testing.md` §3 item 2)

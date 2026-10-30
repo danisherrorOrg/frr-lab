@@ -18,10 +18,10 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 - [x] Tests: small graphs, ECMP, asymmetric metrics, disconnected graph
 
 ## Phase 2 – LFA (1–2 days)
-- [ ] Inequalities 1, 2, 3 + best-LFA choice
+- [x] Inequalities 1, 2, 3 + best-LFA choice
 - [ ] ECMP-protected detection
 - [ ] `explain.ts` steps for LFA
-- [ ] Tests: Example 1 (LFA ✓), Example 2 (LFA ✗)
+- [x] Tests: Example 1 (LFA ✓), Example 2 (LFA ✗)
 
 ## Phase 3 – Remote LFA (2 days)
 - [ ] Re-read RFC 7490 §5.2–5.4; confirm formulas; log it in DECISIONS.md
