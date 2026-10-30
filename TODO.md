@@ -19,7 +19,7 @@ clear "done when".
 - [x] `.gitignore` (node_modules, dist, coverage, .env…)
 - [x] `LICENSE` file (MIT, D10)
 - [x] Vite + React 18 + TypeScript project in the repo root (`npm create vite@latest`)
-- [ ] `tsconfig.json`: `strict: true`, `noUncheckedIndexedAccess: true`
+- [x] `tsconfig.json`: `strict: true`, `noUncheckedIndexedAccess: true`
 - [ ] Install and set up Vitest + fast-check
 - [ ] Install and set up ESLint + Prettier
 - [ ] Add an ESLint rule that blocks `react`, DOM globals and `Math.random` inside `src/engine/` (keeps the engine pure, `CLAUDE.md` rule 1)
