@@ -105,7 +105,7 @@ clear "done when".
 - [ ] Return "unprotected: network partitioned" when D can't be reached
 - [ ] Greedy segment-list walk (§4.2, D8)
 - [ ] Clean-up rule: drop a first `PrefixSID(N)` or `AdjSID(S→N)` for the first-hop neighbor (D11, D18); end with `PrefixSID(D)`
-- [ ] `labels.ts`: prefix label = SRGB + index; Adj-SID from file or auto-assigned from 24000
+- [x] `labels.ts`: prefix label = SRGB + index; Adj-SID from file or auto-assigned from 24000
 - [ ] Label stack top-first, before PHP; count extra labels
 - [ ] Explain steps for each walk step (why this Y, or why an Adj-SID)
 - [ ] Property tests (items 4, 5): simulating the segment list with pre-failure tables reaches D, never uses S–E, and costs the same as the post-convergence path; a path is found whenever D is reachable
