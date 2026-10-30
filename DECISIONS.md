@@ -60,3 +60,9 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Tooling added:** `tailwindcss`, `@tailwindcss/vite` (dev-only).
 - **Other options considered:** Tailwind 3 with PostCSS and `tailwind.config.js` (more files, older), dark mode from `prefers-color-scheme` only (no manual toggle).
 - **Status:** Accepted.
+
+### D14 – js-yaml 4 for topology files (2026-10-30)
+- **Why:** js-yaml is the YAML choice in `docs/03-architecture.md` §2. Files load with `CORE_SCHEMA` (plain YAML types only), so custom tags like `!!js/function` are rejected (§8). Pinned to 4.x because `@types/js-yaml` only covers v4; v5 can come later.
+- **Format additions:** an optional `pos: { x, y }` per node so saved files keep the canvas layout. The engine ignores it. A missing `name` loads as "Untitled". Link ids are made from the ends (`S-E`), since the file has none.
+- **Tooling added:** `js-yaml` (runtime), `@types/js-yaml` (dev-only).
+- **Status:** Accepted.
