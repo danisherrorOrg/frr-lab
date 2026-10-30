@@ -14,8 +14,8 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 - [x] `io/yaml.ts`: load + validate (all rules in §5)
 - [x] `spf.ts`: forward Dijkstra with all predecessors (ECMP) and first-hop sets
 - [x] Reverse SPF
-- [ ] All-pairs distance table + "all shortest paths avoid link" helper (`02-algorithms.md` §1.5)
-- [ ] Tests: small graphs, ECMP, asymmetric metrics, disconnected graph
+- [x] All-pairs distance table + "all shortest paths avoid link" helper (`02-algorithms.md` §1.5)
+- [x] Tests: small graphs, ECMP, asymmetric metrics, disconnected graph
 
 ## Phase 2 – LFA (1–2 days)
 - [ ] Inequalities 1, 2, 3 + best-LFA choice

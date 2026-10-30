@@ -54,9 +54,9 @@ clear "done when".
 - [x] `spf.ts` forward Dijkstra: distance, **all** predecessors, first-hop set (§1.1)
 - [x] Reverse SPF (§1.2)
 - [x] All-pairs distance table, cached by topology version (§1.3)
-- [ ] `avoidsLink(X, Y, S, E)` helper using the strict inequality (§1.5, D6)
-- [ ] Results are deterministic: sort node ids wherever order could vary
-- [ ] Property tests: triangle rule, `dist(X,X)=0`, symmetry with symmetric metrics (`05-testing.md` §3 items 1, 7)
+- [x] `avoidsLink(X, Y, S, E)` helper using the strict inequality (§1.5, D6)
+- [x] Results are deterministic: sort node ids wherever order could vary
+- [x] Property tests: triangle rule, `dist(X,X)=0`, symmetry with symmetric metrics (`05-testing.md` §3 items 1, 7)
 
 **Done when:** all SPF tests pass and distances for Examples 1–3 match the tables in `docs/02-algorithms.md` §6.
 
