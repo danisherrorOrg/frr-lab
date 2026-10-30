@@ -1,0 +1,26 @@
+/** Key for the canvas: line style and symbols as well as colour (docs/01-requirements.md §6). */
+export function Legend() {
+  const line = (style: string, color: string) => (
+    <svg width="28" height="8" aria-hidden="true" className="inline-block">
+      <line x1="0" y1="4" x2="28" y2="4" stroke={color} strokeWidth="4" strokeDasharray={style} />
+    </svg>
+  )
+  const swatch = (bg: string) => (
+    <span
+      aria-hidden="true"
+      className="inline-block h-3 w-3 rounded-full border border-slate-500"
+      style={{ background: bg }}
+    />
+  )
+  return (
+    <ul className="flex flex-wrap gap-x-4 gap-y-1 px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
+      <li className="flex items-center gap-1">{line('', '#2563eb')} primary path</li>
+      <li className="flex items-center gap-1">{line('6 4', '#ea580c')} backup path</li>
+      <li className="flex items-center gap-1">{line('2 3', '#dc2626')} ✕ failed link</li>
+      <li className="flex items-center gap-1">{swatch('#bfdbfe')} P-space</li>
+      <li className="flex items-center gap-1">{swatch('#bbf7d0')} Q-space</li>
+      <li className="flex items-center gap-1">★ chosen PQ node</li>
+      <li>Metrics: one number = same both ways; two numbers = cost leaving each end.</li>
+    </ul>
+  )
+}
