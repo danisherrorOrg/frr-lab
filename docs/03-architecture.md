@@ -53,8 +53,12 @@ LFA LAB/
 │   │   └── index.ts         computeForSource(), computeCoverage()
 │   ├── io/
 │   │   ├── yaml.ts          load/save + schema validation
+│   │   ├── csv.ts           coverage report → CSV text
 │   │   └── share-url.ts
-│   ├── worker/engine.worker.ts
+│   ├── worker/
+│   │   ├── engine.worker.ts thin worker: passes messages to protocol.ts
+│   │   ├── protocol.ts      request/response messages + handler (testable in Node)
+│   │   └── client.ts        promise-based calls into the worker
 │   ├── state/store.ts       topology, selection, failed links, history
 │   ├── ui/
 │   │   ├── GraphCanvas.tsx  Cytoscape wrapper

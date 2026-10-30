@@ -117,15 +117,15 @@ clear "done when".
 
 ## Phase 5 – Coverage + worker (1 day)
 
-- [ ] `index.ts`: `computeForSource(topology, source, options)` returning `DestinationResult[]`
-- [ ] Tests first for coverage numbers on the 3 examples
-- [ ] `coverage.ts`: per-source LFA %, (LFA or RLFA) %, TI-LFA % (§5)
-- [ ] All-sources mode (sum over every router as S)
-- [ ] List of unprotected (source, destination, link) with the reason
-- [ ] CSV export (pure function returning a string)
-- [ ] Property test: LFA% ≤ RLFA% ≤ TI-LFA% (item 6)
-- [ ] `worker/engine.worker.ts`: run the engine off the main thread, with progress messages
-- [ ] Speed check: generated 200-node / 600-link topology, all-sources coverage < 2 s
+- [x] `index.ts`: `computeForSource(topology, source, options)` returning `DestinationResult[]`
+- [x] Tests first for coverage numbers on the 3 examples
+- [x] `coverage.ts`: per-source LFA %, (LFA or RLFA) %, TI-LFA % (§5)
+- [x] All-sources mode (sum over every router as S)
+- [x] List of unprotected (source, destination, link) with the reason
+- [x] CSV export (pure function returning a string)
+- [x] Property test: LFA% ≤ RLFA% ≤ TI-LFA% (item 6)
+- [x] `worker/engine.worker.ts`: run the engine off the main thread, with progress messages
+- [x] Speed check: generated 200-node / 600-link topology, all-sources coverage < 2 s
 
 🎯 **Milestone A: engine done.**
 - [ ] (opt) Tiny CLI: `npx lfa-lab examples/02-ring5.yaml --source S`

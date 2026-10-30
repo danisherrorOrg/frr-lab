@@ -106,3 +106,16 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Adj-SID auto-assignment:** a link direction with no Adj-SID in the file gets one from its router: each router numbers its own outgoing links from 24000, in neighbor-ID order, skipping labels it already uses (its explicit Adj-SIDs and any prefix-SID label). Adj-SIDs are local to a router (RFC 8402 §3.4), so two routers may use the same number. Numbering per router means editing one part of the network doesn't renumber links elsewhere.
 - **Other options considered:** one global counter (renumbers everything after any edit).
 - **Status:** Accepted.
+
+### D19 – Coverage counting, CSV export and the worker protocol (2026-10-30)
+- **Counting (`02-algorithms.md` §5):** one pair per (D, primary next-hop link), so ECMP destinations count once per next hop. Routers the source can't reach aren't counted. "LFA" = a best LFA exists; "RLFA" = LFA or a PQ node; "TI-LFA" = a repair path exists. ECMP-protected pairs get their own count but are always inside the LFA count (D16).
+- **Unprotected list:** every pair LFA alone doesn't protect, tagged with the strongest method that fails (`no-lfa`, `no-rlfa`, `partitioned`) and a one-line reason. Sorted by source, destination, link.
+- **Hand-checked numbers** (tests): `01-square` all sources 12 pairs, LFA 8, RLFA 12, TI-LFA 12; `02-ring5` 20 / 10 / 20 / 20; `03-ring5-highmetric` from S: 4 / 0 / 0 / 4.
+- **Explain steps are off in coverage runs** (`computeForSource(…, { explain: false })`): RLFA explains every P/Q check, so all-sources on 200 routers would build hundreds of thousands of strings for nothing.
+- **Speed:** a fixed 200-router / 600-link topology, all sources: about 1.0 s on a laptop (target < 2 s). No optimisation needed yet; time is spread over Dijkstra and graph building.
+- **`index.ts`** holds `computeForSource()` and `computeCoverage()`; `coverage.ts` only sums results, so there's no import cycle.
+- **CSV (`src/io/csv.ts`):** two files instead of one mixed table: per-source numbers (with an "All sources" row) and the unprotected list. RFC 4180 quoting, CRLF line ends. Text starting with `= + - @` gets a leading `'` so spreadsheets don't run it as a formula, since router ids come from shared files.
+- **Worker:** `protocol.ts` has the messages and a `handleRequest()` that tests call directly in Node; `engine.worker.ts` only wires it to `onmessage`; `client.ts` gives promise-based calls with a progress callback, matched by request id. A running job can't be cancelled except by `terminate()`; fine for < 2 s runs.
+- **Other options considered:** a single CSV with a summary block on top (awkward to open in a spreadsheet); testing the worker only in a browser (slow, needs Playwright).
+- **No new dependencies.**
+- **Status:** Accepted. D16's open item (maximum-metric links in normal SPF) is still open; moved to the UI work.

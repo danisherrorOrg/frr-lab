@@ -147,6 +147,11 @@ TI-LFA coverage = protected-by-TI-LFA pairs / all pairs   (should be 100% unless
 ```
 "All sources" mode repeats this for every router as S and adds the numbers together.
 
+Counting details (D19):
+- A pair is (D, primary next-hop link S–E). D with two ECMP next hops gives two pairs. Routers S can't reach give none.
+- "Protected by LFA" means a best LFA exists. ECMP-protected pairs are also counted on their own; they are always LFA-protected too (§2).
+- The unprotected list holds every pair LFA doesn't protect, with the reason from the strongest method that fails: `no-lfa` (RLFA or TI-LFA protects it), `no-rlfa` (only TI-LFA), `partitioned` (nothing: the link is a bridge for D).
+
 ---
 
 ## 6. Worked examples (these become fixed tests)
