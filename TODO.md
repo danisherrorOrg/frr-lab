@@ -17,7 +17,7 @@ clear "done when".
 
 - [x] Git repo created
 - [x] `.gitignore` (node_modules, dist, coverage, .env…)
-- [ ] `LICENSE` file (MIT, D10)
+- [x] `LICENSE` file (MIT, D10)
 - [ ] Vite + React 18 + TypeScript project in the repo root (`npm create vite@latest`)
 - [ ] `tsconfig.json`: `strict: true`, `noUncheckedIndexedAccess: true`
 - [ ] Install and set up Vitest + fast-check

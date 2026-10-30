@@ -3,7 +3,7 @@
 Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Rough time assumes evenings and weekends.
 
 ## Phase 0 – Setup (½ day)
-- [ ] `git init`, MIT licence, `.gitignore`
+- [x] `git init`, MIT licence, `.gitignore`
 - [ ] Vite + React + TypeScript (strict) project
 - [ ] Vitest, ESLint, Prettier, Tailwind
 - [ ] GitHub Actions: lint → typecheck → test → build
