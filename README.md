@@ -35,6 +35,7 @@ Learning these is hard: textbooks show one or two static diagrams, and vendor to
 | [docs/03-architecture.md](docs/03-architecture.md) | Tech stack, folder layout, data model, YAML format, UI layout |
 | [docs/04-roadmap.md](docs/04-roadmap.md) | Phases with checklists (the build order) |
 | [docs/05-testing.md](docs/05-testing.md) | Test plan and expected results to check the engine against |
+| [TODO.md](TODO.md) | Detailed task list to work through, phase by phase |
 | [DECISIONS.md](DECISIONS.md) | Decision log: what was chosen and why |
 | [CLAUDE.md](CLAUDE.md) | Rules for AI coding agents working in this repo |
 | [examples/](examples/) | Sample topologies used by the docs and the tests |
