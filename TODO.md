@@ -70,7 +70,7 @@ clear "done when".
 - [x] Candidate cost `c(S,N) + dist(N,D)`
 - [x] Best-LFA choice: node-protecting → downstream → lowest cost → lowest router ID (D7)
 - [x] ECMP-protected detection (§1.4) + test with an ECMP square
-- [ ] `explain.ts`: LFA steps with real numbers, e.g. `dist(A,E)=2 < 1+1=2 ✗`, with RFC section
+- [x] `explain.ts`: LFA steps with real numbers, e.g. `dist(A,E)=2 < 1+1=2 ✗`, with RFC section
 - [ ] Property test: every reported LFA reaches D without passing S (`05-testing.md` §3 item 2)
 
 **Done when:** Example 1 and 2 LFA results match `05-testing.md` §2 exactly.
