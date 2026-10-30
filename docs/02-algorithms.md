@@ -33,7 +33,7 @@ If it's `=`, some ECMP path uses the link, so treat it as **not** avoiding it (s
 ---
 
 ## 2. LFA (RFC 5286)
-For S, destination D, primary next hop E, and every other neighbor N of S:
+For S, destination D, primary next hop E, and every other neighbor N of S (other primary next hops count too: RFC 5286 §3.4):
 
 | Name | Inequality | Meaning |
 |---|---|---|
@@ -42,6 +42,10 @@ For S, destination D, primary next hop E, and every other neighbor N of S:
 | **Node-protecting** (Inequality 3) | `dist(N,D) < dist(N,E) + dist(E,D)` | N's path to D avoids router E, so it survives E failing. |
 
 **Link-protecting:** In the MVP, all links are point-to-point, so a loop-free N with N ≠ E never uses link S–E for its first hop. The check in §1.5 confirms N's path to D doesn't come back over S–E (Inequality 1 already implies this).
+
+**Excluded neighbors:** skip N if the link S→N or N→S has the IS-IS maximum metric 16,777,215 (RFC 5286 §3.5).
+
+**ECMP-protected:** another primary next hop for D that avoids link S–E (§1.4). With point-to-point links it is always downstream, so it is also an LFA candidate.
 
 **Choosing the best LFA** (documented in `DECISIONS.md`, can be changed):
 1. node-protecting before link-only

@@ -72,3 +72,14 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Rule this creates:** treat a `Topology` as immutable once passed to the engine. Changing it in place would return stale distances.
 - **Other options considered:** a `version` counter on `Topology` (easy to forget to bump), hashing the topology (slower, more code).
 - **Status:** Accepted.
+
+### D16 – LFA rules checked against RFC 5286 §3–4 (2026-10-30)
+- **Checked:** Inequalities 1–3 (RFC 5286 §1, §3.1, §3.2), alternates per primary next hop (§3.4), the selection rules (§3.6) and using an alternate (§4). The formulas in `docs/02-algorithms.md` §2 match the RFC word for word.
+- **D7 still holds:** §1 says a router SHOULD pick a node-protecting LFA over a link-protecting downstream path, and §3.6 rule 1 prefers node-protecting. Downstream as the second key matches step 16 of the §3.6 algorithm. The RFC leaves the rest to "distance, IP addresses, or any router-local tie-breaker", so lowest `c(S,N) + dist(N,D)` then lowest router ID is our choice.
+- **Added to the doc:**
+  - Other primary next hops (ECMP) are LFA candidates too; only E itself is skipped (§3.4, §3.6 step 2). With point-to-point links and no parallel links, another primary next hop is always downstream, so it always protects the link (that is the "ECMP-protected" flag).
+  - A neighbor N is never an LFA if the link S→N or N→S has the IS-IS maximum metric 16,777,215 (§3.5 MUST NOT). The overload bit isn't modelled.
+  - Candidate flags hold the plain result of each inequality. `best` only looks at loop-free candidates. With E a primary next hop, Inequality 3 can't hold when Inequality 1 fails, and Inequality 2 implies Inequality 1, so the flags never contradict.
+- **Not in the MVP:** the §3.6 rule 4 mode "prefer other primary next hops over non-primary alternates". The UI shows `ecmpProtected` instead.
+- **Open (later phase):** RFC 5305 §3.7 says a link with the maximum metric must not be used in normal SPF at all. Our SPF still uses it. Revisit with the coverage/UI work.
+- **Status:** Accepted.

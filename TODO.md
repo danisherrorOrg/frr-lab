@@ -64,7 +64,7 @@ clear "done when".
 
 ## Phase 2 – LFA (1–2 days)
 
-- [ ] Re-read RFC 5286 §3–4; note anything that differs from `02-algorithms.md` §2 in `DECISIONS.md`
+- [x] Re-read RFC 5286 §3–4; note anything that differs from `02-algorithms.md` §2 in `DECISIONS.md`
 - [ ] Tests first: Example 1 (N is node-protecting, downstream LFA); Example 2 (no LFA)
 - [ ] `lfa.ts`: Inequality 1 (loop-free), 2 (downstream), 3 (node-protecting) for each neighbor N ≠ E
 - [ ] Candidate cost `c(S,N) + dist(N,D)`
