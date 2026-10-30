@@ -1,5 +1,5 @@
 import { linkMetric } from './graph'
-import { dist, type AllPairs } from './spf'
+import { avoidsLink, dist, type AllPairs } from './spf'
 import type { LfaCandidate, NodeId } from './types'
 
 /** Highest IS-IS wide metric. RFC 5286 §3.5: never use an alternate over such a link. */
@@ -101,4 +101,14 @@ function betterLfa(a: LfaCandidate, b: LfaCandidate): boolean {
   if (a.downstream !== b.downstream) return a.downstream
   if (a.cost !== b.cost) return a.cost < b.cost
   return a.neighbor < b.neighbor
+}
+
+/**
+ * Other primary next hops for D whose shortest paths all avoid link S→E
+ * (docs/02-algorithms.md §1.4, RFC 5286 §3.4). Non-empty means "ECMP-protected":
+ * S keeps forwarding over them when S–E fails. Sorted by router id.
+ */
+export function ecmpProtectors(table: AllPairs, s: NodeId, d: NodeId, e: NodeId): NodeId[] {
+  const hops = table.from.get(s)?.firstHops.get(d) ?? []
+  return hops.filter((n) => n !== e && avoidsLink(table, n, d, s, e))
 }

@@ -19,7 +19,7 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 
 ## Phase 2 – LFA (1–2 days)
 - [x] Inequalities 1, 2, 3 + best-LFA choice
-- [ ] ECMP-protected detection
+- [x] ECMP-protected detection
 - [ ] `explain.ts` steps for LFA
 - [x] Tests: Example 1 (LFA ✓), Example 2 (LFA ✗)
 
