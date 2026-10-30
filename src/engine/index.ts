@@ -120,3 +120,4 @@ export type {
   UnprotectedReason,
 } from './coverage'
 export { percent } from './coverage'
+export { protectionPaths, shortestPath, type ProtectionPaths } from './paths'
