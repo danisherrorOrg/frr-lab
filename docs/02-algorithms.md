@@ -96,7 +96,7 @@ Checked against RFC 7490 §5.2–5.4 on 2026-10-30 (D17). The RFC's Q-space form
 ## 4. TI-LFA (Segment Routing): link protection
 
 ### 4.1 Post-convergence path
-Remove link S–E (both directions) and run SPF from S. The shortest path to D is the **post-convergence path** (if there's a tie, pick one deterministically: lowest router IDs along the path).
+Remove link S–E (both directions) and run SPF from S. The shortest path to D is the **post-convergence path** (RFC 9855 §3: `SPT_new(S, S–E)`). If there's a tie, pick one deterministically: **lowest router IDs along the path**, i.e. compare the paths router by router from S, and the first difference decides.
 If D can't be reached, the destination can't be protected (the network is partitioned).
 
 ### 4.2 Turning the path into a segment list (greedy method)
@@ -115,14 +115,18 @@ while current != D:
         next = the node after `current` on the path
         segments.push(AdjSID(current → next)); current = next
 ```
-- **Clean-up rule:** the outgoing interface is always the path's first hop N. If the first segment is `PrefixSID(N)` (the directly connected first-hop neighbor itself), **drop it**: sending out of that interface already gets there.
+- **The repair is an outgoing interface plus a repair list** (RFC 9855 §5). The outgoing interface is always the path's first hop N.
+- **Clean-up rule:** if the first segment only reaches N, as `PrefixSID(N)` or `AdjSID(S→N)`, **drop it**: sending out of that interface already gets there (RFC 9855 §5.1). Don't drop it when N is D itself (see the next rule).
+- **The list always ends with `PrefixSID(D)`:** that's the packet's own label, which stays under the repair list (RFC 9855 §7.1). If the walk ends with an `AdjSID(X→D)`, add `PrefixSID(D)` after it.
 - So if the first hop N is already a valid LFA for D, the greedy walk gives `[PrefixSID(N), PrefixSID(D)]` → after clean-up `[PrefixSID(D)]` (zero extra labels).
+- Extra labels = segments − 1 (the repair list without the destination's own label).
 - Typical results: 0 extra labels (LFA case), 1 (a PQ node exists), 2 (P and Q are adjacent: prefix-SID(P) + adj-SID(P→Q)), more in rare cases.
+- The walk always makes progress (an Adj-SID moves one hop), so it ends. Each prefix segment follows normal shortest paths that all avoid S–E and cost the same as the post-convergence path, so the repair is loop-free and costs exactly the post-convergence cost (a property test checks this).
 
 ### 4.3 Label stack
 - Prefix-SID label = SRGB base (default 16000) + router's SID index. The MVP assumes **every router uses the same SRGB**.
-- Adj-SID label = value from the topology file, or an auto-assigned 24000+ number.
-- Show the stack top-first, before any penultimate-hop popping (state this in the UI).
+- Adj-SID label = value from the topology file, or auto-assigned: Adj-SIDs are local to each router (RFC 8402 §3.4), so each router numbers its own links from 24000 in neighbor-ID order, skipping labels it already uses (D18).
+- Show the stack top-first, before any penultimate-hop popping (state this in the UI). So RFC 9855 §7.1 rule 1 (pop the destination label when PHP is on and the list ends at the penultimate hop) is not shown.
 
 ### 4.4 Node protection (v0.2)
 Same as above, but remove node E (all its links) for the post-convergence SPF, and the avoid-check becomes "all normal shortest paths current→Y avoid node E":
@@ -201,5 +205,5 @@ With SRGB 16000 and SID indices S=1, E=2, A=3, B=4, C=5, Adj-SID B→C = 24005, 
 - RFC 8102 – Remote-LFA Node Protection and Manageability (for v0.2).
 - RFC 8402 – Segment Routing Architecture (Prefix-SID, Adj-SID, SRGB).
 - RFC 8667 – IS-IS Extensions for Segment Routing.
-- TI-LFA: IETF draft `draft-ietf-rtgwg-segment-routing-ti-lfa`. **Check whether it has been published as an RFC and update this link.**
+- RFC 9855 – Topology Independent Fast Reroute Using Segment Routing (TI-LFA), October 2025 (was `draft-ietf-rtgwg-segment-routing-ti-lfa`). https://www.rfc-editor.org/rfc/rfc9855
 - RFC 6571 – LFA applicability (good background on coverage in real topologies).

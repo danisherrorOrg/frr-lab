@@ -94,3 +94,15 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Max metric (§5.4):** a neighbor whose link to or from S has the maximum metric is not used as an extended-P-space exit, the same rule as LFA (D16). The overload bit isn't modelled.
 - **Not in the MVP:** the optional downstream constraint on PQ nodes (§5.3 `Apply_Downstream_Constraint`), and LAN/pseudonode cases.
 - **Status:** Accepted. D11's tie-break part is replaced by this entry; its "exit via neighbor" part still holds.
+
+### D18 – TI-LFA checked against RFC 9855; Adj-SID auto-assignment (2026-10-30)
+- **Checked:** the TI-LFA draft was published as **RFC 9855** (October 2025). README and `docs/02-algorithms.md` §7 now cite it. Sections read: §2–5 (notation, post-convergence path, repair path), §7.1 (MPLS) and §9 (Adj-SIDs in the repair list).
+- **Matches:** the repair follows `SPT_new(S, X)` (§3), and "an implementation is free to use any local optimization to provide smaller segment lists" (§3, §5.4). Our greedy walk (D8) is such an optimization. Its Prefix-SID check (all normal paths avoid S–E) is what makes the list loop-free.
+- **Added:**
+  - The repair is an outgoing interface plus a repair list (§5). So the clean-up rule (D11) also drops a first `AdjSID(S→N)`, not only `PrefixSID(N)`: S never pushes a label for its own link (§5.1).
+  - The segment list always ends with `PrefixSID(D)`: the destination's own label stays under the repair list (§7.1 rule 2). If the walk ends with an Adj-SID into D, `PrefixSID(D)` is added after it. "Extra labels" is the repair list length (= segments − 1).
+  - Post-convergence tie-break, made exact: compare equal-cost paths router by router from S; the lowest ID at the first difference wins.
+- **Not in the MVP:** §7.1 rule 1 (popping the destination label with PHP; we show the stack before PHP), per-router SRGBs (D9), choosing unprotected Adj-SIDs (§9 MAY), SRv6.
+- **Adj-SID auto-assignment:** a link direction with no Adj-SID in the file gets one from its router: each router numbers its own outgoing links from 24000, in neighbor-ID order, skipping labels it already uses (its explicit Adj-SIDs and any prefix-SID label). Adj-SIDs are local to a router (RFC 8402 §3.4), so two routers may use the same number. Numbering per router means editing one part of the network doesn't renumber links elsewhere.
+- **Other options considered:** one global counter (renumbers everything after any edit).
+- **Status:** Accepted.

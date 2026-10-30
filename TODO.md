@@ -98,13 +98,13 @@ clear "done when".
 
 ## Phase 4 – TI-LFA, link protection (3 days)
 
-- [ ] Check whether the TI-LFA draft is now an RFC; update the README table and `02-algorithms.md` §7
+- [x] Check whether the TI-LFA draft is now an RFC; update the README table and `02-algorithms.md` §7 (RFC 9855, D18)
 - [ ] Tests first: exact segment lists and label stacks for Examples 1, 2, 3
 - [ ] Post-convergence SPF with link S–E removed (both directions)
 - [ ] Deterministic tie-break: lowest router IDs along the path (§4.1)
 - [ ] Return "unprotected: network partitioned" when D can't be reached
 - [ ] Greedy segment-list walk (§4.2, D8)
-- [ ] Clean-up rule: drop a first `PrefixSID(N)` for the first-hop neighbor (D11)
+- [ ] Clean-up rule: drop a first `PrefixSID(N)` or `AdjSID(S→N)` for the first-hop neighbor (D11, D18); end with `PrefixSID(D)`
 - [ ] `labels.ts`: prefix label = SRGB + index; Adj-SID from file or auto-assigned from 24000
 - [ ] Label stack top-first, before PHP; count extra labels
 - [ ] Explain steps for each walk step (why this Y, or why an Adj-SID)

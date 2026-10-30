@@ -11,7 +11,7 @@ Routers use Fast Reroute (FRR) to switch traffic onto a pre-computed backup path
 |---|---|---|
 | **LFA** (Loop-Free Alternate) | RFC 5286 | Send traffic to a neighbor that won't send it back to you. |
 | **Remote LFA** (RLFA) | RFC 7490 | No safe neighbor? Tunnel the traffic to a safe router further away (a "PQ node"). |
-| **TI-LFA** (Topology-Independent LFA) | IETF rtgwg TI-LFA spec (check whether it has an RFC number now) | Use Segment Routing labels to force traffic along the path the network will use *after* it reconverges. Works in almost any topology. |
+| **TI-LFA** (Topology-Independent LFA) | RFC 9855 | Use Segment Routing labels to force traffic along the path the network will use *after* it reconverges. Works in almost any topology. |
 
 Learning these is hard: textbooks show one or two static diagrams, and vendor tools are closed and only work on live routers. **No open, interactive tool lets you draw a network and see every backup path with the reasoning behind it.** LFA Lab fills that gap.
 
