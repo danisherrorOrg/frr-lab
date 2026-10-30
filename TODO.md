@@ -90,7 +90,7 @@ clear "done when".
 - [x] Only run RLFA when there's no LFA (but still return the spaces for teaching)
 - [x] Explain steps for each P/Q check with numbers
 - [x] Asymmetric-metric test (Q-space must differ from a forward-SPF answer)
-- [ ] Property test: S's path to PQ avoids S–E, PQ's path to E avoids S–E (item 3)
+- [x] Property test: S's path to PQ avoids S–E, PQ's path to E avoids S–E (item 3)
 
 **Done when:** Example 2 and 3 RLFA results match `05-testing.md` §2 exactly.
 
