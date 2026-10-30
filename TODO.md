@@ -47,7 +47,7 @@ clear "done when".
   - [x] no self-loops, no parallel links
   - [x] `metric_ba` defaults to `metric`; `srgb_base` defaults to 16000
   - [x] warning (not error) if the graph is disconnected
-- [ ] `src/engine/graph.ts`: build the adjacency list from a `Topology`
+- [x] `src/engine/graph.ts`: build the adjacency list from a `Topology`
 
 ### SPF
 - [ ] Tests first: line, triangle, square with ECMP, asymmetric metrics, disconnected graph, 2-node graph
