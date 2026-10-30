@@ -6,11 +6,11 @@ import type { Link, NodeId, RouterNode, Topology } from '../engine/types'
 export type ParseResult =
   { ok: true; topology: Topology; warnings: string[] } | { ok: false; errors: string[] }
 
-const DEFAULT_SRGB_BASE = 16000
+export const DEFAULT_SRGB_BASE = 16000
 // IS-IS wide metrics are 24 bits (RFC 5305 §3.7).
-const MAX_METRIC = 16_777_215
+export const MAX_METRIC = 16_777_215
 // MPLS labels are 20 bits (RFC 3032 §2.1).
-const MAX_LABEL = 1_048_575
+export const MAX_LABEL = 1_048_575
 
 type Raw = Record<string, unknown>
 

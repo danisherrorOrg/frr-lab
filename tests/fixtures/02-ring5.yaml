@@ -5,11 +5,11 @@
 name: Five-node ring - RLFA works
 srgb_base: 16000
 nodes:
-  - { id: S, sid: 1 }
-  - { id: E, sid: 2 }
-  - { id: A, sid: 3 }
-  - { id: B, sid: 4 }
-  - { id: C, sid: 5 }
+  - { id: S, sid: 1, pos: { x: 0, y: 100 } }
+  - { id: E, sid: 2, pos: { x: 200, y: 0 } }
+  - { id: A, sid: 3, pos: { x: 80, y: 300 } }
+  - { id: B, sid: 4, pos: { x: 320, y: 300 } }
+  - { id: C, sid: 5, pos: { x: 400, y: 100 } }
 links:
   - { a: S, b: E, metric: 1 }
   - { a: E, b: C, metric: 1 }
