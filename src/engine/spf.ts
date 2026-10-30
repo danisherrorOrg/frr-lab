@@ -1,4 +1,4 @@
-import { buildGraph, type Graph } from './graph'
+import { buildGraph, linkMetric, type Graph } from './graph'
 import type { NodeId, Topology } from './types'
 
 /** Shortest paths from one root. Routers that can't be reached have no entries. */
@@ -78,6 +78,18 @@ export function dist(table: AllPairs, x: NodeId, y: NodeId): number {
   if (fromX === undefined) throw new Error(`Distance from unknown router "${x}".`)
   if (!table.from.has(y)) throw new Error(`Distance to unknown router "${y}".`)
   return fromX.dist.get(y) ?? Infinity
+}
+
+/**
+ * True if ALL shortest paths X→Y avoid the directed link S→E:
+ *   dist(X,Y) < dist(X,S) + c(S,E) + dist(E,Y)
+ * A tie means some equal-cost path may use the link, so it counts as "uses it"
+ * (docs/02-algorithms.md §1.5, D6). Unreachable Y gives Infinity < …, so false.
+ */
+export function avoidsLink(table: AllPairs, x: NodeId, y: NodeId, s: NodeId, e: NodeId): boolean {
+  const cSE = linkMetric(table.graph, s, e)
+  if (cSE === undefined) throw new Error(`There is no link ${s}→${e}.`)
+  return dist(table, x, y) < dist(table, x, s) + cSE + dist(table, e, y)
 }
 
 /**
