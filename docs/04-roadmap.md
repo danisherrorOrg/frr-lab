@@ -30,11 +30,11 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 - [x] Tests: Example 2 (PQ = {B, C}, chosen B), Example 3 (no PQ)
 
 ## Phase 4 – TI-LFA, link protection (3 days)
-- [ ] Post-convergence SPF (link removed), deterministic tie-break
-- [ ] Greedy segment-list encoding (`02-algorithms.md` §4.2)
+- [x] Post-convergence SPF (link removed), deterministic tie-break
+- [x] Greedy segment-list encoding (`02-algorithms.md` §4.2)
 - [x] Labels: SRGB, prefix-SID, adj-SID (auto-assign when missing)
 - [ ] Explain steps
-- [ ] Tests: Examples 1, 2, 3 exact segment lists + label stacks
+- [x] Tests: Examples 1, 2, 3 exact segment lists + label stacks
 - [ ] Property test: for random connected graphs, following the segment list hop by hop (simulated with **pre-failure** tables at every non-S router) reaches D **without using the failed link**, and its cost equals the post-convergence cost
 
 ## Phase 5 – Coverage (1 day)
