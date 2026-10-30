@@ -23,7 +23,7 @@ clear "done when".
 - [x] Install and set up Vitest + fast-check
 - [x] Install and set up ESLint + Prettier
 - [x] Add an ESLint rule that blocks `react`, DOM globals and `Math.random` inside `src/engine/` (keeps the engine pure, `CLAUDE.md` rule 1)
-- [ ] Install and set up Tailwind CSS (with `dark:` class mode)
+- [x] Install and set up Tailwind CSS (with `dark:` class mode)
 - [ ] Add npm scripts: `dev`, `test`, `lint`, `typecheck`, `build`
 - [ ] Create the empty folders from `docs/03-architecture.md` §3 (`src/engine`, `src/io`, `src/worker`, `src/state`, `src/ui`, `tests/engine`, `tests/fixtures`)
 - [ ] GitHub Actions workflow: lint → typecheck → test → build, on every push and PR

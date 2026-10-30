@@ -1,4 +1,9 @@
+@import 'tailwindcss';
+
+/* dark: styles apply when <html> has the "dark" class, so the ☾/☀ toggle
+   (not only the OS setting) controls the theme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 body {
-  margin: 0;
   font-family: system-ui, sans-serif;
 }

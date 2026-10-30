@@ -54,3 +54,9 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Tooling added:** `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `globals`, `prettier`, `eslint-config-prettier`. All are dev-only and are the standard pieces of the ESLint + Prettier setup in `docs/03-architecture.md` §2.
 - **Other options considered:** keep TypeScript 7 and use oxlint (the template default). Rejected for now: the docs pick ESLint, and the engine-purity rule (`CLAUDE.md` rule 1) is easy to write as an ESLint `no-restricted-*` rule.
 - **Status:** Accepted. Move to TypeScript 7 once `typescript-eslint` supports it.
+
+### D13 – Tailwind CSS 4 with class-based dark mode (2026-10-30)
+- **Why:** Tailwind is the styling choice in `docs/03-architecture.md` §2. Version 4 needs no config file: one `@import` in `src/index.css` plus the official `@tailwindcss/vite` plugin. Dark mode uses a `.dark` class on `<html>` (set with `@custom-variant` in CSS) so the ☾/☀ toggle can override the OS setting.
+- **Tooling added:** `tailwindcss`, `@tailwindcss/vite` (dev-only).
+- **Other options considered:** Tailwind 3 with PostCSS and `tailwind.config.js` (more files, older), dark mode from `prefers-color-scheme` only (no manual toggle).
+- **Status:** Accepted.
