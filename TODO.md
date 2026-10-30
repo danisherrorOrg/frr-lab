@@ -53,7 +53,7 @@ clear "done when".
 - [x] Tests first: line, triangle, square with ECMP, asymmetric metrics, disconnected graph, 2-node graph
 - [x] `spf.ts` forward Dijkstra: distance, **all** predecessors, first-hop set (§1.1)
 - [x] Reverse SPF (§1.2)
-- [ ] All-pairs distance table, cached by topology version (§1.3)
+- [x] All-pairs distance table, cached by topology version (§1.3)
 - [ ] `avoidsLink(X, Y, S, E)` helper using the strict inequality (§1.5, D6)
 - [ ] Results are deterministic: sort node ids wherever order could vary
 - [ ] Property tests: triangle rule, `dist(X,X)=0`, symmetry with symmetric metrics (`05-testing.md` §3 items 1, 7)

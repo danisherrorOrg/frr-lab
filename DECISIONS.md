@@ -66,3 +66,9 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Format additions:** an optional `pos: { x, y }` per node so saved files keep the canvas layout. The engine ignores it. A missing `name` loads as "Untitled". Link ids are made from the ends (`S-E`), since the file has none.
 - **Tooling added:** `js-yaml` (runtime), `@types/js-yaml` (dev-only).
 - **Status:** Accepted.
+
+### D15 – Cache all-pairs distances by topology object, not a version number (2026-10-30)
+- **Why:** `docs/02-algorithms.md` §1.3 says "cache by topology version". The store will replace the topology object on every edit (never change it in place), so the object itself is the version. A `WeakMap` keyed by it needs no extra field on `Topology` and frees old tables automatically.
+- **Rule this creates:** treat a `Topology` as immutable once passed to the engine. Changing it in place would return stale distances.
+- **Other options considered:** a `version` counter on `Topology` (easy to forget to bump), hashing the topology (slower, more code).
+- **Status:** Accepted.

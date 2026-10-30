@@ -1,5 +1,5 @@
-import type { Graph } from './graph'
-import type { NodeId } from './types'
+import { buildGraph, type Graph } from './graph'
+import type { NodeId, Topology } from './types'
 
 /** Shortest paths from one root. Routers that can't be reached have no entries. */
 export interface SpfResult {
@@ -48,6 +48,36 @@ export interface ReverseSpfResult {
  */
 export function reverseSpf(graph: Graph, root: NodeId): ReverseSpfResult {
   return { root, dist: dijkstra(graph, root, 'reverse').dist }
+}
+
+/** dist(X,Y) for every pair, from one forward SPF per router (§1.3). */
+export interface AllPairs {
+  graph: Graph
+  /** Forward SPF from each router, in sorted router order. */
+  from: Map<NodeId, SpfResult>
+}
+
+// Cache keyed by the topology object itself. The store replaces the topology on
+// every edit instead of changing it, so a new object is the "new version" (§1.3).
+// This doesn't break purity: the same input still gives the same output.
+const cache = new WeakMap<Topology, AllPairs>()
+
+/** All-pairs shortest paths, cached per topology object. Treat topologies as immutable. */
+export function allPairs(topology: Topology): AllPairs {
+  const cached = cache.get(topology)
+  if (cached !== undefined) return cached
+  const graph = buildGraph(topology)
+  const table: AllPairs = { graph, from: new Map(graph.nodes.map((x) => [x, spf(graph, x)])) }
+  cache.set(topology, table)
+  return table
+}
+
+/** dist(X,Y), or Infinity if Y can't be reached, so strict "<" checks stay false. */
+export function dist(table: AllPairs, x: NodeId, y: NodeId): number {
+  const fromX = table.from.get(x)
+  if (fromX === undefined) throw new Error(`Distance from unknown router "${x}".`)
+  if (!table.from.has(y)) throw new Error(`Distance to unknown router "${y}".`)
+  return fromX.dist.get(y) ?? Infinity
 }
 
 /**
