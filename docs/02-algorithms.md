@@ -121,6 +121,7 @@ while current != D:
 - So if the first hop N is already a valid LFA for D, the greedy walk gives `[PrefixSID(N), PrefixSID(D)]` → after clean-up `[PrefixSID(D)]` (zero extra labels).
 - Extra labels = segments − 1 (the repair list without the destination's own label).
 - Typical results: 0 extra labels (LFA case), 1 (a PQ node exists), 2 (P and Q are adjacent: prefix-SID(P) + adj-SID(P→Q)), more in rare cases.
+- (a) always holds when (b) does: normal paths that avoid S–E still exist after the failure, so they cost the same as the post-convergence path. (a) is kept because it makes the explain steps easier to follow.
 - The walk always makes progress (an Adj-SID moves one hop), so it ends. Each prefix segment follows normal shortest paths that all avoid S–E and cost the same as the post-convergence path, so the repair is loop-free and costs exactly the post-convergence cost (a property test checks this).
 
 ### 4.3 Label stack

@@ -35,7 +35,7 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 - [x] Labels: SRGB, prefix-SID, adj-SID (auto-assign when missing)
 - [x] Explain steps
 - [x] Tests: Examples 1, 2, 3 exact segment lists + label stacks
-- [ ] Property test: for random connected graphs, following the segment list hop by hop (simulated with **pre-failure** tables at every non-S router) reaches D **without using the failed link**, and its cost equals the post-convergence cost
+- [x] Property test: for random connected graphs, following the segment list hop by hop (simulated with **pre-failure** tables at every non-S router) reaches D **without using the failed link**, and its cost equals the post-convergence cost
 
 ## Phase 5 – Coverage (1 day)
 - [ ] Per-source and all-sources numbers + unprotected list

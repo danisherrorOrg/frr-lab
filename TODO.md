@@ -108,7 +108,7 @@ clear "done when".
 - [x] `labels.ts`: prefix label = SRGB + index; Adj-SID from file or auto-assigned from 24000
 - [x] Label stack top-first, before PHP; count extra labels
 - [x] Explain steps for each walk step (why this Y, or why an Adj-SID)
-- [ ] Property tests (items 4, 5): simulating the segment list with pre-failure tables reaches D, never uses S–E, and costs the same as the post-convergence path; a path is found whenever D is reachable
+- [x] Property tests (items 4, 5): simulating the segment list with pre-failure tables reaches D, never uses S–E, and costs the same as the post-convergence path; a path is found whenever D is reachable
 - [x] Edge cases: D = E, bridge link, 3-node graph, ties
 
 **Done when:** all 3 examples give `[Prefix D]`, `[Prefix B, Prefix E]` and `[Prefix B, Adj B→C, Prefix E]` with stacks `16000+sid(D)`, `16004 16002`, `16004 24005 16002`.
