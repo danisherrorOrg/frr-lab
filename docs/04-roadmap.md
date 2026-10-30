@@ -26,7 +26,7 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 ## Phase 3 – Remote LFA (2 days)
 - [x] Re-read RFC 7490 §5.2–5.4; confirm formulas; log it in DECISIONS.md
 - [x] P-space, extended P-space, Q-space, PQ, best PQ
-- [ ] Explain steps
+- [x] Explain steps
 - [x] Tests: Example 2 (PQ = {B, C}, chosen B), Example 3 (no PQ)
 
 ## Phase 4 – TI-LFA, link protection (3 days)

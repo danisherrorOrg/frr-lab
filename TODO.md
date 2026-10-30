@@ -88,7 +88,7 @@ clear "done when".
 - [x] Best PQ: lowest cost from S to the PQ node → lowest router ID (RFC 7490 §5.2.2, D17)
 - [x] Plain-P-space toggle (option on the compute call)
 - [x] Only run RLFA when there's no LFA (but still return the spaces for teaching)
-- [ ] Explain steps for each P/Q check with numbers
+- [x] Explain steps for each P/Q check with numbers
 - [x] Asymmetric-metric test (Q-space must differ from a forward-SPF answer)
 - [ ] Property test: S's path to PQ avoids S–E, PQ's path to E avoids S–E (item 3)
 
