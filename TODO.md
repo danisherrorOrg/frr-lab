@@ -134,19 +134,19 @@ clear "done when".
 
 ## Phase 6 – UI basics (4–5 days)
 
-- [ ] Add example topologies `04-isp-core.yaml` and `05-leaf-spine.yaml` (F2 asks for 4–5) + their expected results
-- [ ] `state/store.ts` (Zustand): topology, selected source, selection, failed links, settings
-- [ ] Undo / redo history in the store
-- [ ] `GraphCanvas.tsx`: Cytoscape wrapper; show routers, links, metrics (both directions if different)
-- [ ] `Toolbar.tsx`: tools (select, add router, add link, fail link), examples menu, import, export
-- [ ] Add / move / delete routers and links on the canvas
-- [ ] `PropertiesPanel.tsx`: edit name, SID index, metrics, Adj-SIDs, with validation messages
-- [ ] Import YAML (file picker) with clear errors; export YAML (download)
-- [ ] Source picker
-- [ ] `ResultsTable.tsx`: Dest · NH · Cost · LFA · RLFA · TI-LFA · ✓/✗
-- [ ] Row click → primary path blue solid, backup orange dashed, P/Q spaces shaded, PQ node ★
-- [ ] `DetailPanel.tsx`: LFA candidates, P / ext-P / Q / PQ sets, segment list, label stack, explain steps
-- [ ] UI smoke test: load an example, pick a source, see the table (Testing Library)
+- [x] Add example topologies `04-isp-core.yaml` and `05-leaf-spine.yaml` (F2 asks for 4–5) + their expected results
+- [x] `state/store.ts` (Zustand): topology, selected source, selection, failed links, settings
+- [x] Undo / redo history in the store
+- [x] `GraphCanvas.tsx`: Cytoscape wrapper; show routers, links, metrics (both directions if different)
+- [x] `Toolbar.tsx`: tools (select, add router, add link, fail link), examples menu, import, export
+- [x] Add / move / delete routers and links on the canvas
+- [x] `PropertiesPanel.tsx`: edit name, SID index, metrics, Adj-SIDs, with validation messages
+- [x] Import YAML (file picker) with clear errors; export YAML (download)
+- [x] Source picker
+- [x] `ResultsTable.tsx`: Dest · NH · Cost · LFA · RLFA · TI-LFA · ✓/✗
+- [x] Row click → primary path blue solid, backup orange dashed, P/Q spaces shaded, PQ node ★
+- [x] `DetailPanel.tsx`: LFA candidates, P / ext-P / Q / PQ sets, segment list, label stack, explain steps
+- [x] UI smoke test: load an example, pick a source, see the table (Testing Library)
 
 **Done when:** a new user can load an example and read a result in under 30 s.
 

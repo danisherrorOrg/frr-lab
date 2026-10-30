@@ -45,13 +45,13 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 🎯 **Milestone A: engine done.** Optional: a tiny CLI (`npx lfa-lab examples/02-ring5.yaml --source S`) to show results in the terminal.
 
 ## Phase 6 – UI basics (4–5 days)
-- [ ] Cytoscape canvas: show topology, metrics on edges
-- [ ] Add/move/delete routers and links; properties panel
-- [ ] Undo/redo
-- [ ] Examples menu, import/export YAML
-- [ ] Source picker + results table
-- [ ] Row click → highlight primary/backup paths, P/Q spaces, PQ node
-- [ ] Detail panel: candidates, spaces, segment list, label stack, explain steps
+- [x] Cytoscape canvas: show topology, metrics on edges
+- [x] Add/move/delete routers and links; properties panel
+- [x] Undo/redo
+- [x] Examples menu, import/export YAML
+- [x] Source picker + results table
+- [x] Row click → highlight primary/backup paths, P/Q spaces, PQ node
+- [x] Detail panel: candidates, spaces, segment list, label stack, explain steps
 
 ## Phase 7 – Failure simulation + reports (2–3 days)
 - [ ] Fail-link mode, animated repair path, then "Converge" view

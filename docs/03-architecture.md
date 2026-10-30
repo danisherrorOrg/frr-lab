@@ -50,6 +50,7 @@ LFA LAB/
 │   │   ├── labels.ts        SRGB / prefix-SID / adj-SID → label values
 │   │   ├── coverage.ts      per-source and all-sources reports
 │   │   ├── explain.ts       turns checks into readable steps with numbers
+│   │   ├── paths.ts         node-by-node paths to draw (primary, LFA, RLFA, TI-LFA)
 │   │   └── index.ts         computeForSource(), computeCoverage()
 │   ├── io/
 │   │   ├── yaml.ts          load/save + schema validation
@@ -59,9 +60,14 @@ LFA LAB/
 │   │   ├── engine.worker.ts thin worker: passes messages to protocol.ts
 │   │   ├── protocol.ts      request/response messages + handler (testable in Node)
 │   │   └── client.ts        promise-based calls into the worker
-│   ├── state/store.ts       topology, selection, failed links, history
+│   ├── state/
+│   │   ├── store.ts         topology, selection, failed links, undo/redo history
+│   │   ├── edit.ts          pure topology edits (add/move/delete/update + checks)
+│   │   └── examples.ts      built-in examples, bundled from examples/*.yaml
 │   ├── ui/
-│   │   ├── GraphCanvas.tsx  Cytoscape wrapper
+│   │   ├── GraphCanvas.tsx  Cytoscape wrapper (clicks → store actions)
+│   │   ├── canvas.ts        Cytoscape styles, sync and highlight (tested headless)
+│   │   ├── Sidebar.tsx      tools, source picker, settings
 │   │   ├── Toolbar.tsx      add node/link, fail mode, examples, import/export
 │   │   ├── ResultsTable.tsx
 │   │   ├── DetailPanel.tsx  P/Q spaces, segment list, explain steps

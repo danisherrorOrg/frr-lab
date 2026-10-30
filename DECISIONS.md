@@ -126,3 +126,15 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Undo / redo:** written by hand in the store (a past/future stack of topologies, max 100) instead of the `zundo` middleware. It's about 30 lines and only the topology needs history, not the selection or results.
 - **Other options considered:** React Flow (rejected in D3), Redux Toolkit (more code for the same job), Playwright for the smoke test (slow, needs a browser; kept for later).
 - **Status:** Accepted.
+
+### D21 – UI basics: paths to draw, link ids, what the canvas shows (2026-10-30)
+- **Paths come from the engine:** `engine/paths.ts` turns a result into node-by-node primary, LFA, RLFA and TI-LFA paths, so the UI still does no routing maths (`docs/03-architecture.md` §1). Ties use the lowest-id rule of the post-convergence path (`02-algorithms.md` §4.1), so a drawing never flips between equal-cost paths. It runs on the main thread: it only reads the cached all-pairs table.
+- **Which backup is drawn:** "Auto" draws the first that exists in coverage order (LFA, then Remote LFA, then TI-LFA); the detail panel can switch to any of them. The RLFA path goes S → exit neighbor → PQ → D (D11).
+- **Status column:** names the simplest method that protects the pair (ECMP, LFA, Remote LFA, TI-LFA), the same order as the coverage counts (D19).
+- **Ids typed in the UI:** letters, digits, `_` and `.` only. No `-`, since link ids are `a-b` (D14) and "A-B"+"C" would clash with "A"+"B-C". Files may still use other ids. Renaming a router renames its links.
+- **Positions:** examples 1–3 now carry `pos`, so the ring draws as a ring. Files without positions get a circle layout on load; dragging saves the position (one undo step per drag).
+- **Asymmetric metrics:** one number in the middle when both directions match, else one number near each end = the cost of leaving that end.
+- **Fail-link tool:** in this phase it only marks links as failed (red dotted, ✕). The repair animation and "Converge" view are Phase 7.
+- **Testing:** jsdom has no `<canvas>`, so the smoke test stubs `GraphCanvas`; the drawing logic lives in `ui/canvas.ts` and is tested with headless Cytoscape. Where `Worker` doesn't exist, the engine client runs the same protocol on the main thread (`createInlineWorker`).
+- **Bundle size:** 679 kB (218 kB gzipped), mostly Cytoscape. Vite warns above 500 kB; fine for now, revisit at launch (code-split the canvas).
+- **Status:** Accepted.
