@@ -74,17 +74,22 @@ The MVP uses **extended P-space** by default, with a toggle to show plain P-spac
 Y ∈ Q(E)  ⇔  dist(Y,E) < dist(Y,S) + c(S,E)
 ```
 
-**PQ nodes** = (extended) P-space ∩ Q-space, excluding S and E.
+**PQ nodes** = (extended) P-space ∩ Q-space. S and E are never listed in any space (S can't pass the tests; if E were in some P(N), N would already be an LFA, see D17).
 S tunnels traffic to the PQ node, and the PQ node forwards it normally to E and then to D. **Which way the tunnel leaves S matters:**
 - PQ node in plain P(S): the tunnel follows S's normal shortest path (it already avoids S–E).
-- PQ node only in some neighbor's P(N): the tunnel must be **sent out through neighbor N** (S's own normal path to it may use S–E). Store that exit neighbor with the result.
+- PQ node only in some neighbor's P(N): the tunnel must be **sent out through neighbor N** (S's own normal path to it may use S–E). Store that exit neighbor with the result. If several neighbors work, use the one with the lowest `c(S,N) + dist(N,PQ)`, then the lowest router ID.
 
-**Choosing the PQ node:**
-1. lowest repair cost: `dist(S,PQ) + dist(PQ,D)` for plain-P nodes, `c(S,N) + dist(N,PQ) + dist(PQ,D)` for extended-P nodes
-2. then prefer plain-P-space nodes (no forced exit)
-3. then lowest router ID
+**Skipped neighbors:** a neighbor whose link to or from S has the maximum metric 16,777,215 is never an exit (RFC 7490 §5.4).
 
-⚠️ Before coding, check the exact extended-P-space wording in RFC 7490 §5.2.1 and the Q-space rule in §5.3. Note the result in `DECISIONS.md`.
+**Choosing the PQ node** (RFC 7490 §5.2.2):
+1. lowest cost from S to the PQ node: `dist(S,PQ)` for plain-P nodes, `c(S,N) + dist(N,PQ)` for nodes reached through neighbor N
+2. then lowest router ID
+
+The choice doesn't depend on D: E's Q-space stands in for every destination behind E (RFC 7490 §5.2.1.3).
+
+**When RLFA is used:** only when there's no LFA for (S, D, link S–E). The spaces are still computed and shown for teaching.
+
+Checked against RFC 7490 §5.2–5.4 on 2026-10-30 (D17). The RFC's Q-space formula writes `dist(S,E)` where we write `c(S,E)`; they are equal whenever S–E is a primary link.
 
 ---
 
@@ -169,7 +174,7 @@ Ring `S – E – C – B – A – S`, all metrics 1. Destination **D = E**, pr
 - P(S): A `1<1+2` ✓, B `2<1+2` ✓, C `2<1+1` ✗ → {A, B}.
 - Extended P-space via A: C `dist(A,C)=2 (A-B-C) < dist(A,S)+dist(S,C)=1+2=3` ✓ → extended P = {A, B, C}.
 - Q(E): A `2<1+1` ✗, B `2<2+1` ✓, C `1<2+1` ✓ → {B, C}.
-- **PQ = {B, C}.** Repair costs: B = `dist(S,B)+dist(B,E) = 2+2 = 4`; C (extended, exit via A) = `c(S,A)+dist(A,C)+dist(C,E) = 1+2+1 = 4`. Tie → prefer plain-P node → **chosen PQ = B**. RLFA: tunnel to B, then B→C→E. (With plain P-space only, PQ = {B}.)
+- **PQ = {B, C}.** Cost from S: B = `dist(S,B) = 2`; C (extended, exit via A) = `c(S,A)+dist(A,C) = 1+2 = 3`. Lowest → **chosen PQ = B**. RLFA: tunnel to B, then B→C→E. (With plain P-space only, PQ = {B}.)
 - TI-LFA: post-convergence path S-A-B-C-E. From S: furthest valid Y = B (S→B normal path S-A-B, cost 2, avoids S–E; S→C would use S–E). From B: B→E normal path B-C-E (cost 2, avoids S–E) ✓.
 - **Segment list `[PrefixSID(B), PrefixSID(E)]`** → 1 extra label. Out via A.
 

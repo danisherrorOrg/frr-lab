@@ -79,13 +79,13 @@ clear "done when".
 
 ## Phase 3 – Remote LFA (2 days)
 
-- [ ] Re-read RFC 7490 §5.2–5.4; confirm P-space, extended P-space (§5.2.1) and Q-space (§5.3) rules; log the result in `DECISIONS.md` (closes the check in D5)
+- [x] Re-read RFC 7490 §5.2–5.4; confirm P-space, extended P-space (§5.2.1) and Q-space (§5.3) rules; log the result in `DECISIONS.md` (closes the check in D5)
 - [ ] Tests first: Example 2 (P={A,B}, ext P={A,B,C}, Q={B,C}, PQ={B,C}, chosen B); Example 3 (P={A,B}, ext P={A,B}, Q={C}, no PQ)
 - [ ] `rlfa.ts`: P-space of S
 - [ ] Extended P-space via each other neighbor N, remembering the exit neighbor (D11)
 - [ ] Q-space of E using **reverse** distances
-- [ ] PQ = (extended) P ∩ Q, minus S and E
-- [ ] Best PQ: lowest repair cost → plain-P before extended-P → lowest router ID (D11)
+- [ ] PQ = (extended) P ∩ Q (S and E never in any space, D17)
+- [ ] Best PQ: lowest cost from S to the PQ node → lowest router ID (RFC 7490 §5.2.2, D17)
 - [ ] Plain-P-space toggle (option on the compute call)
 - [ ] Only run RLFA when there's no LFA (but still return the spaces for teaching)
 - [ ] Explain steps for each P/Q check with numbers

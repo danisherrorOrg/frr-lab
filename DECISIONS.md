@@ -24,7 +24,7 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 
 ### D5 – Use extended P-space for RLFA by default (2026-10-29)
 - **Why:** this is what most implementations do, and it finds more PQ nodes. Plain P-space stays available as a toggle for teaching.
-- **Status:** Accepted. Check RFC 7490 §5.2.1 wording in Phase 3.
+- **Status:** Accepted. RFC 7490 §5.2.1 checked in D17: extended P-space is "the preferred approach".
 
 ### D6 – Treat ECMP ties as "may use the link" (strict inequalities) (2026-10-29)
 - **Why:** safe choice: never claim protection that a tie could break.
@@ -47,7 +47,7 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 
 ### D11 – RLFA tie-break and extended-P exit; TI-LFA first-hop clean-up (2026-10-29)
 - **Why:** checking the worked examples with a script showed (a) a PQ node found only through a neighbor's P-space must be reached by sending out through that neighbor, (b) costs can tie, so plain-P-space nodes are preferred before router ID, (c) the greedy TI-LFA walk adds a label for the first-hop neighbor itself, which must be dropped.
-- **Status:** Accepted. Rules in `docs/02-algorithms.md` §3 and §4.2.
+- **Status:** Accepted, except (b): replaced by D17 (RFC 7490 §5.2.2 picks the lowest S->P cost, then router ID). Rules in `docs/02-algorithms.md` §3 and §4.2.
 
 ### D12 – Pin TypeScript to 6.0.x; lint and format tooling (2026-10-30)
 - **Why:** the Vite template installs TypeScript 7, but `typescript-eslint` (needed for ESLint on TS code) only supports TypeScript below 6.1. TypeScript 6.0 has every tsconfig option we use.
@@ -83,3 +83,14 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Not in the MVP:** the §3.6 rule 4 mode "prefer other primary next hops over non-primary alternates". The UI shows `ecmpProtected` instead.
 - **Open (later phase):** RFC 5305 §3.7 says a link with the maximum metric must not be used in normal SPF at all. Our SPF still uses it. Revisit with the coverage/UI work.
 - **Status:** Accepted.
+
+### D17 – RLFA rules checked against RFC 7490 §5.2–5.4 (2026-10-30)
+- **Checked:** P-space (§5.2.1.1), extended P-space (§5.2.1.2 and the §5.3 pseudocode), Q-space (§5.2.1.3, §5.3), choosing the PQ node (§5.2.2) and maximum-metric links (§5.4). This closes the check left open in D5.
+- **P-space matches:** "cost S->P strictly less than S->E->P", i.e. `dist(S,Y) < c(S,E) + dist(E,Y)`.
+- **Extended P-space:** the RFC gives two formulas. The prose (§5.2.1.2) says `dist(N,Y) < dist(N,S) + c(S,E) + dist(E,Y)`; the pseudocode (§5.3) uses RFC 5286 Inequality 1, `dist(N,Y) < dist(N,S) + dist(S,Y)`. We use Inequality 1 per neighbor, so the tunnel from N never comes back through S. Once P(S) is added (and the pseudocode's union over neighbors already contains P(S)), both give the **same set**: a node that passes the prose test but not Inequality 1 has `dist(N,Y) = dist(N,S) + dist(S,Y)`, so the prose test reduces to `dist(S,Y) < c(S,E) + dist(E,Y)`, which puts it in P(S).
+- **Q-space:** the RFC writes `dist(Y,E) < dist(Y,S) + dist(S,E)`; we write `c(S,E)`. They are equal whenever S–E is a primary next-hop link (if `dist(S,E) < c(S,E)`, no shortest path would use the link). `c(S,E)` is also exactly the "avoids link" check in `02-algorithms.md` §1.5. Distances to E come from a reverse SPF (§5.3 `Compute_and_Store_Reverse_SPF`).
+- **Changed – choosing the PQ node:** §5.2.2 RECOMMENDS the lowest cost S->P, then the lowest node id (SHOULD). This replaces D11's "lowest `dist(S,PQ) + dist(PQ,D)`, then plain-P first". The S->P cost is `dist(S,P)` for a plain-P node and `c(S,N) + dist(N,P)` for one reached only through neighbor N (the cheapest such N, then lowest id). The choice no longer depends on D: the RFC uses E's Q-space as a stand-in for every destination behind E (§5.2.1.3). Example 2 still picks B (cost 2 vs 3 for C via A).
+- **S and E are left out of every space.** S can never pass the tests. E is never in P(S) (a tie). If E is in some P(N), then N is loop-free for E, and so `dist(N,D) ≤ dist(N,E) + dist(E,D) < dist(N,S) + dist(S,D)`: N is an LFA for every D behind E and RLFA never runs. So leaving E out loses nothing.
+- **Max metric (§5.4):** a neighbor whose link to or from S has the maximum metric is not used as an extended-P-space exit, the same rule as LFA (D16). The overload bit isn't modelled.
+- **Not in the MVP:** the optional downstream constraint on PQ nodes (§5.3 `Apply_Downstream_Constraint`), and LAN/pseudonode cases.
+- **Status:** Accepted. D11's tie-break part is replaced by this entry; its "exit via neighbor" part still holds.
