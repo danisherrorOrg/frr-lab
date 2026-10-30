@@ -19,3 +19,28 @@ describe('test fixtures', () => {
     expect(fixture).toBe(example)
   })
 })
+
+interface ExpectedFile {
+  fixture: string
+  results: {
+    protections: {
+      tilfa: { segments: { label: number }[]; labelStack: number[]; extraLabels: number }
+    }[]
+  }[]
+}
+
+// Guards against typos in the hand-written expected files; the engine tests
+// in later phases compare real results against them.
+describe('expected results files', () => {
+  it.each(examples)('%s has an expected file that is consistent with itself', (file) => {
+    const name = file.replace(/\.yaml$/, '.expected.json')
+    const expected = JSON.parse(readFileSync(new URL(name, fixturesDir), 'utf8')) as ExpectedFile
+    expect(expected.fixture).toBe(file)
+    for (const result of expected.results) {
+      for (const { tilfa } of result.protections) {
+        expect(tilfa.labelStack).toEqual(tilfa.segments.map((s) => s.label))
+        expect(tilfa.extraLabels).toBe(tilfa.labelStack.length - 1)
+      }
+    }
+  })
+})

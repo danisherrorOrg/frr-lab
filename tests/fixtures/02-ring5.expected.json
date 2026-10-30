@@ -1,0 +1,48 @@
+{
+  "$comment": "Expected engine results for Example 2 (docs/02-algorithms.md §6, docs/05-testing.md §2). Only the fields listed here are checked. null means 'none'. exitVia: PQ nodes found only through a neighbor's P-space, and the neighbor to send through (D11).",
+  "fixture": "02-ring5.yaml",
+  "source": "S",
+  "results": [
+    {
+      "dest": "E",
+      "cost": 1,
+      "nextHops": ["E"],
+      "protections": [
+        {
+          "protectedLink": { "from": "S", "to": "E" },
+          "ecmpProtected": false,
+          "lfa": {
+            "candidates": [
+              {
+                "neighbor": "A",
+                "loopFree": false,
+                "downstream": false,
+                "nodeProtecting": false,
+                "cost": 3
+              }
+            ],
+            "best": null
+          },
+          "rlfa": {
+            "pSpace": ["A", "B"],
+            "extPSpace": ["A", "B", "C"],
+            "qSpace": ["B", "C"],
+            "pq": ["B", "C"],
+            "exitVia": { "C": "A" },
+            "best": "B",
+            "plainPSpaceOnly": { "pq": ["B"], "best": "B" }
+          },
+          "tilfa": {
+            "path": ["S", "A", "B", "C", "E"],
+            "segments": [
+              { "kind": "prefix", "node": "B", "label": 16004 },
+              { "kind": "prefix", "node": "E", "label": 16002 }
+            ],
+            "labelStack": [16004, 16002],
+            "extraLabels": 1
+          }
+        }
+      ]
+    }
+  ]
+}

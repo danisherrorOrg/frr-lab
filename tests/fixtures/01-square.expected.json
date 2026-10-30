@@ -1,0 +1,37 @@
+{
+  "$comment": "Expected engine results for Example 1 (docs/02-algorithms.md §6, docs/05-testing.md §2). Only the fields listed here are checked. null means 'none'.",
+  "fixture": "01-square.yaml",
+  "source": "S",
+  "results": [
+    {
+      "dest": "D",
+      "cost": 20,
+      "nextHops": ["E"],
+      "protections": [
+        {
+          "protectedLink": { "from": "S", "to": "E" },
+          "ecmpProtected": false,
+          "lfa": {
+            "candidates": [
+              {
+                "neighbor": "N",
+                "loopFree": true,
+                "downstream": true,
+                "nodeProtecting": true,
+                "cost": 25
+              }
+            ],
+            "best": "N"
+          },
+          "rlfa": { "best": null },
+          "tilfa": {
+            "path": ["S", "N", "D"],
+            "segments": [{ "kind": "prefix", "node": "D", "label": 16004 }],
+            "labelStack": [16004],
+            "extraLabels": 0
+          }
+        }
+      ]
+    }
+  ]
+}
