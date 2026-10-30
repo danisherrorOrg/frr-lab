@@ -7,3 +7,5 @@ coverage/
 .env.*
 .vscode/
 .idea/
+dist-ssr/
+*.local
