@@ -13,7 +13,7 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 - [x] `types.ts` (from `03-architecture.md` §4)
 - [x] `io/yaml.ts`: load + validate (all rules in §5)
 - [x] `spf.ts`: forward Dijkstra with all predecessors (ECMP) and first-hop sets
-- [ ] Reverse SPF
+- [x] Reverse SPF
 - [ ] All-pairs distance table + "all shortest paths avoid link" helper (`02-algorithms.md` §1.5)
 - [ ] Tests: small graphs, ECMP, asymmetric metrics, disconnected graph
 

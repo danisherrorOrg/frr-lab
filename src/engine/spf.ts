@@ -16,37 +16,7 @@ const byId = (x: NodeId, y: NodeId) => (x < y ? -1 : x > y ? 1 : 0)
 
 /** Forward SPF (Dijkstra) from `root`: docs/02-algorithms.md §1.1. */
 export function spf(graph: Graph, root: NodeId): SpfResult {
-  if (!graph.out.has(root)) throw new Error(`SPF from unknown router "${root}".`)
-
-  const dist = new Map<NodeId, number>([[root, 0]])
-  const preds = new Map<NodeId, NodeId[]>([[root, []]])
-  const settled: NodeId[] = []
-  const done = new Set<NodeId>()
-  const heap = new MinHeap()
-  heap.push(0, root)
-
-  for (let item = heap.pop(); item !== undefined; item = heap.pop()) {
-    const [d, u] = item
-    // Lazy deletion: skip stale heap entries.
-    if (done.has(u) || d !== dist.get(u)) continue
-    done.add(u)
-    settled.push(u)
-
-    for (const edge of graph.out.get(u) ?? []) {
-      const v = edge.to
-      const candidate = d + edge.metric
-      const current = dist.get(v)
-      if (current === undefined || candidate < current) {
-        dist.set(v, candidate)
-        preds.set(v, [u])
-        heap.push(candidate, v)
-      } else if (candidate === current) {
-        // Equal cost: keep every predecessor so ECMP is visible.
-        preds.get(v)?.push(u)
-      }
-    }
-  }
-
+  const { dist, preds, settled } = dijkstra(graph, root, 'forward')
   for (const list of preds.values()) list.sort(byId)
 
   // Metrics are positive, so every predecessor is settled before the node itself:
@@ -63,6 +33,60 @@ export function spf(graph: Graph, root: NodeId): SpfResult {
   }
 
   return { root, dist, preds, firstHops }
+}
+
+/** Distances to one root. Routers that can't reach it have no entry. */
+export interface ReverseSpfResult {
+  root: NodeId
+  /** dist(Y, root). */
+  dist: Map<NodeId, number>
+}
+
+/**
+ * Reverse SPF: Dijkstra over incoming edges, giving dist(Y, root) for every Y
+ * in one run. Q-space needs this when metrics differ per direction (§1.2, RFC 7490 §5.3).
+ */
+export function reverseSpf(graph: Graph, root: NodeId): ReverseSpfResult {
+  return { root, dist: dijkstra(graph, root, 'reverse').dist }
+}
+
+/**
+ * Shared Dijkstra. Forward follows edges leaving each router; reverse follows
+ * edges arriving, so "predecessors" in reverse are next hops towards the root.
+ */
+function dijkstra(graph: Graph, root: NodeId, direction: 'forward' | 'reverse') {
+  const edges = direction === 'forward' ? graph.out : graph.in
+  if (!edges.has(root)) throw new Error(`SPF from unknown router "${root}".`)
+
+  const dist = new Map<NodeId, number>([[root, 0]])
+  const preds = new Map<NodeId, NodeId[]>([[root, []]])
+  const settled: NodeId[] = []
+  const done = new Set<NodeId>()
+  const heap = new MinHeap()
+  heap.push(0, root)
+
+  for (let item = heap.pop(); item !== undefined; item = heap.pop()) {
+    const [d, u] = item
+    // Lazy deletion: skip stale heap entries.
+    if (done.has(u) || d !== dist.get(u)) continue
+    done.add(u)
+    settled.push(u)
+
+    for (const edge of edges.get(u) ?? []) {
+      const v = direction === 'forward' ? edge.to : edge.from
+      const candidate = d + edge.metric
+      const current = dist.get(v)
+      if (current === undefined || candidate < current) {
+        dist.set(v, candidate)
+        preds.set(v, [u])
+        heap.push(candidate, v)
+      } else if (candidate === current) {
+        // Equal cost: keep every predecessor so ECMP is visible.
+        preds.get(v)?.push(u)
+      }
+    }
+  }
+  return { dist, preds, settled }
 }
 
 /** Binary min-heap of [distance, node], ties broken by node id so the settle order is fixed. */

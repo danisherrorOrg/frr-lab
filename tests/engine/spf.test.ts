@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildGraph } from '../../src/engine/graph'
-import { spf, type SpfResult } from '../../src/engine/spf'
+import { reverseSpf, spf, type SpfResult } from '../../src/engine/spf'
 import type { Topology } from '../../src/engine/types'
 import { loadFixture } from '../helpers'
 
@@ -200,5 +200,66 @@ describe('spf: worked examples', () => {
     const fromB = spf(g, 'B')
     expect(fromB.dist.get('C')).toBe(4)
     expect(fromB.firstHops.get('C')).toEqual(['A'])
+  })
+})
+
+// Reverse SPF gives dist(Y, root) for every Y: docs/02-algorithms.md §1.2.
+describe('reverseSpf', () => {
+  const asym = topo([
+    ['S', 'E', 10, 1],
+    ['S', 'A', 3, 4],
+    ['A', 'E', 3, 2],
+  ])
+
+  it('uses the metric of the direction towards the root', () => {
+    // Towards E: S→E direct is 10, S→A→E is 3+3=6. A→E is 3.
+    expect(Object.fromEntries(reverseSpf(buildGraph(asym), 'E').dist)).toEqual({ E: 0, S: 6, A: 3 })
+    // Towards S: E→S is 1, A→S is min(4 direct, A→E→S = 3+1) = 4.
+    expect(Object.fromEntries(reverseSpf(buildGraph(asym), 'S').dist)).toEqual({ S: 0, E: 1, A: 4 })
+  })
+
+  it('differs from forward SPF when metrics are asymmetric', () => {
+    const g = buildGraph(asym)
+    expect(spf(g, 'E').dist.get('S')).toBe(1)
+    expect(reverseSpf(g, 'E').dist.get('S')).toBe(6)
+  })
+
+  it('matches a forward SPF from every router (random-ish asymmetric graph)', () => {
+    const g = buildGraph(
+      topo([
+        ['A', 'B', 1, 9],
+        ['B', 'C', 4, 2],
+        ['C', 'D', 7, 1],
+        ['D', 'A', 2, 8],
+        ['A', 'C', 5, 3],
+        ['B', 'E', 6, 6],
+      ]),
+    )
+    for (const root of g.nodes) {
+      const rev = reverseSpf(g, root)
+      for (const y of g.nodes) {
+        expect(rev.dist.get(y), `dist(${y},${root})`).toBe(spf(g, y).dist.get(root))
+      }
+    }
+  })
+
+  it('Example 2: dist(Y,E) and dist(Y,S) columns', () => {
+    const g = buildGraph(loadFixture('02-ring5.yaml'))
+    expect(Object.fromEntries(reverseSpf(g, 'E').dist)).toEqual({ E: 0, S: 1, A: 2, B: 2, C: 1 })
+    expect(Object.fromEntries(reverseSpf(g, 'S').dist)).toEqual({ S: 0, E: 1, A: 1, B: 2, C: 2 })
+  })
+
+  it('leaves out routers that cannot reach the root', () => {
+    const g = buildGraph(
+      topo([
+        ['S', 'E', 1],
+        ['X', 'Y', 1],
+      ]),
+    )
+    expect(Object.fromEntries(reverseSpf(g, 'S').dist)).toEqual({ S: 0, E: 1 })
+  })
+
+  it('rejects an unknown root', () => {
+    expect(() => reverseSpf(buildGraph(topo([['S', 'E', 1]])), 'X')).toThrow(/unknown router "X"/)
   })
 })
