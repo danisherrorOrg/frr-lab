@@ -48,3 +48,9 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 ### D11 – RLFA tie-break and extended-P exit; TI-LFA first-hop clean-up (2026-10-29)
 - **Why:** checking the worked examples with a script showed (a) a PQ node found only through a neighbor's P-space must be reached by sending out through that neighbor, (b) costs can tie, so plain-P-space nodes are preferred before router ID, (c) the greedy TI-LFA walk adds a label for the first-hop neighbor itself, which must be dropped.
 - **Status:** Accepted. Rules in `docs/02-algorithms.md` §3 and §4.2.
+
+### D12 – Pin TypeScript to 6.0.x; lint and format tooling (2026-10-30)
+- **Why:** the Vite template installs TypeScript 7, but `typescript-eslint` (needed for ESLint on TS code) only supports TypeScript below 6.1. TypeScript 6.0 has every tsconfig option we use.
+- **Tooling added:** `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `globals`, `prettier`, `eslint-config-prettier`. All are dev-only and are the standard pieces of the ESLint + Prettier setup in `docs/03-architecture.md` §2.
+- **Other options considered:** keep TypeScript 7 and use oxlint (the template default). Rejected for now: the docs pick ESLint, and the engine-purity rule (`CLAUDE.md` rule 1) is easy to write as an ESLint `no-restricted-*` rule.
+- **Status:** Accepted. Move to TypeScript 7 once `typescript-eslint` supports it.

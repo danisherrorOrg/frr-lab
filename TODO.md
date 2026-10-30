@@ -21,7 +21,7 @@ clear "done when".
 - [x] Vite + React 18 + TypeScript project in the repo root (`npm create vite@latest`)
 - [x] `tsconfig.json`: `strict: true`, `noUncheckedIndexedAccess: true`
 - [x] Install and set up Vitest + fast-check
-- [ ] Install and set up ESLint + Prettier
+- [x] Install and set up ESLint + Prettier
 - [ ] Add an ESLint rule that blocks `react`, DOM globals and `Math.random` inside `src/engine/` (keeps the engine pure, `CLAUDE.md` rule 1)
 - [ ] Install and set up Tailwind CSS (with `dark:` class mode)
 - [ ] Add npm scripts: `dev`, `test`, `lint`, `typecheck`, `build`
