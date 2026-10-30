@@ -1,0 +1,14 @@
+# Example 1 (docs/02-algorithms.md §6): LFA works.
+# Source S, destination D, primary next hop E. Expected: N is a node-protecting, downstream LFA.
+name: Square - LFA works
+srgb_base: 16000
+nodes:
+  - { id: S, sid: 1 }
+  - { id: E, sid: 2 }
+  - { id: N, sid: 3 }
+  - { id: D, sid: 4 }
+links:
+  - { a: S, b: E, metric: 10 }
+  - { a: E, b: D, metric: 10 }
+  - { a: S, b: N, metric: 15 }
+  - { a: N, b: D, metric: 10 }
