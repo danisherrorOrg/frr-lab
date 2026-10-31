@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeCoverage, computeForSource } from '../../src/engine/index'
+import { simulateFailure } from '../../src/engine/simulate'
 import { createEngineClient, createInlineWorker, type WorkerLike } from '../../src/worker/client'
 import { handleRequest, type EngineRequest, type EngineResponse } from '../../src/worker/protocol'
 import { loadFixture } from '../helpers'
@@ -62,6 +63,15 @@ describe('createEngineClient', () => {
     expect(results.map((r) => r.dest)).toEqual(['A', 'B', 'C', 'E'])
     expect(report.total.pairs).toBe(8)
     expect(progress).toEqual([1, 2])
+  })
+
+  it('resolves a failure simulation', async () => {
+    const client = createEngineClient(fakeWorker())
+    const sim = await client.simulateFailure(ring(), 'S', 'S-E', 'tilfa', { extended: true })
+    expect(sim).toEqual(simulateFailure(ring(), 'S', 'S-E', 'tilfa', { extended: true }))
+    await expect(client.simulateFailure(ring(), 'S', 'X-Y', 'lfa')).rejects.toThrow(
+      'Unknown link "X-Y".',
+    )
   })
 
   it('rejects with the engine’s message', async () => {

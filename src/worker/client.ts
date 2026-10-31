@@ -1,4 +1,5 @@
 import type { ComputeOptions, CoverageReport } from '../engine/index'
+import type { FailureSimulation, RepairMode } from '../engine/simulate'
 import type { DestinationResult, NodeId, Topology } from '../engine/types'
 import { handleRequest, type EngineRequest, type EngineResponse } from './protocol'
 
@@ -20,6 +21,13 @@ export interface EngineClient {
     options?: { extended?: boolean; sources?: NodeId[] },
     onProgress?: (done: number, total: number, source: NodeId) => void,
   ): Promise<CoverageReport>
+  simulateFailure(
+    topology: Topology,
+    source: NodeId,
+    link: string,
+    mode: RepairMode,
+    options?: { extended?: boolean },
+  ): Promise<FailureSimulation>
   /** Stops the worker; pending calls reject. */
   terminate(): void
 }
@@ -84,6 +92,7 @@ export function createEngineClient(worker: WorkerLike = createDefaultWorker()): 
     pending.delete(data.id)
     if (data.kind === 'error') p.reject(new Error(data.message))
     else if (data.kind === 'source') p.resolve(data.results as never)
+    else if (data.kind === 'simulate') p.resolve(data.simulation as never)
     else p.resolve(data.report as never)
   })
 
@@ -99,6 +108,8 @@ export function createEngineClient(worker: WorkerLike = createDefaultWorker()): 
       send({ kind: 'source', topology, source, ...(options && { options }) }),
     computeCoverage: (topology, options, onProgress) =>
       send({ kind: 'coverage', topology, ...(options && { options }) }, onProgress),
+    simulateFailure: (topology, source, link, mode, options) =>
+      send({ kind: 'simulate', topology, source, link, mode, ...(options && { options }) }),
     terminate: () => {
       worker.terminate()
       for (const p of pending.values()) p.reject(new Error('The engine worker was stopped.'))

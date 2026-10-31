@@ -4,6 +4,7 @@ import {
   type ComputeOptions,
   type CoverageReport,
 } from '../engine/index'
+import { simulateFailure, type FailureSimulation, type RepairMode } from '../engine/simulate'
 import type { DestinationResult, NodeId, Topology } from '../engine/types'
 
 // Messages between the page and engine.worker.ts. Plain data only, so they
@@ -23,11 +24,21 @@ export type EngineRequest =
       topology: Topology
       options?: { extended?: boolean; sources?: NodeId[] }
     }
+  | {
+      id: number
+      kind: 'simulate'
+      topology: Topology
+      source: NodeId
+      link: string
+      mode: RepairMode
+      options?: { extended?: boolean }
+    }
 
 export type EngineResponse =
   | { id: number; kind: 'progress'; done: number; total: number; source: NodeId }
   | { id: number; kind: 'source'; results: DestinationResult[] }
   | { id: number; kind: 'coverage'; report: CoverageReport }
+  | { id: number; kind: 'simulate'; simulation: FailureSimulation }
   | { id: number; kind: 'error'; message: string }
 
 /**
@@ -41,6 +52,12 @@ export function handleRequest(req: EngineRequest, post: (res: EngineResponse) =>
         id: req.id,
         kind: 'source',
         results: computeForSource(req.topology, req.source, req.options),
+      })
+    } else if (req.kind === 'simulate') {
+      post({
+        id: req.id,
+        kind: 'simulate',
+        simulation: simulateFailure(req.topology, req.source, req.link, req.mode, req.options),
       })
     } else {
       const report = computeCoverage(req.topology, {

@@ -1,0 +1,204 @@
+// Failure simulation (F5, docs/02-algorithms.md §8): fail one link and follow the
+// traffic from S to every destination, first on the FRR repair path, then on the
+// path the network uses once it has reconverged.
+import { computeForSource } from './index'
+import { protectionPaths, shortestPath } from './paths'
+import { allPairs } from './spf'
+import type { DestinationResult, NodeId, Topology } from './types'
+
+/**
+ * Which FRR methods the routers run, as on a real router:
+ * - `lfa`: LFA only (ECMP counts, RFC 5286 §3.4)
+ * - `rlfa`: LFA, else Remote LFA (RFC 7490)
+ * - `tilfa`: TI-LFA for everything (RFC 9855)
+ */
+export type RepairMode = 'lfa' | 'rlfa' | 'tilfa'
+
+/** The method that actually carried the traffic. */
+export type RepairMethod = 'ecmp' | 'lfa' | 'rlfa' | 'tilfa'
+
+/**
+ * How the PLR's repair path compares with the PLR's own post-convergence path:
+ * the same routers, a different path of the same cost, or a more costly path.
+ */
+export type RepairMatch = 'same' | 'same-cost' | 'longer'
+
+/** Traffic from S to one destination. */
+export interface Flow {
+  dest: NodeId
+  /** S's normal path (lowest-id ECMP tie-break, like the drawings). */
+  before: NodeId[]
+  beforeCost: number
+  /** True when `before` crosses the failed link (in either direction). */
+  affected: boolean
+  /** Point of local repair: the router on `before` just before the failed link. */
+  plr?: NodeId
+  /** The router on the far side of the failed link. */
+  next?: NodeId
+  /** Undefined when affected but nothing repairs it: traffic is dropped until convergence. */
+  method?: RepairMethod
+  /** S → … → PLR on the normal path, then the PLR's repair path to D. */
+  repair?: NodeId[]
+  repairCost?: number
+  /** S's path after convergence. Undefined when D can't be reached any more. */
+  after?: NodeId[]
+  afterCost?: number
+  /** Cost of the repair from the PLR to D (the part after the normal path). */
+  plrRepairCost?: number
+  /** The PLR's own post-convergence path to D, and its cost. */
+  plrAfter?: NodeId[]
+  plrAfterCost?: number
+  match?: RepairMatch
+}
+
+export interface FailureSimulation {
+  link: { id: string; a: NodeId; b: NodeId }
+  mode: RepairMode
+  /** One per destination S can reach before the failure, sorted by router id. */
+  flows: Flow[]
+}
+
+export interface SimulateOptions {
+  /** Use extended P-space for RLFA (default true, D5). */
+  extended?: boolean
+}
+
+// Keyed by topology object (D15), so allPairs() of the reduced topology stays cached too.
+const reducedCache = new WeakMap<Topology, Map<string, Topology>>()
+
+/** The topology with one link removed (both directions). */
+function withoutLink(topology: Topology, linkId: string): Topology {
+  const byLink = reducedCache.get(topology) ?? new Map<string, Topology>()
+  reducedCache.set(topology, byLink)
+  let t = byLink.get(linkId)
+  if (t === undefined) {
+    t = { ...topology, links: topology.links.filter((l) => l.id !== linkId) }
+    byLink.set(linkId, t)
+  }
+  return t
+}
+
+/** Sum of directed metrics along a path. */
+function pathCost(topology: Topology, path: NodeId[]): number {
+  let cost = 0
+  for (let i = 0; i + 1 < path.length; i++) {
+    const [x, y] = [path[i]!, path[i + 1]!]
+    const l = topology.links.find((k) => (k.a === x && k.b === y) || (k.a === y && k.b === x))
+    if (l === undefined) throw new Error(`No link ${x}–${y} on the path.`)
+    cost += l.a === x ? l.metricAB : l.metricBA
+  }
+  return cost
+}
+
+const samePath = (x: NodeId[], y: NodeId[]) =>
+  x.length === y.length && x.every((n, i) => n === y[i])
+
+/**
+ * Fail link `linkId` and follow traffic from `source` to every destination.
+ * Each router forwards on its normal (pre-failure) table; the PLR (the router
+ * before the failed link) switches to its pre-computed repair, as in FRR.
+ */
+export function simulateFailure(
+  topology: Topology,
+  source: NodeId,
+  linkId: string,
+  mode: RepairMode,
+  options: SimulateOptions = {},
+): FailureSimulation {
+  const link = topology.links.find((l) => l.id === linkId)
+  if (link === undefined) throw new Error(`Unknown link "${linkId}".`)
+  const table = allPairs(topology)
+  const fromS = table.from.get(source)
+  if (fromS === undefined) throw new Error(`Unknown source router "${source}".`)
+
+  const reduced = withoutLink(topology, linkId)
+  const after = allPairs(reduced)
+  const crosses = (x: NodeId, y: NodeId) =>
+    (x === link.a && y === link.b) || (x === link.b && y === link.a)
+
+  // Each PLR's results, computed once: every affected flow at that PLR shares them.
+  const atPlr = new Map<NodeId, DestinationResult[]>()
+  const resultsAt = (plr: NodeId) => {
+    let r = atPlr.get(plr)
+    if (r === undefined) {
+      r = computeForSource(topology, plr, {
+        explain: false,
+        ...(options.extended !== undefined && { extended: options.extended }),
+      })
+      atPlr.set(plr, r)
+    }
+    return r
+  }
+
+  const flows: Flow[] = []
+  for (const d of table.graph.nodes) {
+    if (d === source || !fromS.dist.has(d)) continue
+    const before = shortestPath(table, source, d)!
+    const flow: Flow = { dest: d, before, beforeCost: fromS.dist.get(d)!, affected: false }
+
+    const i = before.findIndex((x, k) => k + 1 < before.length && crosses(x, before[k + 1]!))
+    if (i >= 0) {
+      const plr = before[i]!
+      const next = before[i + 1]!
+      flow.affected = true
+      flow.plr = plr
+      flow.next = next
+
+      const repair = repairAt(topology, resultsAt(plr), plr, next, d, mode)
+      if (repair) {
+        flow.method = repair.method
+        flow.repair = [...before.slice(0, i), ...repair.path]
+        flow.repairCost = pathCost(topology, flow.repair)
+        flow.plrRepairCost = pathCost(topology, repair.path)
+      }
+      const plrAfter = shortestPath(after, plr, d)
+      if (plrAfter) {
+        flow.plrAfter = plrAfter
+        flow.plrAfterCost = pathCost(topology, plrAfter)
+        if (repair) {
+          flow.match = samePath(repair.path, plrAfter)
+            ? 'same'
+            : flow.plrRepairCost === flow.plrAfterCost
+              ? 'same-cost'
+              : 'longer'
+        }
+      }
+    }
+
+    const sAfter = flow.affected ? shortestPath(after, source, d) : before
+    if (sAfter) {
+      flow.after = sAfter
+      flow.afterCost = pathCost(topology, sAfter)
+    }
+    flows.push(flow)
+  }
+
+  return { link: { id: link.id, a: link.a, b: link.b }, mode, flows }
+}
+
+/** The PLR's repair path to D for its next hop `next`, by the routers' FRR mode. */
+function repairAt(
+  topology: Topology,
+  results: DestinationResult[],
+  plr: NodeId,
+  next: NodeId,
+  d: NodeId,
+  mode: RepairMode,
+): { method: RepairMethod; path: NodeId[] } | undefined {
+  const r = results.find((x) => x.dest === d)
+  const p = r?.protections.find((x) => x.protectedLink.to === next)
+  if (r === undefined || p === undefined) return undefined
+  const paths = protectionPaths(topology, plr, d, p)
+
+  if (mode === 'tilfa') return paths.tilfa && { method: 'tilfa', path: paths.tilfa }
+
+  // Another primary next hop is always loop-free and avoids the link (D16).
+  const other = r.nextHops.find((n) => n !== next)
+  if (p.ecmpProtected && other !== undefined) {
+    const rest = shortestPath(allPairs(topology), other, d)
+    if (rest) return { method: 'ecmp', path: [plr, ...rest] }
+  }
+  if (paths.lfa) return { method: 'lfa', path: paths.lfa }
+  if (mode === 'rlfa' && paths.rlfa) return { method: 'rlfa', path: paths.rlfa }
+  return undefined
+}
