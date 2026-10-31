@@ -173,6 +173,8 @@ clear "done when".
 
 ## Phase 8 – Launch (1–2 days)
 
+> **Do this last:** launch only after Phase 9 and the other planned work are done.
+
 - [ ] Pick Vercel or GitHub Pages; log it in `DECISIONS.md`
 - [ ] Deploy the static build
 - [ ] Record a demo GIF; take screenshots

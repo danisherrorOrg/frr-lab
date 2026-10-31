@@ -62,6 +62,9 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 🎯 **Milestone B: MVP (v0.1).**
 
 ## Phase 8 – Launch (1–2 days)
+
+> **Do this last:** launch only after Phase 9 and the other planned work are done.
+
 - [ ] Deploy (Vercel / GitHub Pages)
 - [ ] README with a demo GIF and screenshots
 - [ ] Blog / LinkedIn post: "TI-LFA explained with pictures" (use Examples 2 and 3)
