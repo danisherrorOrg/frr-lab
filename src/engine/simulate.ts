@@ -1,6 +1,6 @@
-// Failure simulation (F5, docs/02-algorithms.md §8): fail one link and follow the
-// traffic from S to every destination, first on the FRR repair path, then on the
-// path the network uses once it has reconverged.
+// Failure simulation (F5, docs/02-algorithms.md §8): fail one or more links and
+// follow the traffic from S to every destination, first on the FRR repair path,
+// then on the path the network uses once it has reconverged.
 import { computeForSource } from './index'
 import { protectionPaths, shortestPath } from './paths'
 import { allPairs } from './spf'
@@ -23,36 +23,59 @@ export type RepairMethod = 'ecmp' | 'lfa' | 'rlfa' | 'tilfa'
  */
 export type RepairMatch = 'same' | 'same-cost' | 'longer'
 
+/**
+ * What happens to an affected flow while FRR is in charge:
+ * - `repaired`: the backup avoids every failed link
+ * - `broken`: the backup was built for one failure and runs into another failed link
+ * - `dropped`: the PLR has no backup at all
+ * - `unreachable`: the failed links cut D off from S; nothing could reach it
+ */
+export type FlowStatus = 'repaired' | 'broken' | 'dropped' | 'unreachable'
+
+export interface FailedLink {
+  id: string
+  a: NodeId
+  b: NodeId
+}
+
 /** Traffic from S to one destination. */
 export interface Flow {
   dest: NodeId
   /** S's normal path (lowest-id ECMP tie-break, like the drawings). */
   before: NodeId[]
   beforeCost: number
-  /** True when `before` crosses the failed link (in either direction). */
+  /** True when `before` crosses a failed link (in either direction). */
   affected: boolean
-  /** Point of local repair: the router on `before` just before the failed link. */
+  /** The first failed link on `before`: the one the PLR repairs. */
+  hitLink?: string
+  /** Point of local repair: the router on `before` just before `hitLink`. */
   plr?: NodeId
-  /** The router on the far side of the failed link. */
+  /** The router on the far side of `hitLink`. */
   next?: NodeId
+  /** Set for affected flows; see FlowStatus. */
+  status?: FlowStatus
   /** Undefined when affected but nothing repairs it: traffic is dropped until convergence. */
   method?: RepairMethod
   /** S → … → PLR on the normal path, then the PLR's repair path to D. */
   repair?: NodeId[]
   repairCost?: number
+  /** The first other failed link on the PLR's repair path, in the direction traffic goes. */
+  brokenAt?: { link: string; from: NodeId; to: NodeId }
   /** S's path after convergence. Undefined when D can't be reached any more. */
   after?: NodeId[]
   afterCost?: number
   /** Cost of the repair from the PLR to D (the part after the normal path). */
   plrRepairCost?: number
-  /** The PLR's own post-convergence path to D, and its cost. */
+  /** The PLR's own path to D once the network has reconverged, and its cost. */
   plrAfter?: NodeId[]
   plrAfterCost?: number
+  /** Repair vs the PLR's final path. Only for repairs that survive. */
   match?: RepairMatch
 }
 
 export interface FailureSimulation {
-  link: { id: string; a: NodeId; b: NodeId }
+  /** The failed links, in the order given, without repeats. */
+  links: FailedLink[]
   mode: RepairMode
   /** One per destination S can reach before the failure, sorted by router id. */
   flows: Flow[]
@@ -66,14 +89,15 @@ export interface SimulateOptions {
 // Keyed by topology object (D15), so allPairs() of the reduced topology stays cached too.
 const reducedCache = new WeakMap<Topology, Map<string, Topology>>()
 
-/** The topology with one link removed (both directions). */
-function withoutLink(topology: Topology, linkId: string): Topology {
-  const byLink = reducedCache.get(topology) ?? new Map<string, Topology>()
-  reducedCache.set(topology, byLink)
-  let t = byLink.get(linkId)
+/** The topology with these links removed (both directions). */
+function withoutLinks(topology: Topology, ids: Set<string>): Topology {
+  const byLinks = reducedCache.get(topology) ?? new Map<string, Topology>()
+  reducedCache.set(topology, byLinks)
+  const key = [...ids].sort().join('\n')
+  let t = byLinks.get(key)
   if (t === undefined) {
-    t = { ...topology, links: topology.links.filter((l) => l.id !== linkId) }
-    byLink.set(linkId, t)
+    t = { ...topology, links: topology.links.filter((l) => !ids.has(l.id)) }
+    byLinks.set(key, t)
   }
   return t
 }
@@ -94,27 +118,37 @@ const samePath = (x: NodeId[], y: NodeId[]) =>
   x.length === y.length && x.every((n, i) => n === y[i])
 
 /**
- * Fail link `linkId` and follow traffic from `source` to every destination.
+ * Fail links `linkIds` and follow traffic from `source` to every destination.
  * Each router forwards on its normal (pre-failure) table; the PLR (the router
- * before the failed link) switches to its pre-computed repair, as in FRR.
+ * before the first failed link on the path) switches to its pre-computed repair,
+ * as in FRR. Repairs are built for one failure, so with several links down a
+ * repair can run into another failed link: it is then `broken` (D23).
  */
 export function simulateFailure(
   topology: Topology,
   source: NodeId,
-  linkId: string,
+  linkIds: readonly string[],
   mode: RepairMode,
   options: SimulateOptions = {},
 ): FailureSimulation {
-  const link = topology.links.find((l) => l.id === linkId)
-  if (link === undefined) throw new Error(`Unknown link "${linkId}".`)
+  const ids = [...new Set(linkIds)]
+  if (ids.length === 0) throw new Error('No failed link given.')
+  const links: FailedLink[] = ids.map((id) => {
+    const l = topology.links.find((k) => k.id === id)
+    if (l === undefined) throw new Error(`Unknown link "${id}".`)
+    return { id: l.id, a: l.a, b: l.b }
+  })
   const table = allPairs(topology)
   const fromS = table.from.get(source)
   if (fromS === undefined) throw new Error(`Unknown source router "${source}".`)
 
-  const reduced = withoutLink(topology, linkId)
-  const after = allPairs(reduced)
-  const crosses = (x: NodeId, y: NodeId) =>
-    (x === link.a && y === link.b) || (x === link.b && y === link.a)
+  const after = allPairs(withoutLinks(topology, new Set(ids)))
+  /** The failed link between x and y, if any. */
+  const downBetween = (x: NodeId, y: NodeId) =>
+    links.find((l) => (x === l.a && y === l.b) || (x === l.b && y === l.a))
+  /** Index of the first hop of `path` on a failed link, or -1. */
+  const firstDown = (path: NodeId[]) =>
+    path.findIndex((x, k) => k + 1 < path.length && downBetween(x, path[k + 1]!) !== undefined)
 
   // Each PLR's results, computed once: every affected flow at that PLR shares them.
   const atPlr = new Map<NodeId, DestinationResult[]>()
@@ -136,11 +170,12 @@ export function simulateFailure(
     const before = shortestPath(table, source, d)!
     const flow: Flow = { dest: d, before, beforeCost: fromS.dist.get(d)!, affected: false }
 
-    const i = before.findIndex((x, k) => k + 1 < before.length && crosses(x, before[k + 1]!))
+    const i = firstDown(before)
     if (i >= 0) {
       const plr = before[i]!
       const next = before[i + 1]!
       flow.affected = true
+      flow.hitLink = downBetween(plr, next)!.id
       flow.plr = plr
       flow.next = next
 
@@ -150,12 +185,17 @@ export function simulateFailure(
         flow.repair = [...before.slice(0, i), ...repair.path]
         flow.repairCost = pathCost(topology, flow.repair)
         flow.plrRepairCost = pathCost(topology, repair.path)
+        const j = firstDown(repair.path)
+        if (j >= 0) {
+          const [from, to] = [repair.path[j]!, repair.path[j + 1]!]
+          flow.brokenAt = { link: downBetween(from, to)!.id, from, to }
+        }
       }
       const plrAfter = shortestPath(after, plr, d)
       if (plrAfter) {
         flow.plrAfter = plrAfter
         flow.plrAfterCost = pathCost(topology, plrAfter)
-        if (repair) {
+        if (repair && !flow.brokenAt) {
           flow.match = samePath(repair.path, plrAfter)
             ? 'same'
             : flow.plrRepairCost === flow.plrAfterCost
@@ -170,10 +210,19 @@ export function simulateFailure(
       flow.after = sAfter
       flow.afterCost = pathCost(topology, sAfter)
     }
+    if (flow.affected) {
+      flow.status = !flow.after
+        ? 'unreachable'
+        : !flow.repair
+          ? 'dropped'
+          : flow.brokenAt
+            ? 'broken'
+            : 'repaired'
+    }
     flows.push(flow)
   }
 
-  return { link: { id: link.id, a: link.a, b: link.b }, mode, flows }
+  return { links, mode, flows }
 }
 
 /** The PLR's repair path to D for its next hop `next`, by the routers' FRR mode. */

@@ -201,15 +201,15 @@ the current UI before the bigger features below.
 ### 9.2 Fail more than one link
 Today `failedLink` is a single id. FRR protects against one failure, so the tool must
 *show* what goes wrong when a second link fails, not hide it.
-- [ ] Store: `failedLinks: string[]` (keep share URL / old state readable)
-- [ ] Fail-link tool toggles each link on/off; a "Restore all" button
-- [ ] Engine (`simulate.ts`, tests first): with several links down, for each affected destination say
+- [x] Store: `failedLinks: string[]` (keep share URL / old state readable)
+- [x] Fail-link tool toggles each link on/off; a "Restore all" button
+- [x] Engine (`simulate.ts`, tests first): with several links down, for each affected destination say
       - repair still works, or
       - **repair broken**: the pre-computed backup path uses another failed link (show which one), or
       - destination unreachable (network partitioned)
-- [ ] "Converge" uses SPF with all failed links removed
-- [ ] Explain text with real numbers, e.g. "TI-LFA repair to D goes via B–C, which is also down"
-- [ ] `DECISIONS.md` entry: how a multi-failure result is shown and why
+- [x] "Converge" uses SPF with all failed links removed
+- [x] Explain text with real numbers, e.g. "TI-LFA repair to D goes via B–C, which is also down"
+- [x] `DECISIONS.md` entry: how a multi-failure result is shown and why (D23)
 
 **Done when:** failing two links on Example 2 shows which repairs survive and which break.
 

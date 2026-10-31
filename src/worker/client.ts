@@ -24,7 +24,7 @@ export interface EngineClient {
   simulateFailure(
     topology: Topology,
     source: NodeId,
-    link: string,
+    links: string[],
     mode: RepairMode,
     options?: { extended?: boolean },
   ): Promise<FailureSimulation>
@@ -108,8 +108,8 @@ export function createEngineClient(worker: WorkerLike = createDefaultWorker()): 
       send({ kind: 'source', topology, source, ...(options && { options }) }),
     computeCoverage: (topology, options, onProgress) =>
       send({ kind: 'coverage', topology, ...(options && { options }) }, onProgress),
-    simulateFailure: (topology, source, link, mode, options) =>
-      send({ kind: 'simulate', topology, source, link, mode, ...(options && { options }) }),
+    simulateFailure: (topology, source, links, mode, options) =>
+      send({ kind: 'simulate', topology, source, links, mode, ...(options && { options }) }),
     terminate: () => {
       worker.terminate()
       for (const p of pending.values()) p.reject(new Error('The engine worker was stopped.'))

@@ -8,7 +8,7 @@ const TOOLS: { tool: Tool; label: string; key: string; hint: string }[] = [
   { tool: 'select', label: 'Select', key: 'V', hint: 'Click to select, drag to move' },
   { tool: 'add-router', label: 'Add router', key: 'R', hint: 'Click empty space' },
   { tool: 'add-link', label: 'Add link', key: 'L', hint: 'Click two routers' },
-  { tool: 'fail-link', label: 'Fail link', key: 'F', hint: 'Click a link to fail or restore it' },
+  { tool: 'fail-link', label: 'Fail link', key: 'F', hint: 'Click links to fail or restore them' },
 ]
 
 const control =
@@ -26,8 +26,9 @@ function KeyboardTool({ tool }: { tool: Tool }) {
   const select = useStore((s) => s.select)
   const addRouter = useStore((s) => s.addRouter)
   const addLinkBetween = useStore((s) => s.addLinkBetween)
-  const failedLink = useStore((s) => s.failedLink)
-  const failLink = useStore((s) => s.failLink)
+  const failedLinks = useStore((s) => s.failedLinks)
+  const toggleFailedLink = useStore((s) => s.toggleFailedLink)
+  const restoreLinks = useStore((s) => s.restoreLinks)
   const ids = topology.nodes.map((n) => n.id).sort()
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -118,22 +119,37 @@ function KeyboardTool({ tool }: { tool: Tool }) {
       </form>
     )
 
+  // Picking a link toggles it, so the list stays on the prompt and can be used again.
   return (
-    <label className="mt-2 block text-xs">
-      Failed link
-      <select
-        className={control}
-        value={failedLink ?? ''}
-        onChange={(e) => failLink(e.target.value === '' ? null : e.target.value)}
-      >
-        <option value="">None (all links up)</option>
-        {topology.links.map((l) => (
-          <option key={l.id} value={l.id}>
-            ✕ {linkName(l.id)}
+    <div className="mt-2 text-xs">
+      <label className="block">
+        Fail or restore a link
+        <select
+          className={control}
+          value=""
+          onChange={(e) => e.target.value !== '' && toggleFailedLink(e.target.value)}
+        >
+          <option value="">
+            {failedLinks.length === 0
+              ? 'Pick a link to fail'
+              : `${failedLinks.length} down; pick one to change`}
           </option>
-        ))}
-      </select>
-    </label>
+          {topology.links.map((l) => {
+            const down = failedLinks.includes(l.id)
+            return (
+              <option key={l.id} value={l.id}>
+                {down ? `✕ ${linkName(l.id)} (down, restore)` : `${linkName(l.id)} (up)`}
+              </option>
+            )
+          })}
+        </select>
+      </label>
+      {failedLinks.length > 0 && (
+        <button type="button" className={`${smallButton} mt-1`} onClick={restoreLinks}>
+          Restore all
+        </button>
+      )}
+    </div>
   )
 }
 

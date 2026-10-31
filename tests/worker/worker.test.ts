@@ -67,9 +67,9 @@ describe('createEngineClient', () => {
 
   it('resolves a failure simulation', async () => {
     const client = createEngineClient(fakeWorker())
-    const sim = await client.simulateFailure(ring(), 'S', 'S-E', 'tilfa', { extended: true })
-    expect(sim).toEqual(simulateFailure(ring(), 'S', 'S-E', 'tilfa', { extended: true }))
-    await expect(client.simulateFailure(ring(), 'S', 'X-Y', 'lfa')).rejects.toThrow(
+    const sim = await client.simulateFailure(ring(), 'S', ['S-E'], 'tilfa', { extended: true })
+    expect(sim).toEqual(simulateFailure(ring(), 'S', ['S-E'], 'tilfa', { extended: true }))
+    await expect(client.simulateFailure(ring(), 'S', ['X-Y'], 'lfa')).rejects.toThrow(
       'Unknown link "X-Y".',
     )
   })

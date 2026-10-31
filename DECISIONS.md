@@ -140,7 +140,7 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Status:** Accepted.
 
 ### D22 – Failure simulation, coverage panel, share link, theme, keyboard and phone layout (2026-10-31)
-- **One failed link at a time.** Clicking a second link moves the failure; clicking the failed link again restores it. FRR protects against one failure (D4), and two at once would need rules the RFCs don't give.
+- **One failed link at a time** (replaced by D23). Clicking a second link moves the failure; clicking the failed link again restores it. FRR protects against one failure (D4), and two at once would need rules the RFCs don't give.
 - **Any link can fail, not only links at S.** Traffic follows normal tables up to the router before the failed link (the PLR), which uses its own backup. This shows that FRR is local: a far-away failure is repaired by whoever is next to it. Rules in `docs/02-algorithms.md` §8.
 - **"Routers run" modes:** LFA only, LFA + Remote LFA, TI-LFA, like the settings on a real router. Default TI-LFA. An ECMP destination uses its other primary next hop first (RFC 5286 §3.4), so ECMP is shown as its own method.
 - **Repair vs final path is compared at the PLR,** not end to end from S: that is the claim RFC 9855 §3 makes for TI-LFA. S's own final path is shown in the Converge view.
@@ -157,3 +157,15 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Other options considered:** several failed links at once (no RFC rules for it); comparing repair and final paths end to end from S (would flag TI-LFA as "different" when the PLR isn't S); JSON instead of YAML in the share link (needs its own validation); the Clipboard API alone for sharing (fails without permission, so the link is also put in the address bar).
 - **Status:** Accepted.
 
+### D23 – Several failed links: which repairs survive and which break (2026-10-31)
+- **Why:** user feedback (Phase 9.2). FRR plans for one failure, so the tool should *show* what goes wrong with a second one instead of forbidding it. This replaces D22's "one failed link at a time".
+- **Model:** each router still forwards on its pre-failure table. A flow is repaired by the router before the *first* failed link on its normal path, using the backup it computed for that one link on the full topology (RFC 5286 §1, RFC 9855 §3: alternates are pre-computed per protected link). "Converge" runs SPF with every failed link removed.
+- **Broken:** if the backup's path from the PLR crosses another failed link, the repair is broken at the first one, shown in the direction traffic goes (e.g. "at C it runs into C–E"). We don't model a second repair at that router: whether it would re-repair, drop or loop depends on the method and the vendor, and the RFCs don't define it. Treating it as lost traffic is the safe, honest answer.
+- **Status per affected flow, first match wins:** `unreachable` (the failed links split S from D, so nothing could help), `dropped` (no backup), `broken`, `repaired`. A broken repair to an unreachable destination still shows where it broke.
+- **"Repair = final?"** is only shown for repairs that work. A surviving TI-LFA repair always equals the PLR's final path (property test).
+- **UI:** the fail-link tool and the sidebar list toggle each link; the panel has a restore button per link and "Restore all". A broken repair is drawn without moving dashes.
+- **Share link and stored state:** failed links were never in the share link or `localStorage`, so there is no old format to read. They stay out of the link: a shared link is a topology, not a scenario.
+- **Engine API:** `simulateFailure(topology, source, linkIds[], mode)`; repeats are ignored and an empty list is an error. The result lists `links` instead of one `link`.
+- **Other options considered:** chaining repairs at each failed link (no RFC rules, and it would hide the point that FRR covers one failure); choosing the PLR by the order the links were failed (the result would depend on click order).
+- **No new dependencies.**
+- **Status:** Accepted.

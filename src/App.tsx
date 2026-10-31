@@ -51,7 +51,7 @@ function useShortcuts() {
         s.setTool('select')
       } else if (TOOL_KEYS[key]) {
         s.setTool(TOOL_KEYS[key])
-      } else if (key === 'c' && s.failedLink !== null) {
+      } else if (key === 'c' && s.failedLinks.length > 0) {
         s.setConverged(!s.converged)
       }
     }
@@ -92,13 +92,14 @@ export function App() {
   const selectRow = useStore((s) => s.selectRow)
   const toggleRow = useStore((s) => s.toggleRow)
   const setBackup = useStore((s) => s.setBackup)
-  const failedLink = useStore((s) => s.failedLink)
+  const failedLinks = useStore((s) => s.failedLinks)
+  const anyFailed = failedLinks.length > 0
   const simMode = useStore((s) => s.simMode)
   const converged = useStore((s) => s.converged)
   const simDest = useStore((s) => s.simDest)
   const setSimDest = useStore((s) => s.setSimDest)
   const { results, loading, error } = useResults(topology, source, extended)
-  const sim = useSimulation(topology, source, failedLink, simMode, extended)
+  const sim = useSimulation(topology, source, failedLinks, simMode, extended)
 
   const selected = useMemo(() => {
     if (!results || !row || source === null) return null
@@ -110,8 +111,8 @@ export function App() {
   }, [results, row, source, topology, backup])
 
   const highlight = useMemo<Highlight>(() => {
-    // A failed link: draw the simulated traffic instead of the selected row (F5).
-    if (failedLink !== null) {
+    // Failed links: draw the simulated traffic instead of the selected row (F5).
+    if (anyFailed) {
       const flow = sim.simulation && drawnFlow(sim.simulation, simDest)
       if (!flow) return { source }
       if (converged) return { source, dest: flow.dest, ...(flow.after && { final: flow.after }) }
@@ -119,7 +120,8 @@ export function App() {
         source,
         dest: flow.dest,
         primary: flow.before,
-        ...(flow.repair && { backup: flow.repair, flowing: true }),
+        // A broken repair is still drawn, but nothing flows along it.
+        ...(flow.repair && { backup: flow.repair, flowing: flow.status === 'repaired' }),
       }
     }
     if (!selected) return { source }
@@ -133,7 +135,7 @@ export function App() {
       qSpace: rlfa.qSpace,
       ...(rlfa.needed && rlfa.best !== undefined && { pq: rlfa.best }),
     }
-  }, [selected, source, failedLink, sim.simulation, simDest, converged])
+  }, [selected, source, anyFailed, sim.simulation, simDest, converged])
 
   return (
     <div className="flex min-h-screen flex-col bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
@@ -149,7 +151,7 @@ export function App() {
         </div>
         <Sidebar className="order-2 md:col-start-1 md:row-span-2 md:row-start-1" />
         <main className="order-3 flex min-w-0 flex-col gap-4 p-3 md:col-start-2 md:row-start-2">
-          {failedLink !== null && source !== null && (
+          {anyFailed && source !== null && (
             <FailurePanel source={source} simulation={sim.simulation} error={sim.error} />
           )}
           <div className="grid gap-4 lg:grid-cols-2">
@@ -161,7 +163,7 @@ export function App() {
               row={row}
               onSelect={(r) => {
                 toggleRow(r)
-                if (failedLink !== null) setSimDest(r.dest)
+                if (anyFailed) setSimDest(r.dest)
               }}
             />
             <div>

@@ -72,7 +72,7 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 
 ## Phase 9 – User feedback, v0.2
 - [x] Close button / Escape for the detail panel
-- [ ] Fail several links; show which repairs survive or break
+- [x] Fail several links; show which repairs survive or break
 - [ ] Fail a router (down or rebooting): show which link-protecting repairs break because they go through it
 - [ ] Parallel links between two routers (replaces D4)
 - [ ] Canvas usability: obvious dragging, tooltips, right-click menu, click-to-select destination

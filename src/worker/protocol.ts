@@ -29,7 +29,7 @@ export type EngineRequest =
       kind: 'simulate'
       topology: Topology
       source: NodeId
-      link: string
+      links: string[]
       mode: RepairMode
       options?: { extended?: boolean }
     }
@@ -57,7 +57,7 @@ export function handleRequest(req: EngineRequest, post: (res: EngineResponse) =>
       post({
         id: req.id,
         kind: 'simulate',
-        simulation: simulateFailure(req.topology, req.source, req.link, req.mode, req.options),
+        simulation: simulateFailure(req.topology, req.source, req.links, req.mode, req.options),
       })
     } else {
       const report = computeCoverage(req.topology, {

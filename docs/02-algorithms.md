@@ -217,18 +217,24 @@ With SRGB 16000 and SID indices S=1, E=2, A=3, B=4, C=5, Adj-SID B→C = 24005, 
 ---
 
 ## 8. Failure simulation (F5)
-Code: `src/engine/simulate.ts`. One link fails at a time (FRR protects against a single failure, D4).
+Code: `src/engine/simulate.ts`. One or more links can fail. FRR backups are built for a single failure, so with several links down the simulation shows which backups still work and which break (D23).
 
 For every destination D that S reaches before the failure:
 1. **Normal path:** follow S's normal shortest path hop by hop. Ties use the lowest router id at each hop, the same rule as the drawings (§4.1), so one flow is shown per destination.
-2. **Affected?** Yes if that path crosses the failed link in either direction. The router just before the link is the **point of local repair (PLR)**, and the router after it is its next hop E. The PLR can be S or any router further along.
+2. **Affected?** Yes if that path crosses a failed link in either direction. The router just before the *first* failed link on the path is the **point of local repair (PLR)**, and the router after it is its next hop E. The PLR can be S or any router further along.
 3. **Repair:** the PLR switches to its pre-computed backup for (D, link PLR–E); every other router keeps its normal table. What the backup is depends on which FRR methods the routers run:
    - *LFA only:* another primary next hop if D is ECMP (`ecmp`), else the best LFA. The path is PLR → N, then N's normal path to D (RFC 5286 §4).
    - *LFA + Remote LFA:* as above, else the PQ node path PLR → (exit neighbor) → PQ → D (RFC 7490, D11).
    - *TI-LFA:* the PLR's post-convergence path (RFC 9855 §3).
    - None of these: traffic is **dropped** until the network reconverges.
    The repair path shown is S's normal path up to the PLR, then the PLR's backup.
-4. **Converge:** remove the link and run SPF again from S (same tie-break). That is S's final path. If D can't be reached, it is unreachable.
-5. **Repair = final?** Compare the PLR's backup with the PLR's own post-convergence path: `same` (same routers), `same-cost` (other routers, equal cost) or `longer` (costlier). TI-LFA is always `same` (a property test checks it); LFA and RLFA may not be. The comparison is made at the PLR because that is where FRR acts: when the PLR is not S, S itself may later pick a quite different path.
+   - *Several links down:* the backup is still the one built for PLR–E alone (on the full topology). If its path from the PLR crosses another failed link, the repair is **broken** at the first such link; traffic is lost until convergence. We don't model a second repair at that point.
+4. **Converge:** remove all failed links and run SPF again from S (same tie-break). That is S's final path. If D can't be reached, it is unreachable (the network is split).
+5. **Status** of an affected flow, first match wins: `unreachable` (no final path), `dropped` (no backup), `broken` (backup crosses another failed link), else `repaired`.
+6. **Repair = final?** (only for repairs that work) Compare the PLR's backup with the PLR's own post-convergence path: `same` (same routers), `same-cost` (other routers, equal cost) or `longer` (costlier). TI-LFA is always `same` (a property test checks it); LFA and RLFA may not be. The comparison is made at the PLR because that is where FRR acts: when the PLR is not S, S itself may later pick a quite different path.
 
 Worked check (Example 2, fail S–E, TI-LFA): C and E are affected; E is repaired on S→A→B→C→E (cost 4), which is also the final path. With "LFA only", E has no LFA and is dropped, while C uses LFA A.
+
+Worked check, two links (Example 2, fail S–E and E–C, TI-LFA): C's repair S→A→B→C avoids E–C, so it survives (`repaired`, same as the final path, cost 3). E's repair S→A→B→C→E runs into C–E at C, so it is broken; E has lost both links, so its status is `unreachable`.
+
+With a single failed link no repair is ever broken, and a TI-LFA repair that survives is always the PLR's final path: it is a shortest path without the first link, and it is still there with the others removed (property tests check both).

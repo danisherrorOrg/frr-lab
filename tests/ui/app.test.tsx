@@ -135,7 +135,7 @@ describe('Phase 7: failure simulation, coverage, sharing, keyboard', () => {
     // Keyboard path of the fail-link tool: F, then pick the link.
     await user.keyboard('f')
     expect(useStore.getState().tool).toBe('fail-link')
-    await user.selectOptions(screen.getByLabelText('Failed link'), 'S-E')
+    await user.selectOptions(screen.getByLabelText('Fail or restore a link'), 'S-E')
 
     const panel = await screen.findByRole('region', { name: 'Failure simulation' })
     expect(panel.textContent).toContain('Link S–E failed')
@@ -155,10 +155,41 @@ describe('Phase 7: failure simulation, coverage, sharing, keyboard', () => {
     expect(screen.queryByRole('region', { name: 'Failure simulation' })).toBeNull()
   })
 
+  it('two links down on the ring: C’s repair survives, E’s repair breaks (Phase 9.2)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.keyboard('f')
+    const pick = screen.getByLabelText('Fail or restore a link')
+    await user.selectOptions(pick, 'S-E')
+    await user.selectOptions(pick, 'E-C')
+    expect(useStore.getState().failedLinks).toEqual(['S-E', 'E-C'])
+
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    expect(panel.textContent).toContain('2 links failed: S–E, E–C')
+    await within(panel).findByText(/2 of 4 destinations cross a failed link/)
+    expect(panel.textContent).toContain('1 repaired, 1 unreachable')
+    const rows = within(panel).getAllByRole('row')
+    const rowOf = (d: string) => rows.find((r) => r.querySelector('td')?.textContent === d)!
+    expect(rowOf('C').textContent).toContain('S · TI-LFA')
+    expect(rowOf('E').textContent).toContain('broken: C–E down')
+
+    // E's story names the other failed link.
+    await user.click(rowOf('E'))
+    expect(panel.textContent).toContain('at C it runs into C–E, which is also down')
+
+    // Restore one link: back to a single failure, E's repair works again.
+    await user.click(within(panel).getByRole('button', { name: 'Restore E–C' }))
+    await within(panel).findByText(/2 of 4 destinations cross S–E\. 2 repaired\./)
+
+    await user.selectOptions(pick, 'C-B')
+    await user.click(await within(panel).findByRole('button', { name: 'Restore all' }))
+    expect(screen.queryByRole('region', { name: 'Failure simulation' })).toBeNull()
+  })
+
   it('C toggles the converged view while a link is failed', async () => {
     const user = userEvent.setup()
     render(<App />)
-    useStore.getState().failLink('S-E')
+    useStore.getState().toggleFailedLink('S-E')
     await screen.findByRole('region', { name: 'Failure simulation' })
     await user.keyboard('c')
     expect(useStore.getState().converged).toBe(true)

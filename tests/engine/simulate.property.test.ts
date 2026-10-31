@@ -15,42 +15,64 @@ describe('simulateFailure properties (random connected graphs)', () => {
     fc.record({
       t: fc.constant(t),
       s: fc.constantFrom(...t.nodes.map((n) => n.id)),
-      link: fc.constantFrom(...t.links.map((l) => l.id)),
+      links: fc.uniqueArray(fc.constantFrom(...t.links.map((l) => l.id)), {
+        minLength: 1,
+        maxLength: 3,
+      }),
       mode: fc.constantFrom<RepairMode>('lfa', 'rlfa', 'tilfa'),
     }),
   )
 
-  it('repair and final paths never cross the failed link, and end at D', () => {
+  it('repair and final paths never cross the link they repair, and end at D', () => {
     fc.assert(
-      fc.property(input, ({ t, s, link, mode }) => {
-        const sim = simulateFailure(t, s, link, mode)
-        const { a, b } = sim.link
+      fc.property(input, ({ t, s, links, mode }) => {
+        const sim = simulateFailure(t, s, links, mode)
+        const down = sim.links
+        const crossesAny = (p: NodeId[]) => down.some((l) => usesLink(p, l.a, l.b))
         for (const f of sim.flows) {
-          if (!f.affected) expect(f.after).toEqual(f.before)
-          // The part after the PLR is the repair; the part before it is the normal path.
+          expect(f.affected).toBe(crossesAny(f.before))
+          if (!f.affected) {
+            expect(f.after).toEqual(f.before)
+            continue
+          }
+          const hit = down.find((l) => l.id === f.hitLink)!
+          // The part before the PLR is the normal path, and it is still up.
+          const plrAt = f.before.indexOf(f.plr!)
+          expect(crossesAny(f.before.slice(0, plrAt + 1))).toBe(false)
           if (f.repair) {
-            const plrAt = f.before.indexOf(f.plr!)
-            expect(usesLink(f.repair.slice(plrAt), a, b)).toBe(false)
+            const own = f.repair.slice(plrAt)
+            expect(usesLink(own, hit.a, hit.b)).toBe(false)
             expect(f.repair.at(-1)).toBe(f.dest)
+            // Broken exactly when the repair runs into another failed link.
+            expect(f.brokenAt !== undefined).toBe(crossesAny(own))
+          } else {
+            expect(f.brokenAt).toBeUndefined()
           }
           if (f.after) {
-            expect(usesLink(f.after, a, b)).toBe(false)
+            expect(crossesAny(f.after)).toBe(false)
             expect(f.after.at(-1)).toBe(f.dest)
           }
+          const status = !f.after
+            ? 'unreachable'
+            : !f.repair
+              ? 'dropped'
+              : f.brokenAt
+                ? 'broken'
+                : 'repaired'
+          expect(f.status).toBe(status)
         }
       }),
       { numRuns: 150 },
     )
   })
 
-  it('TI-LFA: the repair always equals the PLR’s post-convergence path (RFC 9855 §3)', () => {
+  it('TI-LFA: a repair that survives equals the PLR’s post-convergence path (RFC 9855 §3)', () => {
     fc.assert(
-      fc.property(input, ({ t, s, link }) => {
-        for (const f of simulateFailure(t, s, link, 'tilfa').flows) {
+      fc.property(input, ({ t, s, links }) => {
+        for (const f of simulateFailure(t, s, links, 'tilfa').flows) {
           if (!f.affected) continue
-          // Repaired exactly when D can still be reached after the failure.
-          expect(f.repair !== undefined).toBe(f.plrAfter !== undefined)
-          if (f.repair) expect(f.match).toBe('same')
+          if (links.length === 1) expect(f.repair !== undefined).toBe(f.plrAfter !== undefined)
+          if (f.status === 'repaired') expect(f.match).toBe('same')
         }
       }),
       { numRuns: 150 },

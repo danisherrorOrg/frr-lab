@@ -11,7 +11,7 @@ export function GraphCanvas({ highlight }: { highlight: Highlight }) {
   const loadCount = useStore((s) => s.loadCount)
   const selection = useStore((s) => s.selection)
   const linkStart = useStore((s) => s.linkStart)
-  const failedLink = useStore((s) => s.failedLink)
+  const failedLinks = useStore((s) => s.failedLinks)
   const tool = useStore((s) => s.tool)
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export function GraphCanvas({ highlight }: { highlight: Highlight }) {
         if (st.tool === 'add-link') st.linkClick(id)
         else st.select({ kind: 'node', id })
       } else if (st.tool === 'fail-link') {
-        st.failLink(id)
+        st.toggleFailedLink(id)
       } else {
         st.select({ kind: 'link', id })
       }
@@ -77,9 +77,9 @@ export function GraphCanvas({ highlight }: { highlight: Highlight }) {
     decorate(cy, topology, highlight, {
       selection: selection?.id ?? null,
       linkStart,
-      failed: failedLink === null ? [] : [failedLink],
+      failed: failedLinks,
     })
-  }, [topology, highlight, selection, linkStart, failedLink])
+  }, [topology, highlight, selection, linkStart, failedLinks])
 
   // Traffic on the repair path: marching dashes, unless the user asked for less motion.
   useEffect(() => {

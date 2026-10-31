@@ -39,10 +39,10 @@ export interface AppState {
   row: RowKey | null
   backup: BackupKind
   /**
-   * The link failed by the fail-link tool. One at a time: FRR protects against a
-   * single failure (D4), so a second click moves the failure (D22).
+   * Links failed by the fail-link tool, in the order they were failed. FRR plans for
+   * one failure; with more, the simulation shows which repairs break (D23).
    */
-  failedLink: string | null
+  failedLinks: string[]
   /** Which FRR methods the routers run in the simulation. */
   simMode: RepairMode
   /** False = traffic on the repair path; true = after the network reconverges. */
@@ -77,8 +77,10 @@ export interface AppState {
   tapBackground: (pos: edit.Pos) => void
   setBackup: (b: BackupKind) => void
   setTool: (t: Tool) => void
-  /** Fail this link (restoring any other); the failed link again, or null, restores it. */
-  failLink: (linkId: string | null) => void
+  /** Fail this link, or restore it if it is already failed. */
+  toggleFailedLink: (linkId: string) => void
+  /** Bring every failed link back up. */
+  restoreLinks: () => void
   setSimMode: (m: RepairMode) => void
   setConverged: (on: boolean) => void
   setSimDest: (d: NodeId | null) => void
@@ -106,7 +108,7 @@ function tidy(s: AppState, t: Topology): Partial<AppState> {
     source,
     selection: selOk ? sel : null,
     row: rowOk ? s.row : null,
-    failedLink: s.failedLink !== null && links.has(s.failedLink) ? s.failedLink : null,
+    failedLinks: s.failedLinks.filter((id) => links.has(id)),
     simDest: s.simDest !== null && nodes.has(s.simDest) ? s.simDest : null,
     linkStart: s.linkStart !== null && nodes.has(s.linkStart) ? s.linkStart : null,
   }
@@ -142,7 +144,7 @@ export const useStore = create<AppState>()((set, get) => {
     selection: null,
     row: null,
     backup: 'auto',
-    failedLink: null,
+    failedLinks: [],
     simMode: 'tilfa',
     converged: false,
     simDest: null,
@@ -157,7 +159,7 @@ export const useStore = create<AppState>()((set, get) => {
         source: pickSource(placed, source),
         selection: null,
         row: null,
-        failedLink: null,
+        failedLinks: [],
         converged: false,
         simDest: null,
         linkStart: null,
@@ -278,12 +280,15 @@ export const useStore = create<AppState>()((set, get) => {
     },
     setBackup: (backup) => set({ backup }),
     setTool: (tool) => set({ tool, linkStart: null }),
-    failLink: (id) =>
+    toggleFailedLink: (id) => {
+      const down = get().failedLinks
       set({
-        failedLink: id === get().failedLink ? null : id,
+        failedLinks: down.includes(id) ? down.filter((x) => x !== id) : [...down, id],
         converged: false,
         simDest: null,
-      }),
+      })
+    },
+    restoreLinks: () => set({ failedLinks: [], converged: false, simDest: null }),
     setSimMode: (simMode) => set({ simMode, converged: false }),
     setConverged: (converged) => set({ converged }),
     setSimDest: (simDest) => set({ simDest }),
