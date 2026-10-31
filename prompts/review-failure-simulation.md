@@ -1,4 +1,4 @@
-# Prompt: Review the failure-simulation logic (links and routers)
+# Prompt: Review the failure-simulation logic (links, routers and parallel links)
 
 Review the failure-simulation logic in this repo for correctness. The goal is
 **zero logic errors**: every rule must match what a real router does, and the RFCs
@@ -6,29 +6,39 @@ must back it. **Don't add features.**
 
 ## Read first
 - `CLAUDE.md`
-- `docs/02-algorithms.md` §8 (link failures) and §8.1 (router failure)
-- `DECISIONS.md` entries D22 to D28. D23's "Broken" rule was replaced by D24, and
-  D25, D26 and D28 are earlier reviews. Re-check what they say they checked. Don't
-  assume it is still right.
+- `docs/02-algorithms.md` §8 (link failures), §8.1 (router failure) and §9
+  (parallel links)
+- `DECISIONS.md` entries D22 to D29. D23's "Broken" rule was replaced by D24;
+  D25, D26 and D28 are earlier reviews; D29 made every next hop a specific link.
+  Re-check what they say they checked. Don't assume it is still right.
 
 ## Code to review
-- `src/engine/simulate.ts`: the simulation: hop-by-hop walk, repairs, drops,
-  loops, the router-failure "survives / breaks" check, and the converged path
-- `src/ui/FailurePanel.tsx`: every sentence shown to users
+- `src/engine/simulate.ts`: the simulation: hop-by-hop walk (link by link),
+  repairs, drops, loops, the router-failure "survives / breaks" check, and the
+  converged path
+- What the walk relies on: `firstLinks` (`spf.ts`), `cheapestEdge` (`graph.ts`),
+  `hopLinks` (`paths.ts`), per-link protections in `index.ts`, `lfa.ts`, `rlfa.ts`
+  and `tilfa.ts` (`bestLink`, `outLink`, Adj-SID `link`)
+- `src/ui/FailurePanel.tsx`: every sentence shown to users, including how a link of
+  a bundle is named (`S–E (S-E#2)`)
+- `src/App.tsx` and `src/ui/canvas.ts`: which link of a bundle is drawn for the
+  normal, repair and converged paths
 - Tests: `tests/engine/simulate.test.ts`, `simulate-node.test.ts`,
-  `simulate.property.test.ts`
-- Example networks: `examples/01-square.yaml` to `examples/06-link-protecting.yaml`
+  `simulate.property.test.ts`, `parallel.test.ts`, `parallel.property.test.ts`
+- Example networks: `examples/01-square.yaml` to `examples/07-parallel.yaml`
 
 ## The question for every rule
 > "Is this what a real router does, and does the RFC back it?"
 
 The RFCs are the source of truth:
-- RFC 5286: LFA (§3.2 node-protecting Inequality 3, §3.4 ECMP)
+- RFC 5286: LFA (§3.2 node-protecting Inequality 3, §3.4 ECMP, §3.5 reverse cost
+  of a link, §3.6 a candidate is an (outgoing link, neighbor) pair)
 - RFC 7490: Remote LFA (P/Q space, PQ node tunnel)
 - RFC 8102: Remote LFA node protection (§2.1)
 - RFC 9855: TI-LFA (§3 post-convergence path, §6.1 active segment, §6.2 failed
   Adj-SID, §9 protected Adj-SID in a repair list)
-- RFC 8402 / RFC 8667: Segment Routing, Adj-SID protection (B-flag, §2.2.1)
+- RFC 8402 / RFC 8667: Segment Routing, one Adj-SID per adjacency (RFC 8402 §3.4,
+  RFC 8667 §2.2.1), Adj-SID protection (B-flag)
 
 If code, docs and RFC disagree, follow the RFC (CLAUDE.md rule 3).
 
@@ -74,28 +84,55 @@ If code, docs and RFC disagree, follow the RFC (CLAUDE.md rule 3).
    routers down; the failed router being a second failure rather than the
    protected neighbor; the backup's own neighbor or PQ node being down.
 
+### Parallel links (§9, D29)
+10. **Which link carries traffic:** normal forwarding, Remote LFA exits and TI-LFA
+    prefix hops take the cheapest link, then the lowest link id; an LFA takes
+    `bestLink`, an ECMP member its own link, an Adj-SID its own link, and TI-LFA
+    leaves on `outLink`. Is "affected" decided by the link the flow really uses
+    (failing the unused link of an equal bundle leaves the flow alone)?
+11. **Repairs per link:** a router finding a link down uses the protection for that
+    exact link id. Another equal link to the same neighbor is an ECMP member; an
+    unequal one is a link-protecting LFA, never node-protecting. Check a failed
+    Adj-SID hop whose neighbor is still reachable over another link of the bundle
+    (the normal path is the backup), and both links of a bundle down.
+12. **Costs and "Repair = final?":** repair costs come from the links walked
+    (`repairLinks`), final costs from the SPF without the failed links. `same` must
+    mean the same routers *and* the same cost: a repair over the costlier link of a
+    bundle is not the same path as a final path over a cheaper one.
+13. **Router failure with bundles:** every link of the failed router goes down,
+    whichever bundle it is in. Does the "survives / breaks" check use the member
+    link the traffic really takes?
+14. **Drawing:** the canvas must draw the link the walk used (`repairLinks`), the
+    normal path's link, and the converged path over links that are up. Never a
+    failed link of a bundle when the other one carried the traffic.
+
 ### Text and docs
-10. **Every sentence the panel shows:** is it true in every case it can appear?
+15. **Every sentence the panel shows:** is it true in every case it can appear?
     That includes chains of repairs, loops, split networks, the PLR not being S,
-    repeated failed links, and router plus link failures together. Are the numbers
-    shown measured from the router the sentence names?
-11. **Docs vs code vs RFC:** do §8, §8.1 and D22–D28 say exactly what the code
+    repeated failed links, router plus link failures together, and bundles (is the
+    exact link named whenever two routers have several?). Are the numbers shown
+    measured from the router the sentence names?
+16. **Docs vs code vs RFC:** do §8, §8.1, §9 and D22–D29 say exactly what the code
     does, including the worked checks?
 
 ## How to search
 Don't stop at reading the code. Run it. Write a small throwaway script (in the
 scratchpad, not the repo) that calls `simulateFailure` for every network in
-Examples 1–6, and for each one:
+Examples 1–7, and for each one:
 - every source router
 - every mode
 - every set of one and two failed links (three on the small examples)
 - every single router failure, router + link, and two routers
 
-Also try random networks with asymmetric metrics. Flag anything a real router would
-do differently: a drop where a backup exists, a loop that isn't the same router
+Also try random networks with asymmetric metrics, and random networks with
+bundles (`connectedTopology({ parallel: true })` in `tests/arbitraries.ts`): equal
+and unequal links between the same routers, and both links of a bundle failed.
+
+Flag anything a real router would do differently: a drop where a backup exists, a loop that isn't the same router
 with the same labels, a repair by a router whose link is up, a wrong target, a
-"breaks" for traffic that one backup delivers, or a sentence that is false for that
-case. Check every finding by hand against the RFC before you call it a bug.
+"breaks" for traffic that one backup delivers, traffic sent over a failed link of a
+bundle, a cost that doesn't match the links walked, or a sentence that is false for
+that case. Check every finding by hand against the RFC before you call it a bug.
 
 ## For each problem found
 - Give a concrete network and the failed links or routers that show it (use the
@@ -106,11 +143,12 @@ case. Check every finding by hand against the RFC before you call it a bug.
 1. Fix it test-first: write the failing test, then the fix. Add a property test
    where the rule holds for every network.
 2. Keep the worked examples in `docs/02-algorithms.md` §6 and the worked checks in
-   §8 / §8.1 passing.
+   §8 / §8.1 / §9 passing.
 3. Update `docs/02-algorithms.md` and add a new `DECISIONS.md` entry (next number:
-   D29) that lists what changed, what was checked and left unchanged, and what is
+   D30) that lists what changed, what was checked and left unchanged, and what is
    still not modelled.
-4. Run `npm test`, `npm run lint` and `npm run typecheck`. All must pass.
+4. Run `npm test`, `npm run lint` and `npm run typecheck`. All must pass, including
+   the 200-router speed test (under 2 s).
 5. Commit. Use a short imperative subject and no AI attribution (CLAUDE.md).
 
 If nothing is wrong, say so and list everything you checked, including the
