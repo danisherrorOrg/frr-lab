@@ -1,7 +1,9 @@
 // Phase 9.6: the failure view for every router as the DUT. Expected values for
 // Example 6 were worked out by hand first; the reasoning is in the comments.
+import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
+  meetsDownRouter,
   simulateAllSources,
   simulateFailure,
   summarizeFlows,
@@ -10,6 +12,7 @@ import {
   type RepairMode,
   type SourceFailure,
 } from '../../src/engine/simulate'
+import { connectedTopology } from '../arbitraries'
 import { loadFixture } from '../helpers'
 
 const none: FailureSummary = {
@@ -82,6 +85,55 @@ describe('simulateAllSources: Example 6, router E down', () => {
   it('TI-LFA: S’s link-protecting repair breaks and loops between S and N', () => {
     const s = summaryOf(simulateAllSources(t, { nodes: ['E'] }, 'tilfa'), 'S')
     expect(s).toMatchObject({ affected: 1, looped: 1, repaired: 0, breaks: 1 })
+  })
+})
+
+describe('summarizeFlows: a backup can meet a down router off the normal path (D32)', () => {
+  it('Example 1, source E, router S and link E–D down, LFA only', () => {
+    const t = loadFixture('01-square.yaml')
+    const sim = simulateFailure(t, 'E', { links: ['E-D'], nodes: ['S'] }, 'lfa')
+    // N: E-D-N never touches S, but E–D is down and E's LFA for N is S
+    // (dist(S,N)=15 < dist(S,E)+dist(E,N) = 10+20): that backup breaks because S is down.
+    const n = sim.flows.find((f) => f.dest === 'N')!
+    expect(n.through).toEqual({ node: 'S', at: 'E', why: { method: 'lfa', via: 'S' } })
+    // D: E-D, and E has no LFA (S: dist(S,D)=20 is not < 10+10). It never meets S.
+    const d = sim.flows.find((f) => f.dest === 'D')!
+    expect(d.method).toBeUndefined()
+    // So the router check counts N (it breaks), not D: the same rows the panel marks.
+    expect(summarizeFlows(sim.flows, ['S'])).toEqual({
+      ...none,
+      affected: 2,
+      unreachable: 2,
+      destDown: 1,
+      viaRouter: 1,
+      breaks: 1,
+    })
+  })
+
+  it('every flow whose backup passes a down router is counted as "breaks" (random networks)', () => {
+    const input = connectedTopology().chain((t) => {
+      const ids = t.nodes.map((n) => n.id)
+      return fc
+        .record({
+          s: fc.constantFrom(...ids),
+          x: fc.constantFrom(...ids),
+          link: fc.constantFrom(...t.links.map((l) => l.id)),
+          mode: fc.constantFrom<RepairMode>('lfa', 'rlfa', 'tilfa'),
+        })
+        .filter(({ s, x }) => s !== x)
+        .map((r) => ({ t, ...r }))
+    })
+    fc.assert(
+      fc.property(input, ({ t, s, x, link, mode }) => {
+        const flows = simulateFailure(t, s, { links: [link], nodes: [x] }, mode).flows
+        const sum = summarizeFlows(flows, [x])
+        const meets = flows.filter((f) => meetsDownRouter(f, [x]))
+        expect(sum.breaks).toBe(flows.filter((f) => f.through).length)
+        expect(sum.viaRouter).toBe(meets.length)
+        expect(sum.survive + sum.breaks + sum.noBackup).toBe(sum.viaRouter)
+      }),
+      { numRuns: 200 },
+    )
   })
 })
 

@@ -229,11 +229,16 @@ export function surviveText(s: FailureSummary, noun?: string): string {
 /**
  * One line for one DUT in the per-router failure view (Phase 9.6), e.g.
  * "3 affected, 3 repaired; 2 survive, 1 breaks". `routersDown`: add the survive /
- * break part, which only means something when a router has failed.
+ * break part, which only means something when a router has failed. It counts the
+ * flows that meet a down router; when that isn't every affected one, say how many (D32).
  */
 export function dutSummary(x: SourceFailure, routersDown: boolean): string {
   if ('down' in x) return 'down: sends no traffic'
   const s = x.summary
   if (s.affected === 0) return 'nothing affected'
-  return `${s.affected} affected, ${outcomeText(s)}${routersDown ? `; ${surviveText(s)}` : ''}`
+  const which =
+    s.viaRouter === s.affected
+      ? ''
+      : `${s.viaRouter} meet${s.viaRouter === 1 ? 's' : ''} a down router: `
+  return `${s.affected} affected, ${outcomeText(s)}${routersDown ? `; ${which}${surviveText(s)}` : ''}`
 }

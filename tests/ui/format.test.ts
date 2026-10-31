@@ -243,6 +243,24 @@ describe('per-DUT failure text (Phase 9.6)', () => {
     expect(line('D')).toBe('2 affected, 2 repaired; 2 survive, 0 break')
   })
 
+  it('says which flows the survive / break part counts when not every affected one meets a down router (D32)', () => {
+    // Example 6, router D and link S–N down, LFA only. From S, N and M cross S–N; only
+    // M's backup (LFA E, then E-D-M) meets D. N's backup S-E-N never does.
+    const all = simulateAllSources(
+      loadFixture('06-link-protecting.yaml'),
+      { links: ['S-N'], nodes: ['D'] },
+      'lfa',
+    )
+    expect(
+      dutSummary(
+        all.find((x) => x.source === 'S')!,
+        true,
+      ),
+    ).toBe(
+      '2 affected, 2 repaired (1 by more than one router); 1 meets a down router: 0 survive, 1 breaks',
+    )
+  })
+
   it('without a router down, no survive / break part', () => {
     const all = simulateAllSources(loadFixture('02-ring5.yaml'), { links: ['S-E'] }, 'tilfa')
     expect(

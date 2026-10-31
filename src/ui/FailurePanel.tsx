@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo } from 'react'
 import {
+  meetsDownRouter,
   summarizeFlows,
   type FailureSimulation,
   type FailureSummary,
@@ -245,9 +246,12 @@ function RepairCell({ f }: { f: Flow }) {
   return <>{who}</>
 }
 
-/** "Avoids down router?" cell: does the PLR's planned backup pass a failed router? */
-function ThroughCell({ f }: { f: Flow }) {
-  if (!f.method) return <span className="text-slate-400">–</span>
+/**
+ * "Backup vs down router" cell: does the PLR's planned backup pass a failed router?
+ * Only for flows that meet one, the same flows the router summary counts (D32).
+ */
+function ThroughCell({ f, routers }: { f: Flow; routers: NodeId[] }) {
+  if (!f.method || !meetsDownRouter(f, routers)) return <span className="text-slate-400">–</span>
   if (!f.through) return <span className="text-green-700 dark:text-green-400">✓ survives</span>
   return (
     <span className="text-red-700 dark:text-red-400">
@@ -471,7 +475,7 @@ export function FailurePanel({ source, simulation: sim, error }: Props) {
                           </td>
                           {routers.length > 0 && (
                             <td className={cell}>
-                              <ThroughCell f={f} />
+                              <ThroughCell f={f} routers={routers} />
                             </td>
                           )}
                           <td className={`${cell} font-mono text-xs`}>

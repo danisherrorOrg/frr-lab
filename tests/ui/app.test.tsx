@@ -479,6 +479,25 @@ describe('Phase 9.3: router failure', () => {
     )
   })
 
+  it('a backup through a down router counts as broken even off the normal path (D32)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'link-protecting')
+    useStore.getState().toggleFailedNode('D')
+    useStore.getState().toggleFailedLink('S-N')
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    await user.click(within(panel).getByLabelText('LFA only'))
+    await within(panel).findByText(/D down: 1 destination affected, 0 repairs survive, 1 breaks\./)
+    const rowOf = (d: string) =>
+      within(panel)
+        .getAllByRole('row')
+        .find((r) => r.querySelector('td')?.textContent === d)!
+    // M: S's LFA E reaches M through D.
+    expect(rowOf('M').textContent).toContain('✗ breaks: via D at E')
+    // N: S's LFA E reaches N directly; D plays no part, so the column has nothing to say.
+    expect(rowOf('N').querySelectorAll('td')[2]?.textContent).toBe('–')
+  })
+
   it('the failed router as source sends nothing', async () => {
     render(<App />)
     useStore.getState().toggleFailedNode('S')

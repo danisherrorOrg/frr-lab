@@ -375,7 +375,7 @@ export interface FailureSummary {
   unreachable: number
   /** Destinations that are failed routers themselves: unreachable, as expected (D27). */
   destDown: number
-  /** Affected destinations whose normal path passes a failed router. */
+  /** Affected destinations that meet a failed router (meetsDownRouter). */
   viaRouter: number
   /** Of those: the PLR's backup avoids every failed router, passes one (D27), or doesn't exist. */
   survive: number
@@ -383,11 +383,25 @@ export interface FailureSummary {
   noBackup: number
 }
 
+/**
+ * Does this affected flow meet a failed router: its normal path passes one, or
+ * the PLR's planned backup does (`through`)? A flow that only crosses a failed
+ * link can still have a backup through a failed router, and that backup breaks
+ * (D27, D32). The router check (survive / breaks / no backup) is about these flows.
+ */
+export function meetsDownRouter(f: Flow, nodes: readonly NodeId[]): boolean {
+  return (
+    f.affected &&
+    !f.destDown &&
+    (f.through !== undefined || f.before.some((x) => nodes.includes(x)))
+  )
+}
+
 /** Count one source's flows. `nodes` are the failed routers. */
 export function summarizeFlows(flows: readonly Flow[], nodes: readonly NodeId[]): FailureSummary {
   const hit = flows.filter((f) => f.affected && !f.destDown)
   const n = (st: FlowStatus) => hit.filter((f) => f.status === st).length
-  const viaRouter = hit.filter((f) => f.before.some((x) => nodes.includes(x)))
+  const viaRouter = hit.filter((f) => meetsDownRouter(f, nodes))
   return {
     affected: hit.length,
     repaired: n('repaired'),

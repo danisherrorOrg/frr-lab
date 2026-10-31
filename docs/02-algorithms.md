@@ -264,7 +264,7 @@ For every destination D:
   What then happens to the traffic comes from the walk: the router before E finds its own link to E down and uses its own backup (D24), so traffic may still get through, be dropped, or loop.
 - **No backup:** dropped at the PLR, as for a link.
 - **Converge:** SPF with all of E's links removed.
-- **Summary:** "E down: 3 destinations affected, 2 repairs survive, 1 breaks".
+- **Summary:** "E down: 3 destinations affected, 2 repairs survive, 1 breaks". It counts the destinations that meet a failed router: on the normal path, or on the PLR's planned backup (§8.2, D32).
 - The source router itself can't be failed in the simulation: it sends no traffic.
 - Ties: "goes through E" means the path drawn and walked (lowest-id tie-break, §4.1). The LFA inequality counts a tie as "may use E", so an LFA can fail Inequality 3 and still survive on the one flow shown.
 
@@ -283,9 +283,12 @@ With a single failed link at most one router repairs and traffic never loops, an
 ### 8.2 Every router as the DUT (Phase 9.6, D31)
 `simulateAllSources()` runs `simulateFailure()` once per router with the same failed links and routers and mode, and counts each one's flows (`summarizeFlows()`). A failed router as source is listed as down (it sends nothing). The counts are over the affected flows, leaving out failed routers as destinations (`destDown`, counted on their own):
 - `repaired` / `dropped` / `looped` / `unreachable`: the status of §8 step 5; they add up to `affected`. `relayed`: repaired, but by more than one router.
-- `viaRouter`: affected flows whose normal path passes a failed router; of those, `survive` (the PLR's backup avoids every failed router), `breaks` (it passes one, §8.1) and `noBackup`. They add up to `viaRouter`.
+- `viaRouter`: affected flows that meet a failed router: their normal path passes one, or the PLR's planned backup does (D32). Of those, `survive` (the PLR's backup avoids every failed router), `breaks` (it passes one, §8.1) and `noBackup`. They add up to `viaRouter`. A flow that only crosses a failed link can still have a backup through a failed router, so it breaks and is counted; one whose backup avoids every failed router has nothing to do with them and is left out (the panel's "Backup vs down router" cell shows "–" for it).
+- The per-DUT line adds "n meet(s) a down router:" before the survive / break part when `viaRouter` is not every affected flow, so the numbers are read against the right total.
 
 These are the same numbers as the single-source failure panel for that router (a test checks every example, mode and single link or router failure).
+
+Worked check (Example 1, source E, router S and link E–D down, LFA only): D (E→D) has no LFA (S: `dist(S,D)=20` is not `< 10+10`) and never meets S. N (E→D→N) is repaired by E with LFA S (`15 < 10+20`), but S is down: it breaks. Both are unreachable (E has no link left). Per-DUT line: `2 affected, 0 repaired, 2 unreachable; 1 meets a down router: 0 survive, 1 breaks`, and the panel says "S down: 1 destination affected, 0 repairs survive, 1 breaks".
 
 Worked check (Example 6, fail router E, LFA only): from S, only D is affected; LFA N is link-protecting, breaks at N, and N repairs again via M (`1 affected, 1 repaired, 1 relayed; 0 survive, 1 breaks`). From N, D is affected and LFA M is node-protecting (dist(M,D)=10 < dist(M,E)+dist(E,D)=11+1), so it survives. From D, S and N are affected and LFA M survives for both (11 < 11+1). From M, nothing is affected: M-D, M-N and M-N-S (11 < 12) avoid E.
 
