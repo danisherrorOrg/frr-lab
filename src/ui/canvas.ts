@@ -28,6 +28,11 @@ export interface Highlight {
   /** Packet walk: the router the packet is at, and the link it leaves on. */
   packetAt?: NodeId
   packetLink?: string
+  /**
+   * Packet walk on the diagram: the label stack each link of the repair carries,
+   * top first, written under its metric. `current` is the hop being looked at.
+   */
+  packetStacks?: { link: string; lines: string[]; current: boolean }[]
 }
 
 export const COLORS = { primary: '#2563eb', backup: '#ea580c', final: '#16a34a' }
@@ -152,6 +157,33 @@ export const STYLE: cytoscape.StylesheetJson = [
     style: { 'underlay-color': '#7c3aed', 'underlay-opacity': 0.45, 'underlay-padding': 8 },
   },
   {
+    // The label stack on a link of the packet walk: a stack of boxes read top-down.
+    selector: 'edge.walk-stack',
+    style: {
+      'text-wrap': 'wrap',
+      'font-family': 'ui-monospace, SFMono-Regular, Menlo, monospace',
+      'font-size': 11,
+      color: '#4c1d95',
+      'text-background-color': '#ede9fe',
+      'text-background-opacity': 0.95,
+      'text-background-shape': 'roundrectangle',
+      'text-border-width': 1,
+      'text-border-color': '#a78bfa',
+      'text-border-opacity': 1,
+      'z-index': 5,
+    },
+  },
+  {
+    selector: 'edge.walk-current',
+    style: {
+      'font-weight': 'bold',
+      'text-border-width': 2,
+      'text-border-color': '#7c3aed',
+      'text-background-color': '#ddd6fe',
+      'z-index': 6,
+    },
+  },
+  {
     selector: 'edge.failed',
     style: { 'line-color': '#dc2626', 'line-style': 'dotted', width: 4 },
   },
@@ -202,7 +234,7 @@ export function sync(cy: cytoscape.Core, t: Topology) {
 }
 
 const CLASSES =
-  'p-space q-space pq down source dest sel link-start primary backup final primary-fwd primary-rev backup-fwd backup-rev final-fwd final-rev flowing failed packet-at packet-hop'
+  'p-space q-space pq down source dest sel link-start primary backup final primary-fwd primary-rev backup-fwd backup-rev final-fwd final-rev flowing failed packet-at packet-hop walk-stack walk-current'
 
 export function decorate(
   cy: cytoscape.Core,
@@ -268,6 +300,14 @@ export function decorate(
     if (h.flowing) cy.edges('.backup').addClass('flowing')
     if (h.packetAt !== undefined) cy.getElementById(h.packetAt).addClass('packet-at')
     if (h.packetLink !== undefined) cy.getElementById(h.packetLink).addClass('packet-hop')
+    for (const { link, lines, current } of h.packetStacks ?? []) {
+      const e = cy.getElementById(link)
+      if (e.empty()) continue
+      const metric = e.data('label') as string
+      e.data('label', [metric, ...lines].filter((x) => x !== '').join('\n'))
+      e.addClass('walk-stack')
+      if (current) e.addClass('walk-current')
+    }
   })
 }
 

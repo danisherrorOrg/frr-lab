@@ -21,6 +21,9 @@ interface Props {
   walkStep?: number | null
   onWalkStep?: (step: number | null) => void
   onPhp?: (php: boolean) => void
+  /** Draw the label stacks on the diagram during the walk. */
+  walkOnCanvas?: boolean
+  onWalkOnCanvas?: (on: boolean) => void
 }
 
 const h3 = 'mt-3 mb-1 text-sm font-semibold'
@@ -40,6 +43,8 @@ export function DetailPanel({
   walkStep = null,
   onWalkStep = () => {},
   onPhp = () => {},
+  walkOnCanvas = true,
+  onWalkOnCanvas = () => {},
 }: Props) {
   const e = p.protectedLink.to
   const kinds = ['lfa', 'rlfa', 'tilfa'] as const
@@ -196,6 +201,8 @@ export function DetailPanel({
             step={walkStep}
             onStep={onWalkStep}
             onPhp={onPhp}
+            onCanvas={walkOnCanvas}
+            onOnCanvas={onWalkOnCanvas}
             b={b}
           />
         </>

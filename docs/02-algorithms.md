@@ -147,6 +147,7 @@ If D == E, node protection doesn't apply (fall back to link protection).
   - another router Y's Prefix-SID → forward to the next router on the path. The walk checks it is a normal next hop: `c(R,next) + dist(next,Y) = dist(R,Y)`. With ECMP the real router may pick another equal-cost next hop; the walk shows the one on the post-convergence path.
 - **PHP (on by default):** when the top label after R's actions is a Prefix-SID of the very next router, R pops it before sending (penultimate-hop popping, RFC 8660 §2). With PHP the segment's end router never sees its own label, and D gets a plain IP packet. With PHP off, each segment end pops its own label (D too).
 - The walk ends at D with no labels left. The metrics walked add up to the post-convergence cost.
+- On the diagram (optional), each link of the repair shows the stack it carries, top first, under its metric.
 
 Example 3 (§6), PHP on:
 

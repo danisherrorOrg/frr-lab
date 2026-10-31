@@ -116,6 +116,17 @@ describe('App smoke test', () => {
     await user.click(within(walk).getByLabelText('PHP (penultimate-hop popping)'))
     expect(walk.textContent).toContain("16004 is B's own Prefix-SID: this segment ends here")
 
+    // The stacks are drawn on the diagram, top first, current hop marked; they can be hidden.
+    expect(canvas.highlight?.packetStacks).toEqual([
+      { link: 'A-S', lines: ['16004 B', '24005 B→C', '16002 E'], current: false },
+      { link: 'B-A', lines: ['16004 B', '24005 B→C', '16002 E'], current: false },
+      { link: 'C-B', lines: ['16002 E'], current: true },
+      { link: 'E-C', lines: ['16002 E'], current: false },
+    ])
+    await user.click(within(walk).getByLabelText('Show labels on the diagram'))
+    expect(canvas.highlight?.packetStacks).toBeUndefined()
+    expect(canvas.highlight?.packetAt).toBe('B')
+
     await user.click(within(walk).getByRole('button', { name: 'Stop' }))
     expect(canvas.highlight?.packetAt).toBeUndefined()
   })

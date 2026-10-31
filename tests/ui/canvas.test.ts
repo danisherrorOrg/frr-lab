@@ -175,4 +175,34 @@ describe('canvas: parallel links (D29)', () => {
     )
     expect(cy.getElementById('S-E#2').hasClass('failed')).toBe(false)
   })
+
+  it('packet walk: writes the label stack under each link’s metric, current hop in bold, and clears it', () => {
+    const { cy, t } = draw('03-ring5-highmetric.yaml')
+    decorate(
+      cy,
+      t,
+      {
+        source: 'S',
+        packetAt: 'B',
+        packetLink: 'C-B',
+        packetStacks: [
+          { link: 'A-S', lines: ['16004 B', '24005 B→C', '16002 E'], current: false },
+          { link: 'C-B', lines: ['16002 E'], current: true },
+          { link: 'E-C', lines: ['no labels'], current: false },
+        ],
+      },
+      none,
+    )
+    expect(cy.getElementById('A-S').data('label')).toBe('1\n16004 B\n24005 B→C\n16002 E')
+    expect(cy.getElementById('C-B').data('label')).toBe('10\n16002 E')
+    expect(cy.getElementById('C-B').classes()).toEqual(
+      expect.arrayContaining(['walk-stack', 'walk-current', 'packet-hop']),
+    )
+    expect(cy.getElementById('A-S').hasClass('walk-current')).toBe(false)
+    expect(cy.getElementById('B').hasClass('packet-at')).toBe(true)
+
+    decorate(cy, t, { source: 'S' }, none)
+    expect(cy.getElementById('A-S').data('label')).toBe('1')
+    expect(cy.getElementById('A-S').hasClass('walk-stack')).toBe(false)
+  })
 })

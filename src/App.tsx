@@ -10,7 +10,7 @@ import { CoverageReport } from './ui/CoverageReport'
 import { DetailPanel } from './ui/DetailPanel'
 import { FailureByDut } from './ui/FailureByDut'
 import { FailurePanel } from './ui/FailurePanel'
-import { drawnFlow, pickBackup } from './ui/format'
+import { bundles, drawnFlow, pickBackup, stackLines } from './ui/format'
 import { GraphCanvas } from './ui/GraphCanvas'
 import { Legend } from './ui/Legend'
 import { NoticeBox } from './ui/NoticeBox'
@@ -136,6 +136,8 @@ export function App() {
 
   // Packet walk (TODO backlog): the step belongs to one row, so a new row starts fresh.
   const [php, setPhp] = useState(true)
+  // Label stacks drawn on the diagram during the walk; the user can hide them.
+  const [walkOnCanvas, setWalkOnCanvas] = useState(true)
   const [walkAt, setWalkAt] = useState<{ key: string; step: number } | null>(null)
   const walkKey = row && source !== null ? `${source}|${row.dest}|${row.via}|${row.link ?? ''}` : ''
   const walkStep = walkAt !== null && walkAt.key === walkKey ? walkAt.step : null
@@ -207,11 +209,25 @@ export function App() {
         walk.hops[walkStep] && {
           packetAt: walk.hops[walkStep].router,
           ...(walk.hops[walkStep].link !== undefined && { packetLink: walk.hops[walkStep].link }),
+          ...(walkOnCanvas && {
+            packetStacks: walk.hops.flatMap((h, i) =>
+              h.link === undefined || h.sent === undefined
+                ? []
+                : [
+                    {
+                      link: h.link,
+                      lines: stackLines(h.sent, bundles(topology)),
+                      current: i === walkStep,
+                    },
+                  ],
+            ),
+          }),
         }),
     }
   }, [
     walk,
     walkStep,
+    walkOnCanvas,
     selected,
     source,
     anyFailed,
@@ -276,6 +292,8 @@ export function App() {
                   walkStep={walkStep}
                   onWalkStep={setWalkStep}
                   onPhp={setPhp}
+                  walkOnCanvas={walkOnCanvas}
+                  onWalkOnCanvas={setWalkOnCanvas}
                 />
               ) : (
                 <p className="text-sm text-slate-500">

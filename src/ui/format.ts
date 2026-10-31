@@ -54,6 +54,15 @@ export const linkName = (b: Bundles | undefined, x: NodeId, y: NodeId, link: str
 export const segmentText = (s: Segment, b?: Bundles): string =>
   s.kind === 'prefix' ? `Prefix ${s.node}` : `Adj ${s.from}→${hopName(b, s.from, s.to, s.link)}`
 
+/** A label stack as diagram lines, top first: ["16004 B", "24005 B→C"], or ["no labels"]. */
+export const stackLines = (segs: Segment[], b?: Bundles): string[] =>
+  segs.length === 0
+    ? ['no labels']
+    : segs.map(
+        (s) =>
+          `${s.label} ${s.kind === 'prefix' ? s.node : `${s.from}→${hopName(b, s.from, s.to, s.link)}`}`,
+      )
+
 /** "B · B→C · E": short form for the table. */
 export const segmentsShort = (segs: Segment[], b?: Bundles): string =>
   segs

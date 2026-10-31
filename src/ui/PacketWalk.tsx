@@ -11,6 +11,9 @@ interface Props {
   step: number | null
   onStep: (step: number | null) => void
   onPhp: (php: boolean) => void
+  /** Show the label stacks on the diagram while walking. */
+  onCanvas: boolean
+  onOnCanvas: (on: boolean) => void
   b: Bundles
 }
 
@@ -87,7 +90,17 @@ function actionText(
  * Step through the TI-LFA repair router by router, with the label stack at each one
  * (docs/02-algorithms.md §4.5, TODO backlog "Packet walk").
  */
-export function PacketWalk({ walk, e, failedLink, step, onStep, onPhp, b }: Props) {
+export function PacketWalk({
+  walk,
+  e,
+  failedLink,
+  step,
+  onStep,
+  onPhp,
+  onCanvas,
+  onOnCanvas,
+  b,
+}: Props) {
   const last = walk.hops.length - 1
   const hop = step === null ? undefined : walk.hops[step]
 
@@ -139,6 +152,14 @@ export function PacketWalk({ walk, e, failedLink, step, onStep, onPhp, b }: Prop
         <label className="flex items-center gap-1 text-xs">
           <input type="checkbox" checked={walk.php} onChange={(ev) => onPhp(ev.target.checked)} />
           PHP (penultimate-hop popping)
+        </label>
+        <label className="flex items-center gap-1 text-xs">
+          <input
+            type="checkbox"
+            checked={onCanvas}
+            onChange={(ev) => onOnCanvas(ev.target.checked)}
+          />
+          Show labels on the diagram
         </label>
       </div>
 
