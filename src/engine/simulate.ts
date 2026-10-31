@@ -327,7 +327,8 @@ function forward(
         drop: { at, link: down.id, next, reason: 'backup-down' },
       }
     }
-    // A failed Adj-SID hop is repaired towards its far end (Adj-SID B-flag, RFC 8667 §2.2.1).
+    // A failed Adj-SID hop is repaired towards its far end (RFC 9855 §6.2, §9; Adj-SID
+    // B-flag, RFC 8667 §2.2.1).
     // Only TI-LFA stacks carry Adj-SIDs mid-path, and a fresh backup's own first hop
     // was handled above. When the router's normal path to that neighbor doesn't use
     // the link (the Adj-SID forced a costlier link), that normal path is the backup.

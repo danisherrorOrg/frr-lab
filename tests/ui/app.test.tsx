@@ -242,6 +242,65 @@ describe('Phase 7: failure simulation, coverage, sharing, keyboard', () => {
     expect(panel.textContent).toContain('The backup sends it back to P1')
   })
 
+  it('"same cost" and "costlier" cells name the PLR when it isn’t S (isp-core, from PE1)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'isp-core')
+    const cellOf = async (panel: HTMLElement, dest: string) =>
+      (await within(panel).findAllByRole('row'))
+        .find((r) => r.querySelector('td')?.textContent === dest)!
+        .querySelectorAll('td')[4]!.textContent
+    // P3 repairs PE2 on P3→P4→PE2 (40), P3's final path P3→P1→P4→PE2 also costs 40,
+    // while the row shows the whole repair (60) next to S's final path (40).
+    for (const id of ['PE1-P2', 'P1-P2', 'P3-PE2']) useStore.getState().toggleFailedLink(id)
+    let panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    await user.click(within(panel).getByLabelText('LFA only'))
+    await within(panel).findByText(/LFA only/)
+    expect(await cellOf(panel, 'PE2')).toBe('≈ same cost from P3, other path')
+
+    // P2 repairs P4 and the repair from P2 costs 70; P2's final path costs 50.
+    // The row shows 80 and 60, so the cell must say whose costs it compares.
+    useStore.getState().restoreLinks()
+    for (const id of ['PE1-P1', 'P2-P4']) useStore.getState().toggleFailedLink(id)
+    panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    await user.click(within(panel).getByLabelText('TI-LFA'))
+    expect(await cellOf(panel, 'P4')).toBe('✗ costlier from P2 (70 vs 50)')
+  })
+
+  it('a backup that leaves on a link the traffic already met doesn’t call it "down too"', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'isp-core')
+    await user.selectOptions(screen.getByLabelText('Source router (S)'), 'P4')
+    for (const id of ['P1-P3', 'P2-P4', 'P3-PE2']) useStore.getState().toggleFailedLink(id)
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    const row = (await within(panel).findAllByRole('row')).find(
+      (r) => r.querySelector('td')?.textContent === 'P2',
+    )!
+    await user.click(row)
+    // PE2 finds PE2–P3 down first; later P3's backup leaves on that same link.
+    expect(panel.textContent).toContain('At PE2 it finds PE2–P3 down too')
+    expect(panel.textContent).toContain(
+      'But that backup leaves P3 on P3–PE2, a failed link the traffic already met: traffic is dropped.',
+    )
+  })
+
+  it('when S itself repairs, the story doesn’t say traffic "reaches S" (ring, S–E)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    useStore.getState().toggleFailedLink('S-E')
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    await within(panel).findByText(/2 of 4 destinations cross S–E/)
+    expect(panel.textContent).not.toContain('reaches S')
+    expect(panel.textContent).toContain('Traffic to C starts at S, finds S–E down')
+    // A PLR further along is still "reached" (ring, E–C: E repairs C).
+    await user.click(within(panel).getByRole('button', { name: 'Restore link' }))
+    useStore.getState().toggleFailedLink('E-C')
+    const again = await screen.findByRole('region', { name: 'Failure simulation' })
+    await within(again).findByText(/1 of 4 destinations cross E–C/)
+    expect(again.textContent).toContain('Traffic to C reaches E, finds E–C down')
+  })
+
   it('C toggles the converged view while a link is failed', async () => {
     const user = userEvent.setup()
     render(<App />)

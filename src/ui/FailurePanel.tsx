@@ -21,19 +21,17 @@ const cell = 'px-2 py-1 align-top'
 const arrow = (ids: NodeId[]) => ids.join('→')
 
 function Match({ f }: { f: Flow }) {
-  // The comparison is made at the PLR (D22), so say so when that isn't S.
+  // The comparison is made at the PLR (D22), so say so when that isn't S: the row's
+  // other costs are from S and would not match the numbers compared here.
+  const from = f.plr !== f.before[0] ? ` from ${f.plr}` : ''
   if (f.match === 'same')
-    return (
-      <span className="text-green-700 dark:text-green-400">
-        ✓ same path{f.plr !== f.before[0] && ` from ${f.plr}`}
-      </span>
-    )
+    return <span className="text-green-700 dark:text-green-400">✓ same path{from}</span>
   if (f.match === 'same-cost')
-    return <span className="text-amber-700 dark:text-amber-400">≈ same cost, other path</span>
+    return <span className="text-amber-700 dark:text-amber-400">≈ same cost{from}, other path</span>
   if (f.match === 'longer')
     return (
       <span className="text-red-700 dark:text-red-400">
-        ✗ costlier ({f.plrRepairCost} vs {f.plrAfterCost})
+        ✗ costlier{from} ({f.plrRepairCost} vs {f.plrAfterCost})
       </span>
     )
   return <span className="text-slate-400">–</span>
@@ -60,6 +58,8 @@ function Chain({ f }: { f: Flow }) {
   }
   const words = more.map((r) => word(r.link))
   const dropWord = drop?.reason === 'no-backup' ? word(drop.link) : ''
+  // A backup can also leave on a link the traffic met earlier, at another router.
+  const backupMet = drop?.reason === 'backup-down' && met.has(drop.link)
   return (
     <>
       {more.map((r, k) => (
@@ -79,8 +79,9 @@ function Chain({ f }: { f: Flow }) {
       {drop?.reason === 'backup-down' && (
         <>
           {' '}
-          But that backup leaves {drop.at} on <strong>{dash(drop.at, drop.next)}</strong>, which is
-          down too: traffic is <strong>dropped</strong>.
+          But that backup leaves {drop.at} on <strong>{dash(drop.at, drop.next)}</strong>,{' '}
+          {backupMet ? 'a failed link the traffic already met' : 'which is down too'}: traffic is{' '}
+          <strong>dropped</strong>.
         </>
       )}
       {f.loopAt !== undefined && (
@@ -97,6 +98,8 @@ function Chain({ f }: { f: Flow }) {
 /** What happens to the drawn flow, in a few plain sentences with real numbers. */
 function Story({ f, converged, source }: { f: Flow; converged: boolean; source: NodeId }) {
   const hit = `${f.plr}–${f.next}`
+  // Traffic from S doesn't "reach" S: it starts there.
+  const reaches = f.plr === source ? `starts at ${source}` : `reaches ${f.plr}`
   const cutOff =
     f.status === 'unreachable' ? (
       <>
@@ -109,7 +112,7 @@ function Story({ f, converged, source }: { f: Flow; converged: boolean; source: 
     if (!f.repair)
       return (
         <p>
-          ✗ Traffic to {f.dest} reaches {f.plr}, finds {hit} down and has no backup: it is{' '}
+          ✗ Traffic to {f.dest} {reaches}, finds {hit} down and has no backup: it is{' '}
           <strong>dropped</strong>
           {f.status === 'unreachable' ? '.' : ' until the network reconverges.'}
           {cutOff}
@@ -119,7 +122,7 @@ function Story({ f, converged, source }: { f: Flow; converged: boolean; source: 
     if (f.drop || f.loopAt !== undefined)
       return (
         <p>
-          ✗ Traffic to {f.dest} reaches {f.plr}, finds {hit} down, and {f.plr} switches to its{' '}
+          ✗ Traffic to {f.dest} {reaches}, finds {hit} down, and {f.plr} switches to its{' '}
           {METHOD[f.method!]} backup.
           <Chain f={f} /> Path: <span className="font-mono">{pathText(f)}</span>.
           {f.status !== 'unreachable' && ' Traffic is lost until the network reconverges.'}
@@ -128,8 +131,8 @@ function Story({ f, converged, source }: { f: Flow; converged: boolean; source: 
       )
     return (
       <p>
-        ↻ Traffic to {f.dest} reaches {f.plr}, finds {hit} down, and {f.plr} switches at once (FRR,
-        about 50 ms) to its {METHOD[f.method!]} backup.
+        ↻ Traffic to {f.dest} {reaches}, finds {hit} down, and {f.plr} switches at once (FRR, about
+        50 ms) to its {METHOD[f.method!]} backup.
         {chained && <Chain f={f} />} Traffic reaches {f.dest} on{' '}
         <span className="font-mono">{arrow(f.repair)}</span> (cost {f.repairCost}, was{' '}
         {f.beforeCost}).
@@ -375,10 +378,10 @@ export function FailurePanel({ source, simulation: sim, error }: Props) {
             </p>
           )}
           <p className="mt-1 text-xs text-slate-500">
-            &quot;Repair = final?&quot; compares the repairing router&apos;s backup with its own
-            path after convergence, for traffic that gets through. With one failed link TI-LFA
-            always matches (RFC 9855 §3); LFA and Remote LFA may not. With several, a repair passed
-            on by more than one router may not match either.
+            &quot;Repair = final?&quot; compares the path from the first router that repairs with
+            that router&apos;s own path after convergence, for traffic that gets through. With one
+            failed link TI-LFA always matches (RFC 9855 §3); LFA and Remote LFA may not. With
+            several, a repair passed on by more than one router may not match either.
           </p>
         </>
       )}

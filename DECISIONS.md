@@ -196,3 +196,15 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Not modelled (unchanged):** the first hop of a plain-P-space Remote LFA tunnel is the router's lowest-id path to the PQ node; if that link is down too, the packet is dropped even when an equal-cost path to the PQ node is up. With one failure this can't happen (P-space means every shortest path avoids the link).
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D26 – Failure simulation review 2: panel wording; RFC 9855 §6 citations (2026-10-31)
+- **Why:** a second review of `simulate.ts` and the failure panel against RFC 5286, 7490, 9855, 8402 and 8667 (`docs/02-algorithms.md` §8). Every source, every set of one, two and (on the small examples) three failed links, and every mode was run on the five example networks, plus random networks with asymmetric metrics.
+- **Engine: no change.** Checked: only a router whose own next hop is down repairs; ECMP first, then LFA / Remote LFA / TI-LFA, and what each puts on the packet; repairs go towards the active target (D, PQ node, prefix segment, far end of a failed Adj-SID); one backup per router visit; exact loops and the 255-hop cut (Example 1, fail E–D and S–N, TI-LFA: S and E push labels at each other forever, shown as S→E→S…); status order; "Repair = final?" at the PLR; the converged path.
+- **RFC check:** RFC 9855 §6.1 (keep the active node segment, put the repair list in front), §6.2 (repair a failed Adj-SID towards its far end) and §9 (a protected Adj-SID in a repair list can trigger a second repair) back D24's model directly. §8 and the code comment now cite them; before, only RFC 8667 §2.2.1 was cited. RFC 9855 §6.2.2 also allows repairing an [Adj-SID, node] pair straight towards the next node segment; we keep the far-end rule (§6.2, simplest).
+- **Changed – panel text:**
+  - The "Repair = final?" cell named the PLR only for `same`. `same-cost` and `longer` now say "from P3" too: their costs are measured from the PLR, while the row's other columns are from S. Example 4, source PE1, fail PE1–P2, P1–P2 and P3–PE2, LFA only: the row showed repair 60 and final 40 next to "≈ same cost" (it is 40 vs 40 from P3). Fail PE1–P1 and P2–P4, TI-LFA, P4: "costlier (70 vs 50)" next to 80 and 60.
+  - A backup whose first link is down said "which is down too" even when the traffic had already met that link at another router. Example 4, source P4, fail P1–P3, P2–P4 and P3–PE2, TI-LFA, P2: PE2 finds PE2–P3 down, later P3's backup leaves on P3–PE2. It now says "a failed link the traffic already met".
+  - When S itself is the PLR the story said "Traffic to C reaches S". It now says "starts at S".
+  - The footer said "Repair = final?" compares "the repairing router's backup"; with several repairs it is the whole path from the first router that repairs. §8 step 6 says the same now.
+- **No new dependencies.**
+- **Status:** Accepted.
