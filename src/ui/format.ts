@@ -82,10 +82,16 @@ export function drawnFlow(sim: FailureSimulation, dest: NodeId | null): Flow | u
 /**
  * Why a backup is broken by a router failure, with real numbers (D27):
  * "N's path to D goes through E: dist(N,D) = 2 is not < dist(N,E) + dist(E,D) = 1+1 = 2 …"
+ * `next` is the neighbor the PLR protects against. Only when that neighbor is the
+ * failed router is it a node-protection story; any other failed router is a second
+ * failure the backup was never planned for (D28).
  */
-export function throughText(t: Through, plr: NodeId, dest: NodeId): string {
+export function throughText(t: Through, plr: NodeId, next: NodeId, dest: NodeId): string {
   const { node, at, why } = t
   const hop = `${at}→${node}`
+  const second =
+    `${node} is a second failure: ${plr}'s backup was planned for the link ${plr}–${next} ` +
+    `alone, and FRR plans for one failure at a time.`
   if (why.method === 'ecmp' || why.method === 'lfa') {
     const who = why.method === 'ecmp' ? `the other ECMP next hop ${why.via}` : `LFA ${why.via}`
     if (why.check) {
@@ -96,14 +102,22 @@ export function throughText(t: Through, plr: NodeId, dest: NodeId): string {
         `so ${why.via} only protects the link ${plr}–${node}, not the router (RFC 5286 §3.2).`
       )
     }
-    return `${who} reaches ${dest} through ${node} (${hop}).`
+    const part =
+      why.via === node
+        ? `${who} is itself down.`
+        : `${who} reaches ${dest} through ${node} (${hop}).`
+    return node === next ? part : `${part} ${second}`
   }
   if (why.method === 'rlfa') {
     const leg =
       why.leg === 'to-pq'
-        ? `the tunnel to PQ node ${why.pq} goes through ${node} (${hop})`
+        ? why.pq === node
+          ? `PQ node ${why.pq} is itself down`
+          : `the tunnel to PQ node ${why.pq} goes through ${node} (${hop})`
         : `PQ node ${why.pq} reaches ${dest} through ${node} (${hop})`
-    return `${leg}. Remote LFA (RFC 7490) only protects the link ${plr}–${node}, not the router (RFC 8102 §2.1).`
+    return node === next
+      ? `${leg}. Remote LFA (RFC 7490) only protects the link ${plr}–${node}, not the router (RFC 8102 §2.1).`
+      : `${leg}. ${second}`
   }
   // TypeScript can't narrow the 'ecmp' | 'lfa' member away by the checks above.
   if (why.method !== 'tilfa') return ''
@@ -116,5 +130,7 @@ export function throughText(t: Through, plr: NodeId, dest: NodeId): string {
         : seg.kind === 'adj'
           ? `the segment list holds Adj-SID(${seg.from}→${seg.to}) (label ${seg.label}), a link of ${node}`
           : `segment Prefix-SID(${seg.node}) follows normal paths through ${node} (${hop})`
-  return `${part}. TI-LFA link protection only avoids the link ${plr}–${node}; node protection would plan around the router (RFC 9855 §1).`
+  return node === next
+    ? `${part}. TI-LFA link protection only avoids the link ${plr}–${node}; node protection would plan around the router (RFC 9855 §1).`
+    : `${part}. ${second}`
 }

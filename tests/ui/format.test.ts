@@ -55,6 +55,7 @@ describe('throughText (Phase 9.3)', () => {
         why: { method: 'lfa', via: 'N', check: { distND: 2, distNE: 1, distED: 1 } },
       },
       'S',
+      'E',
       'D',
     )
     expect(text).toBe(
@@ -67,6 +68,7 @@ describe('throughText (Phase 9.3)', () => {
       throughText(
         { node: 'E', at: 'C', why: { method: 'rlfa', pq: 'B', leg: 'from-pq' } },
         'S',
+        'E',
         'D',
       ),
     ).toMatch(/^PQ node B reaches D through E \(C→E\)\. .*RFC 8102 §2\.1/)
@@ -78,8 +80,63 @@ describe('throughText (Phase 9.3)', () => {
           why: { method: 'tilfa', segment: { kind: 'prefix', node: 'E', label: 16002 } },
         },
         'S',
+        'E',
         'D',
       ),
     ).toMatch(/^the segment list holds Prefix-SID\(E\) \(label 16002\)/)
+  })
+
+  // D28: a failed router other than the PLR's protected neighbor is a second failure,
+  // not something node protection of that neighbor would avoid.
+  it('a router that is not the protected neighbor is called a second failure', () => {
+    // Example 5, source SP1, TI-LFA, fail L2–SP1 and router L1: SP1's repair for L2 leaves via L1.
+    const tilfa = throughText(
+      { node: 'L1', at: 'SP1', why: { method: 'tilfa', segment: null } },
+      'SP1',
+      'L2',
+      'L2',
+    )
+    expect(tilfa).toBe(
+      "its first hop is L1. L1 is a second failure: SP1's backup was planned for the link SP1–L2 alone, and FRR plans for one failure at a time.",
+    )
+    expect(tilfa).not.toMatch(/SP1–L1|node protection/)
+    // Example 4, source PE1, TI-LFA, fail routers P1 and PE2: the repair for P3 is planned around P1.
+    expect(
+      throughText(
+        {
+          node: 'PE2',
+          at: 'P4',
+          why: { method: 'tilfa', segment: { kind: 'prefix', node: 'P3', label: 16003 } },
+        },
+        'PE1',
+        'P1',
+        'P3',
+      ),
+    ).toBe(
+      "segment Prefix-SID(P3) follows normal paths through PE2 (P4→PE2). PE2 is a second failure: PE1's backup was planned for the link PE1–P1 alone, and FRR plans for one failure at a time.",
+    )
+  })
+
+  it('a backup whose own neighbor or PQ node is down says so', () => {
+    // Example 4, source P1, fail P1–P4 and router P2: P1's LFA for P4 is P2.
+    expect(
+      throughText({ node: 'P2', at: 'P1', why: { method: 'lfa', via: 'P2' } }, 'P1', 'P4', 'P4'),
+    ).toBe(
+      "LFA P2 is itself down. P2 is a second failure: P1's backup was planned for the link P1–P4 alone, and FRR plans for one failure at a time.",
+    )
+    expect(
+      throughText({ node: 'PE1', at: 'P2', why: { method: 'ecmp', via: 'PE1' } }, 'P2', 'P4', 'P3'),
+    ).toMatch(/^the other ECMP next hop PE1 is itself down\. /)
+    // Example 1, source S, Remote LFA, fail E–D and router N: E's PQ node is N.
+    expect(
+      throughText(
+        { node: 'N', at: 'S', why: { method: 'rlfa', pq: 'N', leg: 'to-pq' } },
+        'E',
+        'D',
+        'D',
+      ),
+    ).toBe(
+      "PQ node N is itself down. N is a second failure: E's backup was planned for the link E–D alone, and FRR plans for one failure at a time.",
+    )
   })
 })

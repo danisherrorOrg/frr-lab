@@ -262,3 +262,59 @@ describe('router failure properties (random connected graphs)', () => {
     )
   })
 })
+
+describe('router failure: the backup checked is the one the PLR really uses (D28)', () => {
+  it('ECMP skips every member that is down, so the check does too (Example 5)', () => {
+    // SP1 reaches SP2 through all four leaves; L1 and L2 are down. SP1 drops both from
+    // its ECMP set and uses L3 (D25), which never meets a failed router.
+    const sp2 = flow(
+      simulateFailure(loadFixture('05-leaf-spine.yaml'), 'SP1', { nodes: ['L1', 'L2'] }, 'lfa')
+        .flows,
+      'SP2',
+    )
+    expect(sp2).toMatchObject({ status: 'repaired', method: 'ecmp', plr: 'SP1', next: 'L1' })
+    expect(sp2.repair).toEqual(['SP1', 'L3', 'SP2'])
+    expect(sp2.through).toBeUndefined()
+  })
+
+  it('with every ECMP member down, the member it falls back to is the router that is down', () => {
+    // Example 4, P2→P3: 30 via P4 (P4-PE2-P3) and 30 via PE1 (PE1-P1-P3). P2–P4 and
+    // router PE1 are down, so no member is left: dropped at P2 (D25).
+    const p3 = flow(
+      simulateFailure(
+        loadFixture('04-isp-core.yaml'),
+        'P2',
+        { links: ['P2-P4'], nodes: ['PE1'] },
+        'lfa',
+      ).flows,
+      'P3',
+    )
+    expect(p3).toMatchObject({ status: 'dropped', method: 'ecmp', drop: { reason: 'backup-down' } })
+    expect(p3.through).toEqual({ node: 'PE1', at: 'P2', why: { method: 'ecmp', via: 'PE1' } })
+  })
+
+  it('one router that delivers alone never "breaks" (random networks, two routers down)', () => {
+    const two = connectedTopology().chain((t) => {
+      const ids = t.nodes.map((n) => n.id)
+      return fc
+        .record({
+          s: fc.constantFrom(...ids),
+          x: fc.constantFrom(...ids),
+          y: fc.constantFrom(...ids),
+          mode: fc.constantFrom<RepairMode>('lfa', 'rlfa', 'tilfa'),
+        })
+        .filter(({ s, x, y }) => s !== x && s !== y)
+        .map((r) => ({ t, ...r }))
+    })
+    fc.assert(
+      fc.property(two, ({ t, s, x, y, mode }) => {
+        for (const f of simulateFailure(t, s, { nodes: [x, y] }, mode).flows) {
+          if (f.status === 'repaired' && f.repairs!.length === 1) {
+            expect(f.through).toBeUndefined()
+          }
+        }
+      }),
+      { numRuns: 200 },
+    )
+  })
+})

@@ -102,7 +102,7 @@ function Through({ f }: { f: Flow }) {
     <>
       {' '}
       But that backup goes through <strong>{f.through.node}</strong>, which is down:{' '}
-      {throughText(f.through, f.plr!, f.dest)}
+      {throughText(f.through, f.plr!, f.next!, f.dest)}
     </>
   )
 }

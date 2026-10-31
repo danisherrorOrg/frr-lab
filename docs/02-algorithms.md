@@ -251,11 +251,12 @@ A failed router E takes all its links down at once and its Prefix-SID stops work
 For every destination D:
 - **D = E:** unreachable. That is expected, so it is shown on its own line, not as a protection failure. No repair is followed.
 - **Not affected:** S's normal path never goes through E (or any other failed link).
-- **Survives:** the PLR's backup, followed on normal tables as if only the link PLR–E had failed, never goes through E. With E the only failure, the traffic then gets through on that one backup.
+- **Survives:** the PLR's backup, followed on normal tables as if only the link PLR–E had failed, never goes through E. With E the only failure, the traffic then gets through on that one backup. For ECMP the member checked is the one the PLR really uses: the lowest-id member whose link is up (D25, D28).
 - **Broken by the router failure:** that planned backup goes through E. The panel names the router just before E and why:
   - *LFA / ECMP:* neighbor N's path to D goes through E. When E is the PLR's own next hop the failed node-protecting check is shown, `dist(N,D) < dist(N,E) + dist(E,D)` ✗ (RFC 5286 §3.2).
   - *Remote LFA:* the tunnel to the PQ node, or the PQ node's path to D, goes through E (RFC 8102 §2.1).
   - *TI-LFA:* the segment whose path goes through E: `PrefixSID(E)` itself, an Adj-SID on a link of E, or a Prefix-SID whose normal path crosses E (RFC 9855 §1: link protection only avoids the link).
+  These reasons (and the RFC 5286 / 8102 / 9855 node-protection notes) apply when the failed router met is E, the PLR's protected neighbor. When it is another failed router (several things down), it is a **second failure** the backup was never planned for, and the panel says that instead; if the backup's own neighbor or PQ node is that router, it says it "is itself down" (D28).
   What then happens to the traffic comes from the walk: the router before E finds its own link to E down and uses its own backup (D24), so traffic may still get through, be dropped, or loop.
 - **No backup:** dropped at the PLR, as for a link.
 - **Converge:** SPF with all of E's links removed.

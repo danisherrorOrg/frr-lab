@@ -312,7 +312,17 @@ export function simulateFailure(
       if (walk.drop) flow.drop = walk.drop
       if (walk.loopAt !== undefined) flow.loopAt = walk.loopAt
       if (downNodes.size > 0 && walk.repairs.length > 0) {
-        const through = backupThrough(table, resultsAt(plr), plr, flow.next, d, mode, downNodes)
+        const isUp = (n: NodeId) => downBetween(plr, n) === undefined
+        const through = backupThrough(
+          table,
+          resultsAt(plr),
+          plr,
+          flow.next,
+          d,
+          mode,
+          downNodes,
+          isUp,
+        )
         if (through) flow.through = through
       }
 
@@ -510,7 +520,9 @@ function repairAt(
  * Does the PLR's backup for (D, link PLR–E), as planned for that one failure, pass
  * a failed router? Followed leg by leg on normal tables, the same way `forward`
  * would with only that link down (D27). Returns the first failed router met, the
- * router just before it, and which part of the backup leads there.
+ * router just before it, and which part of the backup leads there. `isUp` is the
+ * PLR's real link state: an ECMP router drops every failed member, not only E (D25),
+ * so the member checked must be the one `forward` sends the traffic to (D28).
  */
 function backupThrough(
   table: AllPairs,
@@ -520,8 +532,9 @@ function backupThrough(
   d: NodeId,
   mode: RepairMode,
   downNodes: Set<NodeId>,
+  isUp: (neighbor: NodeId) => boolean,
 ): Through | undefined {
-  const plan = repairAt(table, results, next, d, mode, (n) => n !== next)
+  const plan = repairAt(table, results, next, d, mode, isUp)
   if (plan === undefined) return undefined
   let at = plr
   for (const [k, ins] of plan.instrs.entries()) {
