@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { flowWalk, packetWalk, primaryWalk } from './engine/packet-walk'
+import { convergedWalk, flowWalk, packetWalk, primaryWalk } from './engine/packet-walk'
 import { hopLinks, protectionPaths } from './engine/paths'
 import { readShareHash } from './io/share-url'
 import { isRow, useStore, type Tool } from './state/store'
@@ -170,15 +170,35 @@ export function App() {
   // belongs to one flow under one failure; anything else starts fresh.
   const shownFlow = anyFailed && sim.simulation ? drawnFlow(sim.simulation, simDest) : undefined
   const flowKey = shownFlow
-    ? JSON.stringify([source, shownFlow.dest, failedLinks, failedNodes, simMode, extended])
+    ? JSON.stringify([
+        source,
+        shownFlow.dest,
+        failedLinks,
+        failedNodes,
+        simMode,
+        extended,
+        converged,
+      ])
     : ''
+  // Every link that is down: the failed links plus every link of a failed router.
+  const downLinks = useMemo(() => {
+    const down = new Set(failedLinks)
+    for (const l of topology.links)
+      if (failedNodes.includes(l.a) || failedNodes.includes(l.b)) down.add(l.id)
+    return down
+  }, [topology, failedLinks, failedNodes])
   const [flowAt, setFlowAt] = useState<{ key: string; step: number } | null>(null)
   const flowTrace = useMemo(
-    () => (shownFlow ? flowWalk(topology, shownFlow, { php }) : undefined),
-    [shownFlow, topology, php],
+    () =>
+      !shownFlow
+        ? undefined
+        : converged
+          ? convergedWalk(topology, shownFlow, downLinks, { php })
+          : flowWalk(topology, shownFlow, { php }),
+    [shownFlow, topology, php, converged, downLinks],
   )
   const flowStep =
-    flowTrace && flowAt !== null && flowAt.key === flowKey && !converged
+    flowTrace && flowAt !== null && flowAt.key === flowKey
       ? Math.min(flowAt.step, flowTrace.hops.length - 1)
       : null
   const setFlowStep = (step: number | null) =>
@@ -191,16 +211,14 @@ export function App() {
       const flow = sim.simulation && drawnFlow(sim.simulation, simDest)
       if (!flow) return { source }
       if (converged) {
-        const down = new Set(failedLinks)
-        for (const l of topology.links)
-          if (failedNodes.includes(l.a) || failedNodes.includes(l.b)) down.add(l.id)
         return {
           source,
           dest: flow.dest,
           ...(flow.after && {
             final: flow.after,
-            finalLinks: hopLinks(topology, flow.after, { avoid: down }),
+            finalLinks: hopLinks(topology, flow.after, { avoid: downLinks }),
           }),
+          ...walkMarks(flowTrace, flowStep, walkOnCanvas, bundles(topology)),
         }
       }
       return {
@@ -252,8 +270,7 @@ export function App() {
     simDest,
     converged,
     topology,
-    failedLinks,
-    failedNodes,
+    downLinks,
   ])
 
   return (

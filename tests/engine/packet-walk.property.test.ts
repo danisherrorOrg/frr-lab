@@ -1,6 +1,6 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { flowWalk, packetWalk, primaryWalk } from '../../src/engine/packet-walk'
+import { convergedWalk, flowWalk, packetWalk, primaryWalk } from '../../src/engine/packet-walk'
 import { protectionPaths } from '../../src/engine/paths'
 import { computeForSource } from '../../src/engine/index'
 import { simulateFailure, type RepairMode } from '../../src/engine/simulate'
@@ -118,6 +118,16 @@ describe('packet walk properties', () => {
           }
           const repairs = w!.hops.flatMap((h) => h.actions.filter((a) => a.kind === 'repair'))
           expect(repairs.length).toBe(f.repairs?.length ?? 0)
+          // After convergence: S's final path at its cost, ending at D.
+          const down = new Set(links)
+          for (const l of t.links) if (nodes.includes(l.a) || nodes.includes(l.b)) down.add(l.id)
+          const c = convergedWalk(t, f, down, { php })
+          if (f.after) {
+            expect(c!.hops.map((h) => h.router)).toEqual(f.after)
+            expect(c!.cost).toBe(f.afterCost)
+            expect(c!.hops.some((h) => h.link !== undefined && down.has(h.link))).toBe(false)
+            expect(c!.hops.at(-1)!.actions.at(-1)!.kind).toBe('deliver')
+          } else expect(c).toBeUndefined()
           const end = w!.hops.at(-1)!.actions.at(-1)!.kind
           expect(end).toBe(f.drop ? 'drop' : f.loopAt !== undefined ? 'loop' : 'deliver')
         }

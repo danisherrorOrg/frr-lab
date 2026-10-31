@@ -462,14 +462,15 @@ export function FailurePanel({
                 <Story f={shown} converged={converged} source={source} downNodes={routers} />
               </div>
             )}
-            {shown && walk && !converged && (
+            {shown && walk && (
               <details
                 className="mt-2"
                 open={walkOpen}
                 onToggle={(ev) => setWalkOpen(ev.currentTarget.open)}
               >
                 <summary className="cursor-pointer font-semibold">
-                  Packet walk to {shown.dest}: the labels on each hop
+                  Packet walk to {shown.dest}
+                  {converged ? ' after convergence' : ''}: the labels on each hop
                 </summary>
                 {walkOpen && (
                   <div className="mt-1">

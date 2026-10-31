@@ -67,8 +67,8 @@ export interface PacketHop {
 }
 
 export interface PacketWalk {
-  /** The TI-LFA repair, the normal (primary) path, or simulated traffic. */
-  kind: 'tilfa' | 'primary' | 'flow'
+  /** The TI-LFA repair, the normal (primary) path, simulated traffic, or the path after convergence. */
+  kind: 'tilfa' | 'primary' | 'flow' | 'converged'
   s: NodeId
   d: NodeId
   /** Penultimate-hop popping on (the SR-MPLS default) or off. */
@@ -282,6 +282,37 @@ export function flowWalk(
     cost,
     ...(flow.status !== undefined && { status: flow.status }),
   }
+}
+
+/**
+ * Walk a simulated flow once the network has reconverged (§8 step 4, §8.3): S's
+ * new path to D, with every router's table rebuilt without the links that are down
+ * (`down`: failed links and the links of failed routers). No backup is used, so every
+ * router just forwards on D's Prefix-SID, with PHP before D. Undefined when D can't
+ * be reached any more.
+ */
+export function convergedWalk(
+  topology: Topology,
+  flow: Flow,
+  down: Iterable<string>,
+  options: { php?: boolean } = {},
+): PacketWalk | undefined {
+  const path = flow.after
+  if (!path) return undefined
+  const php = options.php ?? true
+  const gone = new Set(down)
+  const table = allPairs({ ...topology, links: topology.links.filter((l) => !gone.has(l.id)) })
+  const links = path.slice(0, -1).map((x, i) => cheapestEdge(table.graph, x, path[i + 1]!)!.linkId)
+  const own = prefixSeg(topology, flow.dest)
+  const { hops, cost } = labelHops(table, {
+    path,
+    links,
+    sent: links.map(() => [own]),
+    start: [own],
+    repairs: [],
+    php,
+  })
+  return { kind: 'converged', s: path[0]!, d: flow.dest, php, hops, cost }
 }
 
 interface LabelPath {

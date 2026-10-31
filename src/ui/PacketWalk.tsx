@@ -149,6 +149,8 @@ function footer(walk: Walk) {
   const from = `Assumes the packet reaches ${walk.s} already carrying ${walk.d}'s label.`
   if (walk.kind === 'tilfa')
     return `Total ${walk.cost}, the post-convergence cost. Only ${walk.s} uses the repair; every other router just reads the top label. ${from}`
+  if (walk.kind === 'converged')
+    return `Total ${walk.cost}, the cost after convergence. Every router has run SPF again without what failed, so no backup is used: each one just reads ${walk.d}'s label. ${from}`
   if (walk.kind === 'primary')
     return `Total ${walk.cost}, the normal cost. Nothing has failed, so every router, ${walk.s} too, just reads ${walk.d}'s label. ${from}`
   const end =

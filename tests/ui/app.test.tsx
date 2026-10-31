@@ -196,9 +196,45 @@ describe('App smoke test', () => {
     expect(walk.textContent).toContain('S already had this packet with the same labels')
     expect(walk.textContent).toContain('Loops back to S')
 
-    // The converged view has no FRR repair to walk.
+    // E is cut off, so after convergence there is nothing to walk; the step resets.
     act(() => useStore.getState().setConverged(true))
     expect(canvas.highlight?.packetAt).toBeUndefined()
+    expect(within(panel).queryByText(/Packet walk to E/)).toBeNull()
+  })
+
+  it('packet walk after convergence: S’s new path on D’s label only (ring, S–E, to E)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'ring5')
+    act(() => {
+      useStore.getState().toggleFailedLink('S-E')
+      useStore.getState().setSimDest('E')
+      useStore.getState().setConverged(true)
+    })
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    await user.click(
+      await within(panel).findByText('Packet walk to E after convergence: the labels on each hop'),
+    )
+    const walk = within(panel).getByRole('group', { name: 'Packet walk' })
+    await user.click(within(walk).getByRole('button', { name: /Start packet walk/ }))
+    expect(walk.textContent).toContain('Router 1 of 5: S')
+    expect(walk.textContent).toContain('c(S,A) + dist(A,E) = 1 + 3 = 4 = dist(S,E)')
+    expect(walk.textContent).toContain('Total 4, the cost after convergence')
+    expect(canvas.highlight).toMatchObject({
+      final: ['S', 'A', 'B', 'C', 'E'],
+      packetAt: 'S',
+      packetLink: 'A-S',
+    })
+    expect(canvas.highlight?.packetStacks).toContainEqual({
+      link: 'E-C',
+      lines: ['no labels'],
+      current: false,
+    })
+
+    // Back to the repair step: the walk of the FRR repair, from the start.
+    act(() => useStore.getState().setConverged(false))
+    expect(canvas.highlight?.packetAt).toBeUndefined()
+    expect(within(panel).getByText(/Packet walk to E: the labels on each hop/)).toBeTruthy()
   })
 
   it('editing a metric updates the results, and undo puts it back', async () => {

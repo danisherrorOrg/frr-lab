@@ -329,8 +329,11 @@ Worked check (Example 6, fail router E, LFA only): from S, only D is affected; L
 - When the PLR has no backup, the walk is S's normal path up to the PLR, then the drop. A failed router as D has no walk.
 - `flowWalk()` throws if a router could not send what the simulation says (a forward that is not a normal next hop, an Adj-SID that isn't the router's own), so the property test also checks the simulation's labels.
 - On the diagram, a link walked twice (a loop) shows the stack of its latest visit up to the current step.
+- **After convergence:** `convergedWalk()` walks S's final path (§8 step 4) in the "Converge" step. Every router has run SPF again without the links that are down (failed links and every link of a failed router), so no backup is used: each router forwards on D's Prefix-SID, checked against the *new* distances, `c(R,next) + dist'(next,D) = dist'(R,D)`, with PHP before D. No walk when D can't be reached any more.
 
 Worked check (Example 2, fail S–E and E–C, TI-LFA, to E): S gets 16002 (E) and pushes 16004 (B) → A pops 16004 (PHP) → B forwards 16002 → C finds C–E down and pushes 16003 (A) → B pops 16003 (PHP) → A forwards 16002 → S: the same packet as at the start, a loop.
+
+Worked check, after convergence (Example 2, fail S–E, to E): S→A→B→C→E with 16002 only. S forwards to A because `1 + 3 = 4 = dist'(S,E)`; C pops 16002 (PHP). Total 4.
 
 Worked check (Example 3, fail S–E and C–B, TI-LFA, to E): S sends 16004 24005 16002; A pops 16004; B's Adj-SID 24005 (B→C) is down, so B replaces it with 16005 (C) and sends back to A. A has seen this packet before with other labels: it goes round until TTL runs out.
 

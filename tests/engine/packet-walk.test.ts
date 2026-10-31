@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { flowWalk, packetWalk, primaryWalk, type PacketWalk } from '../../src/engine/packet-walk'
+import {
+  convergedWalk,
+  flowWalk,
+  packetWalk,
+  primaryWalk,
+  type PacketWalk,
+} from '../../src/engine/packet-walk'
 import { simulateFailure, type Failures, type RepairMode } from '../../src/engine/simulate'
 import type { Segment, Topology } from '../../src/engine/types'
 import { loadFixture } from '../helpers'
@@ -258,5 +264,30 @@ describe('flowWalk', () => {
   it('PHP off: D pops its own label', () => {
     const w = walkOf(ring, { links: ['S-E'] }, 'tilfa', 'C', false)
     expect(w?.hops.at(-1)!.actions.map((a) => a.kind)).toEqual(['pop-end', 'deliver'])
+  })
+})
+
+// docs/02-algorithms.md §8.3: after convergence, plain forwarding on D's label.
+describe('convergedWalk', () => {
+  const ring = loadFixture('02-ring5.yaml')
+
+  it('Example 2, S–E down, to E: S→A→B→C→E on 16002 only; C pops it (PHP)', () => {
+    const f = simulateFailure(ring, 'S', ['S-E'], 'tilfa').flows.find((x) => x.dest === 'E')!
+    const w = convergedWalk(ring, f, ['S-E'])
+    expect(w).toMatchObject({ kind: 'converged', cost: 4 })
+    expect(brief(w)).toEqual([
+      { router: 'S', in: [16002], do: ['forward'], out: [16002], to: 'A' },
+      { router: 'A', in: [16002], do: ['forward'], out: [16002], to: 'B' },
+      { router: 'B', in: [16002], do: ['forward'], out: [16002], to: 'C' },
+      { router: 'C', in: [16002], do: ['forward', 'php'], out: [], to: 'E' },
+      { router: 'E', in: [], do: ['deliver'], out: undefined, to: undefined },
+    ])
+    // S's new table: c(S,A) + dist(A,E) = 1 + 3 = 4 = dist(S,E) without S–E.
+    expect(w?.hops[0]!.actions[0]).toMatchObject({ metric: 1, distNextY: 3, distRY: 4 })
+  })
+
+  it('nothing to walk when D is cut off', () => {
+    const f = simulateFailure(ring, 'S', ['S-E', 'E-C'], 'tilfa').flows.find((x) => x.dest === 'E')!
+    expect(convergedWalk(ring, f, ['S-E', 'E-C'])).toBeUndefined()
   })
 })
