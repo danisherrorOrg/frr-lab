@@ -158,6 +158,7 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Status:** Accepted.
 
 ### D23 – Several failed links: which repairs survive and which break (2026-10-31)
+- **Note:** the "Broken" rule below is replaced by D24 (every router repairs its own failed link).
 - **Why:** user feedback (Phase 9.2). FRR plans for one failure, so the tool should *show* what goes wrong with a second one instead of forbidding it. This replaces D22's "one failed link at a time".
 - **Model:** each router still forwards on its pre-failure table. A flow is repaired by the router before the *first* failed link on its normal path, using the backup it computed for that one link on the full topology (RFC 5286 §1, RFC 9855 §3: alternates are pre-computed per protected link). "Converge" runs SPF with every failed link removed.
 - **Broken:** if the backup's path from the PLR crosses another failed link, the repair is broken at the first one, shown in the direction traffic goes (e.g. "at C it runs into C–E"). We don't model a second repair at that router: whether it would re-repair, drop or loop depends on the method and the vendor, and the RFCs don't define it. Treating it as lost traffic is the safe, honest answer.
@@ -167,5 +168,17 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Share link and stored state:** failed links were never in the share link or `localStorage`, so there is no old format to read. They stay out of the link: a shared link is a topology, not a scenario.
 - **Engine API:** `simulateFailure(topology, source, linkIds[], mode)`; repeats are ignored and an empty list is an error. The result lists `links` instead of one `link`.
 - **Other options considered:** chaining repairs at each failed link (no RFC rules, and it would hide the point that FRR covers one failure); choosing the PLR by the order the links were failed (the result would depend on click order).
+- **No new dependencies.**
+- **Status:** Accepted.
+
+### D24 – Several failed links: every router repairs its own failed link (2026-10-31)
+- **Why:** user feedback on 9.2. With D23, when the PLR's backup ran into a second failed link we stopped and said "broken", even when another router could still get the traffic through on a third path. That isn't how routers behave: FRR is local, so the router that finds its own link down uses its own backup, whatever the packet is carrying (RFC 5286 §1, RFC 9855 §3: alternates are pre-computed per protected link and installed in each router's forwarding table). This replaces D23's "Broken" rule.
+- **Model:** forward the packet hop by hop. It carries what the backups put on it: plain IP to D, a tunnel to a PQ node (RFC 7490), or a TI-LFA segment list (prefix-SIDs and Adj-SIDs). Each router forwards on its normal table towards the current target; if that link is down it applies its backup for (current target, that link). A failed Adj-SID hop is repaired towards its far end (protected Adj-SID, B-flag, RFC 8667 §2.2.1).
+- **One repair per router visit:** a forwarding entry has one primary and one backup. If the backup's own first link is down too, the packet is dropped there.
+- **Loops:** forwarding depends only on the router and what the packet carries, so meeting the same pair twice means the packet would go round forever. We also stop after 255 hops (the IP TTL limit), which catches backups that keep pushing labels. A loop is shown up to the first router the traffic comes back to.
+- **Status per affected flow, first match wins:** `unreachable`, `repaired` (reaches D, by one or several routers), `dropped`, `looped`. `broken` is gone; the repairs list says which routers repaired.
+- **Single failure unchanged:** property test: one repair at most, never a loop, and the same backup path as the drawings.
+- **Not modelled:** some vendors don't repair traffic that is already on a backup, or limit the label stack depth. The RFCs don't say; we show plain forwarding-table behaviour.
+- **Other options considered:** keep D23 (hides working third paths, which confused users); find any surviving path (that is convergence, not FRR, and is already the Converge view).
 - **No new dependencies.**
 - **Status:** Accepted.

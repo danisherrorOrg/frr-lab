@@ -120,7 +120,7 @@ export function App() {
         source,
         dest: flow.dest,
         primary: flow.before,
-        // A broken repair is still drawn, but nothing flows along it.
+        // A repair that drops or loops is still drawn, but nothing flows along it.
         ...(flow.repair && { backup: flow.repair, flowing: flow.status === 'repaired' }),
       }
     }

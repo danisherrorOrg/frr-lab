@@ -198,10 +198,10 @@ describe('simulateFailure: bridges and bad input', () => {
   })
 })
 
-describe('simulateFailure: several failed links (Phase 9.2)', () => {
+describe('simulateFailure: several failed links (Phase 9.2, D24)', () => {
   const ring = loadFixture('02-ring5.yaml')
 
-  it('ring, S–E and E–C down: C’s repair survives, E’s repair breaks at C–E', () => {
+  it('ring, S–E and E–C down: C’s repair survives; E is cut off and its traffic bounces', () => {
     const sim = simulateFailure(ring, 'S', ['S-E', 'E-C'], 'tilfa')
     expect(sim.links.map((l) => l.id)).toEqual(['S-E', 'E-C'])
     expect(flow(sim.flows, 'A').affected).toBe(false)
@@ -213,18 +213,22 @@ describe('simulateFailure: several failed links (Phase 9.2)', () => {
       plr: 'S',
       method: 'tilfa',
       repair: ['S', 'A', 'B', 'C'],
+      repairs: [{ at: 'S', link: 'S-E', next: 'E', target: 'C', method: 'tilfa' }],
       status: 'repaired',
       after: ['S', 'A', 'B', 'C'],
       afterCost: 3,
       match: 'same',
     })
-    expect(flow(sim.flows, 'C').brokenAt).toBeUndefined()
-    // E: the repair S-A-B-C-E was built for S–E alone and runs into C–E.
+    // E: S's repair reaches C, finds C–E down, and C's own backup sends it back to B.
     const e = flow(sim.flows, 'E')
     expect(e).toMatchObject({
       hitLink: 'S-E',
-      repair: ['S', 'A', 'B', 'C', 'E'],
-      brokenAt: { link: 'E-C', from: 'C', to: 'E' },
+      repair: ['S', 'A', 'B', 'C', 'B'],
+      repairs: [
+        { at: 'S', link: 'S-E', method: 'tilfa' },
+        { at: 'C', link: 'E-C', next: 'E', target: 'E', method: 'tilfa' },
+      ],
+      loopAt: 'B',
       status: 'unreachable',
     })
     // Both of E's links are down: nothing reaches it, and repair = final has no meaning.
@@ -232,13 +236,15 @@ describe('simulateFailure: several failed links (Phase 9.2)', () => {
     expect(e.match).toBeUndefined()
   })
 
-  it('ring, S–E and C–B down: the network splits, both repairs break at B–C', () => {
+  it('ring, S–E and C–B down: the network splits; B repairs too and sends traffic back', () => {
     const sim = simulateFailure(ring, 'S', ['S-E', 'C-B'], 'tilfa')
     for (const d of ['C', 'E']) {
       expect(flow(sim.flows, d)).toMatchObject({
         status: 'unreachable',
-        brokenAt: { link: 'C-B', from: 'B', to: 'C' },
+        repair: ['S', 'A', 'B', 'A'],
+        loopAt: 'A',
       })
+      expect(flow(sim.flows, d).repairs?.map((r) => r.at)).toEqual(['S', 'B'])
     }
     expect(flow(sim.flows, 'B')).toMatchObject({ affected: false, after: ['S', 'A', 'B'] })
   })
@@ -257,18 +263,23 @@ describe('simulateFailure: several failed links (Phase 9.2)', () => {
     ],
   )
 
-  it('a repair can break while D is still reachable after convergence', () => {
+  it('TI-LFA: S’s backup goes to A, A’s backup comes back to S: a loop until convergence', () => {
     const d = flow(simulateFailure(t, 'S', ['S-E', 'A-B'], 'tilfa').flows, 'D')
     expect(d).toMatchObject({
       hitLink: 'S-E',
       method: 'tilfa',
-      repair: ['S', 'A', 'B', 'D'],
-      brokenAt: { link: 'A-B', from: 'A', to: 'B' },
-      status: 'broken',
+      repair: ['S', 'A', 'S'],
+      repairs: [
+        { at: 'S', link: 'S-E' },
+        { at: 'A', link: 'A-B' },
+      ],
+      loopAt: 'S',
+      status: 'looped',
       after: ['S', 'D'],
       afterCost: 10,
     })
     expect(d.match).toBeUndefined()
+    expect(d.drop).toBeUndefined()
   })
 
   it('the same failures with LFA only: LFA D (direct link) survives', () => {
@@ -278,24 +289,70 @@ describe('simulateFailure: several failed links (Phase 9.2)', () => {
     expect(d.match).toBe('same')
   })
 
-  it('each flow is repaired by the router before the first failed link it meets', () => {
-    // S→B normally goes S-A-B, so A repairs it; A's TI-LFA path A-S-E-D-B uses S–E.
-    const b = flow(simulateFailure(t, 'S', ['S-E', 'A-B'], 'tilfa').flows, 'B')
+  it('a router on the way with no backup drops the traffic', () => {
+    // S→B goes S-A-B, so A repairs it. With LFA only, A has no LFA for B.
+    const b = flow(simulateFailure(t, 'S', ['S-E', 'A-B'], 'lfa').flows, 'B')
     expect(b).toMatchObject({
       hitLink: 'A-B',
       plr: 'A',
-      next: 'B',
-      repair: ['S', 'A', 'S', 'E', 'D', 'B'],
-      brokenAt: { link: 'S-E', from: 'S', to: 'E' },
-      status: 'broken',
+      status: 'dropped',
+      repairs: [],
+      drop: { at: 'A', link: 'A-B', reason: 'no-backup' },
+    })
+    expect(b.repair).toBeUndefined()
+    expect(b.method).toBeUndefined()
+  })
+
+  it('one repair can lead into another: A tunnels to E, S then uses its LFA', () => {
+    // A's Remote LFA for B tunnels to PQ node E over S–E; S finds S–E down and
+    // uses its own LFA (D) for E. Traffic reaches B, on a long way round.
+    const b = flow(simulateFailure(t, 'S', ['S-E', 'A-B'], 'rlfa').flows, 'B')
+    expect(b).toMatchObject({
+      plr: 'A',
+      method: 'rlfa',
+      repair: ['S', 'A', 'S', 'D', 'E', 'D', 'B'],
+      repairs: [
+        { at: 'A', link: 'A-B', target: 'B', method: 'rlfa' },
+        { at: 'S', link: 'S-E', target: 'E', method: 'lfa' },
+      ],
+      status: 'repaired',
       after: ['S', 'D', 'B'],
-      afterCost: 11,
+      match: 'longer',
     })
   })
 
-  it('a single failure never breaks a repair; repeats are ignored; none is an error', () => {
+  it('a third path: when the backup hits a second failure, the next router repairs again', () => {
+    // Normal S-E-D (20). S's backup S-A-D (25) runs into A–D; A's own backup
+    // A-B-D (20) beats A-S-E-D (30) and avoids every failed link.
+    const third = topo(
+      ['S', 'E', 'A', 'B', 'D'],
+      [
+        ['S', 'E', 10],
+        ['E', 'D', 10],
+        ['S', 'A', 10],
+        ['A', 'D', 15],
+        ['A', 'B', 10],
+        ['B', 'D', 10],
+      ],
+    )
+    const d = flow(simulateFailure(third, 'S', ['S-E', 'A-D'], 'tilfa').flows, 'D')
+    expect(d).toMatchObject({
+      plr: 'S',
+      repair: ['S', 'A', 'B', 'D'],
+      repairCost: 30,
+      repairs: [
+        { at: 'S', link: 'S-E', method: 'tilfa' },
+        { at: 'A', link: 'A-D', method: 'tilfa' },
+      ],
+      status: 'repaired',
+      after: ['S', 'A', 'B', 'D'],
+      match: 'same',
+    })
+  })
+
+  it('a single failure is repaired by one router at most; repeats are ignored; none is an error', () => {
     const one = simulateFailure(t, 'S', ['S-E'], 'tilfa')
-    expect(one.flows.every((f) => f.brokenAt === undefined)).toBe(true)
+    expect(one.flows.every((f) => (f.repairs?.length ?? 0) <= 1)).toBe(true)
     expect(simulateFailure(t, 'S', ['S-E', 'S-E'], 'tilfa')).toEqual(one)
     expect(() => simulateFailure(t, 'S', [], 'tilfa')).toThrow(/No failed link/)
   })

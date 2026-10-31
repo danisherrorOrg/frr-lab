@@ -210,6 +210,9 @@ Today `failedLink` is a single id. FRR protects against one failure, so the tool
 - [x] "Converge" uses SPF with all failed links removed
 - [x] Explain text with real numbers, e.g. "TI-LFA repair to D goes via B–C, which is also down"
 - [x] `DECISIONS.md` entry: how a multi-failure result is shown and why (D23)
+- [x] Follow-up: when a backup runs into another failed link, the router there uses its own
+      backup (FRR is local), so traffic can still get through on a third path, be dropped, or
+      loop. Shown hop by hop, with every router that repaired (D24)
 
 **Done when:** failing two links on Example 2 shows which repairs survive and which break.
 

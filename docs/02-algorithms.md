@@ -217,7 +217,7 @@ With SRGB 16000 and SID indices S=1, E=2, A=3, B=4, C=5, Adj-SID B→C = 24005, 
 ---
 
 ## 8. Failure simulation (F5)
-Code: `src/engine/simulate.ts`. One or more links can fail. FRR backups are built for a single failure, so with several links down the simulation shows which backups still work and which break (D23).
+Code: `src/engine/simulate.ts`. One or more links can fail. FRR backups are built for a single failure, so with several links down the simulation follows the traffic hop by hop to show whether it still gets through (D23, D24).
 
 For every destination D that S reaches before the failure:
 1. **Normal path:** follow S's normal shortest path hop by hop. Ties use the lowest router id at each hop, the same rule as the drawings (§4.1), so one flow is shown per destination.
@@ -228,13 +228,18 @@ For every destination D that S reaches before the failure:
    - *TI-LFA:* the PLR's post-convergence path (RFC 9855 §3).
    - None of these: traffic is **dropped** until the network reconverges.
    The repair path shown is S's normal path up to the PLR, then the PLR's backup.
-   - *Several links down:* the backup is still the one built for PLR–E alone (on the full topology). If its path from the PLR crosses another failed link, the repair is **broken** at the first such link; traffic is lost until convergence. We don't model a second repair at that point.
+   - *Several links down (D24):* traffic is followed hop by hop. Every router forwards on its normal table, and **any** router whose own outgoing link is down switches to the backup it built for that one link (on the full topology), even when the traffic is already on another router's backup. So when the PLR's backup runs into a second failed link, the router there repairs again, towards wherever the traffic was heading at that point (D, a Remote LFA's PQ node, or the next TI-LFA segment; a failed Adj-SID hop is repaired towards its far end). It ends one of three ways:
+     - it reaches D (possibly on a third path),
+     - **dropped**: a router has no backup for its failed link, or its backup's own first link is down too (a router holds one primary and one backup, so it repairs at most once per visit),
+     - **loop**: the traffic comes back to a router carrying the same thing as before, so it would go round forever (or 255 hops, the IP TTL limit, are used up). The path shown stops where the traffic first comes back to a router it has passed.
 4. **Converge:** remove all failed links and run SPF again from S (same tie-break). That is S's final path. If D can't be reached, it is unreachable (the network is split).
-5. **Status** of an affected flow, first match wins: `unreachable` (no final path), `dropped` (no backup), `broken` (backup crosses another failed link), else `repaired`.
-6. **Repair = final?** (only for repairs that work) Compare the PLR's backup with the PLR's own post-convergence path: `same` (same routers), `same-cost` (other routers, equal cost) or `longer` (costlier). TI-LFA is always `same` (a property test checks it); LFA and RLFA may not be. The comparison is made at the PLR because that is where FRR acts: when the PLR is not S, S itself may later pick a quite different path.
+5. **Status** of an affected flow, first match wins: `unreachable` (no final path), `repaired` (traffic reaches D), `dropped`, `looped`.
+6. **Repair = final?** (only for traffic that reaches D) Compare the PLR's backup with the PLR's own post-convergence path: `same` (same routers), `same-cost` (other routers, equal cost) or `longer` (costlier). TI-LFA is always `same` (a property test checks it); LFA and RLFA may not be. The comparison is made at the PLR because that is where FRR acts: when the PLR is not S, S itself may later pick a quite different path.
 
 Worked check (Example 2, fail S–E, TI-LFA): C and E are affected; E is repaired on S→A→B→C→E (cost 4), which is also the final path. With "LFA only", E has no LFA and is dropped, while C uses LFA A.
 
-Worked check, two links (Example 2, fail S–E and E–C, TI-LFA): C's repair S→A→B→C avoids E–C, so it survives (`repaired`, same as the final path, cost 3). E's repair S→A→B→C→E runs into C–E at C, so it is broken; E has lost both links, so its status is `unreachable`.
+Worked check, two links (Example 2, fail S–E and E–C, TI-LFA): C's repair S→A→B→C avoids E–C, so it survives (`repaired`, same as the final path, cost 3). E's repair S→A→B→C→E runs into C–E at C; C's own TI-LFA backup for E goes back through B, so traffic loops (shown as S→A→B→C→B…). E has lost both links, so its status is `unreachable`.
 
-With a single failed link no repair is ever broken, and a TI-LFA repair that survives is always the PLR's final path: it is a shortest path without the first link, and it is still there with the others removed (property tests check both).
+Worked check, a third path (S–E 10, E–D 10, S–A 10, A–D 15, A–B 10, B–D 10; fail S–E and A–D, TI-LFA): S's backup S→A→D runs into A–D at A; A's own backup A→B→D avoids both failures, so traffic reaches D on S→A→B→D (cost 30), which is also the final path.
+
+With a single failed link at most one router repairs and traffic never loops, and a TI-LFA repair that survives is always the PLR's final path: it is a shortest path without the first link, and it is still there with the others removed (property tests check both).

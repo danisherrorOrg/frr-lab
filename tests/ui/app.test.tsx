@@ -155,7 +155,7 @@ describe('Phase 7: failure simulation, coverage, sharing, keyboard', () => {
     expect(screen.queryByRole('region', { name: 'Failure simulation' })).toBeNull()
   })
 
-  it('two links down on the ring: C’s repair survives, E’s repair breaks (Phase 9.2)', async () => {
+  it('two links down on the ring: C’s repair survives, C repairs E’s traffic again (Phase 9.2)', async () => {
     const user = userEvent.setup()
     render(<App />)
     await user.keyboard('f')
@@ -171,11 +171,14 @@ describe('Phase 7: failure simulation, coverage, sharing, keyboard', () => {
     const rows = within(panel).getAllByRole('row')
     const rowOf = (d: string) => rows.find((r) => r.querySelector('td')?.textContent === d)!
     expect(rowOf('C').textContent).toContain('S · TI-LFA')
-    expect(rowOf('E').textContent).toContain('broken: C–E down')
+    expect(rowOf('E').textContent).toContain('S · TI-LFA, then C · TI-LFA ✗ loops back to B')
 
-    // E's story names the other failed link.
+    // E's story names the other failed link and the router that repairs again.
     await user.click(rowOf('E'))
-    expect(panel.textContent).toContain('at C it runs into C–E, which is also down')
+    expect(panel.textContent).toContain(
+      'At C it finds C–E down too, and C switches to its own TI-LFA backup.',
+    )
+    expect(panel.textContent).toContain('S→A→B→C→B…')
 
     // Restore one link: back to a single failure, E's repair works again.
     await user.click(within(panel).getByRole('button', { name: 'Restore E–C' }))
