@@ -293,6 +293,98 @@ describe('App smoke test', () => {
   })
 })
 
+describe('YAML format guide', () => {
+  /** Replace the checker's text (user-event treats "{" as a key name, so paste instead). */
+  async function setChecker(user: ReturnType<typeof userEvent.setup>, text: string) {
+    const box = screen.getByLabelText('Check your YAML')
+    await user.clear(box)
+    if (text) {
+      await user.click(box)
+      await user.paste(text)
+    }
+  }
+
+  it('opens from the toolbar with the field reference, and closes with ✕ or Escape', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'YAML format' }))
+    const dialog = screen.getByRole('dialog', { name: 'Topology YAML format' })
+    for (const key of ['srgb_base', 'sid', 'pos', 'metric_ba', 'adj_sid_ab']) {
+      expect(within(dialog).getAllByText(key).length).toBeGreaterThan(0)
+    }
+    // The starter file in the checker loads cleanly.
+    expect(within(dialog).getByLabelText('YAML check passed').textContent).toContain(
+      '3 routers, 3 links',
+    )
+    await user.click(within(dialog).getByRole('button', { name: 'Close the YAML guide' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'YAML format' }))
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('lists every problem as you type, then loads the fixed file', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'YAML format' }))
+    await setChecker(
+      user,
+      'name: Mine\nnodes:\n  - { id: X, sid: 1 }\n  - { id: Y, sid: 1 }\nlinks:\n  - { a: X, b: Z, metrc: 5 }\n',
+    )
+    const problems = screen.getByLabelText('YAML problems')
+    expect(problems.textContent).toContain('SID index 1 is already used by X')
+    expect(problems.textContent).toContain('unknown field "metrc". Did you mean "metric"?')
+    expect(problems.textContent).toContain('node "Z" does not exist')
+    const loadButton = screen.getByRole('button', { name: 'Load into LFA Lab' })
+    expect((loadButton as HTMLButtonElement).disabled).toBe(true)
+
+    await setChecker(
+      user,
+      'name: Mine\nnodes:\n  - { id: X, sid: 1 }\n  - { id: Y, sid: 2 }\nlinks:\n  - { a: X, b: Y, metric: 5 }\n',
+    )
+    expect(screen.getByLabelText('YAML check passed').textContent).toContain('2 routers, 1 link')
+    await user.click(loadButton)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(useStore.getState().topology.name).toBe('Mine')
+    expect(await screen.findByRole('table', { name: 'Results for X' })).toBeTruthy()
+  })
+
+  it('shows the line of a syntax error and says when the box is empty', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'YAML format' }))
+    await setChecker(user, 'nodes:\n  - { id: S, sid: 1\n')
+    expect(screen.getByLabelText('YAML problems').textContent).toMatch(/line \d+, column \d+/)
+    await setChecker(user, '')
+    expect(screen.getByText('Nothing to check yet.')).toBeTruthy()
+  })
+
+  it('fills the checker with the network on screen', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'ring5')
+    await user.click(screen.getByRole('button', { name: 'YAML format' }))
+    await user.click(screen.getByRole('button', { name: 'Use the network on screen' }))
+    expect((screen.getByLabelText('Check your YAML') as HTMLTextAreaElement).value).toContain(
+      'Five-node ring',
+    )
+    expect(screen.getByLabelText('YAML check passed').textContent).toContain('5 routers, 5 links')
+  })
+
+  it('a failed import links to the guide', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    const bad = new File(['routers:\n  - { id: A, sid: 1 }\n'], 'typo.yaml')
+    await user.upload(screen.getByTestId('import-file'), bad)
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('fix these 2 problems and import again')
+    expect(alert.textContent).toContain('Unknown key "routers". Did you mean "nodes"?')
+    await user.click(within(alert).getByRole('button', { name: 'Open the YAML format guide' }))
+    expect(screen.getByRole('dialog', { name: 'Topology YAML format' })).toBeTruthy()
+  })
+})
+
 describe('Phase 7: failure simulation, coverage, sharing, keyboard', () => {
   it('fails S–E on the ring: TI-LFA repair, then the converged path', async () => {
     const user = userEvent.setup()

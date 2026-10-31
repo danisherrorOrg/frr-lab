@@ -1,16 +1,22 @@
 import { CORE_SCHEMA, dump, load } from 'js-yaml'
 import type { Link, NodeId, RouterNode, Topology } from '../engine/types'
+import {
+  DEFAULT_SRGB_BASE,
+  ID_PATTERN,
+  KEY_ALIASES,
+  LINK_FIELDS,
+  MAX_LABEL,
+  MAX_METRIC,
+  NODE_FIELDS,
+  TOP_FIELDS,
+} from './yaml-format'
 
 // Topology YAML format and validation rules: docs/03-architecture.md §5.
 
 export type ParseResult =
   { ok: true; topology: Topology; warnings: string[] } | { ok: false; errors: string[] }
 
-export const DEFAULT_SRGB_BASE = 16000
-// IS-IS wide metrics are 24 bits (RFC 5305 §3.7).
-export const MAX_METRIC = 16_777_215
-// MPLS labels are 20 bits (RFC 3032 §2.1).
-export const MAX_LABEL = 1_048_575
+export { DEFAULT_SRGB_BASE, ID_PATTERN, MAX_LABEL, MAX_METRIC } from './yaml-format'
 
 type Raw = Record<string, unknown>
 
@@ -28,8 +34,10 @@ export function parseTopology(text: string): ParseResult {
     // CORE_SCHEMA = plain YAML types only; custom tags like !!js/function are rejected.
     doc = load(text, { schema: CORE_SCHEMA })
   } catch (e) {
-    const reason = e instanceof Error ? e.message.split('\n')[0] : String(e)
-    return { ok: false, errors: [`The file is not valid YAML: ${reason}`] }
+    return { ok: false, errors: [syntaxError(e)] }
+  }
+  if (doc === undefined || doc === null) {
+    return { ok: false, errors: ['The file is empty. See the YAML format guide for an example.'] }
   }
   if (!isMap(doc)) {
     return {
@@ -39,6 +47,7 @@ export function parseTopology(text: string): ParseResult {
   }
 
   const errors: string[] = []
+  unknownKeys(doc, TOP_FIELDS, (key, hint) => errors.push(`Unknown key "${key}". ${hint}`))
 
   let name = 'Untitled'
   if (doc.name !== undefined) {
@@ -52,8 +61,8 @@ export function parseTopology(text: string): ParseResult {
     else errors.push(`"srgb_base" must be a whole number from 0 to ${fmt(MAX_LABEL)}.`)
   }
 
-  const nodes = parseNodes(doc.nodes, errors)
-  const links = parseLinks(doc.links, new Set(nodes.map((n) => n.id)), errors)
+  const { nodes, declared } = parseNodes(doc.nodes, errors)
+  const links = parseLinks(doc.links, declared, errors)
 
   if (errors.length > 0) return { ok: false, errors }
   return {
@@ -63,34 +72,117 @@ export function parseTopology(text: string): ParseResult {
   }
 }
 
-function parseNodes(raw: unknown, errors: string[]): RouterNode[] {
+/** js-yaml's error as one line with its position (lines and columns counted from 1). */
+function syntaxError(e: unknown): string {
+  const err = e as { reason?: unknown; mark?: { line?: unknown; column?: unknown } }
+  const reason =
+    typeof err.reason === 'string'
+      ? err.reason
+      : (e instanceof Error ? e.message : String(e)).split('\n')[0]
+  const { line, column } = err.mark ?? {}
+  const where =
+    typeof line === 'number' && typeof column === 'number'
+      ? ` (line ${line + 1}, column ${column + 1})`
+      : ''
+  const hint = /\btab/.test(reason ?? '') ? '. Indent with spaces: use spaces, not tabs' : ''
+  return `The file is not valid YAML${where}: ${reason}${hint}.`
+}
+
+/** Edit distance, to suggest "metric" for "metrc". Keys are short, so the simple table is fine. */
+function distance(a: string, b: string): number {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j)
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i]
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(
+        prev[j]! + 1,
+        cur[j - 1]! + 1,
+        prev[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1),
+      )
+    }
+    prev = cur
+  }
+  return prev[b.length]!
+}
+
+/**
+ * Report keys the format doesn't have. Without this a typo like "metrc" or "adj_sid"
+ * is dropped without a word and the network silently differs from the file.
+ */
+function unknownKeys(
+  map: Raw,
+  fields: { key: string }[],
+  report: (key: string, hint: string) => void,
+) {
+  const known = fields.map((f) => f.key)
+  for (const key of Object.keys(map)) {
+    if (known.includes(key)) continue
+    const lower = key.toLowerCase()
+    const alias = KEY_ALIASES[lower]
+    const close = known
+      .map((k) => ({ k, d: distance(lower, k) }))
+      .filter(({ k, d }) => d <= (k.length <= 3 ? 1 : 2))
+      .sort((x, y) => x.d - y.d)[0]?.k
+    const guess = alias !== undefined && known.includes(alias) ? alias : close
+    report(
+      key,
+      guess !== undefined ? `Did you mean "${guess}"?` : `Allowed keys: ${known.join(', ')}.`,
+    )
+  }
+}
+
+/** A short view of a bad list item for the error text. */
+const shown = (v: unknown) => {
+  const text = typeof v === 'string' ? v : (JSON.stringify(v) ?? String(v))
+  return text.length > 30 ? `${text.slice(0, 30)}…` : text
+}
+
+/** The routers that load, plus every id the file declares (so links to a router with another error don't also say "does not exist"). */
+function parseNodes(
+  raw: unknown,
+  errors: string[],
+): { nodes: RouterNode[]; declared: Set<NodeId> } {
+  const declared = new Set<NodeId>()
   if (!Array.isArray(raw)) {
     errors.push('"nodes" must be a list of routers.')
-    return []
+    return { nodes: [], declared }
   }
   const nodes: RouterNode[] = []
-  const ids = new Set<NodeId>()
+  const ids = new Map<NodeId, number>()
   const sidOwner = new Map<number, NodeId>()
 
   raw.forEach((item, i) => {
     const where = `Node #${i + 1}`
     if (!isMap(item)) {
-      errors.push(`${where}: must be a mapping like { id: S, sid: 1 }.`)
+      errors.push(`${where}: must be a mapping like { id: S, sid: 1 }, not "${shown(item)}".`)
       return
     }
     const { id, sid, name, pos } = item
+    const named = typeof id === 'string' && id !== '' ? `${where} (${id})` : where
+    unknownKeys(item, NODE_FIELDS, (key, hint) =>
+      errors.push(`${named}: unknown field "${key}". ${hint}`),
+    )
     if (typeof id !== 'string' || id === '') {
       errors.push(`${where}: "id" must be text, e.g. R1 (put numbers in quotes).`)
       return
     }
-    const label = `${where} (${id})`
+    declared.add(id)
+    const label = named
     let valid = true
 
-    if (ids.has(id)) {
-      errors.push(`${where}: id "${id}" is already used.`)
+    if (!ID_PATTERN.test(id)) {
+      errors.push(
+        `${where}: id "${id}" can only use letters, digits, "_" and "." (no spaces or "-").`,
+      )
       valid = false
     }
-    ids.add(id)
+    const first = ids.get(id)
+    if (first !== undefined) {
+      errors.push(`${where}: id "${id}" is already used by Node #${first}.`)
+      valid = false
+    } else {
+      ids.set(id, i + 1)
+    }
 
     if (!isWhole(sid, 0, MAX_LABEL)) {
       errors.push(`${label}: "sid" must be a whole number from 0 to ${fmt(MAX_LABEL)}.`)
@@ -121,7 +213,7 @@ function parseNodes(raw: unknown, errors: string[]): RouterNode[] {
     if (isPos) node.pos = { x: pos.x as number, y: pos.y as number }
     nodes.push(node)
   })
-  return nodes
+  return { nodes, declared }
 }
 
 function parseLinks(raw: unknown, nodeIds: Set<NodeId>, errors: string[]): Link[] {
@@ -136,10 +228,16 @@ function parseLinks(raw: unknown, nodeIds: Set<NodeId>, errors: string[]): Link[
   raw.forEach((item, i) => {
     const where = `Link #${i + 1}`
     if (!isMap(item)) {
-      errors.push(`${where}: must be a mapping like { a: S, b: E, metric: 10 }.`)
+      errors.push(
+        `${where}: must be a mapping like { a: S, b: E, metric: 10 }, not "${shown(item)}".`,
+      )
       return
     }
     const { a, b, metric, metric_ba, adj_sid_ab, adj_sid_ba } = item
+    const named = typeof a === 'string' && typeof b === 'string' ? `${where} (${a}–${b})` : where
+    unknownKeys(item, LINK_FIELDS, (key, hint) =>
+      errors.push(`${named}: unknown field "${key}". ${hint}`),
+    )
     if (typeof a !== 'string' || typeof b !== 'string') {
       errors.push(`${where}: "a" and "b" must be router ids.`)
       return

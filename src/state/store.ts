@@ -40,6 +40,8 @@ export interface Notice {
   lines: string[]
   /** A "back up" notice: the routers it says are back, so failing one again can update it. */
   backUp?: NodeId[]
+  /** Offer a link to the YAML format guide (bad imports). */
+  yamlHelp?: boolean
 }
 
 const HISTORY_LIMIT = 100
@@ -80,6 +82,8 @@ export interface AppState {
   notice: Notice | null
   /** Guided tour step (TODO backlog), or null when the tour is closed. */
   tour: number | null
+  /** The "YAML format" guide is open. */
+  yamlGuide: boolean
 
   loadTopology: (t: Topology, source?: NodeId, warnings?: string[]) => void
   loadExample: (key: string) => void
@@ -122,6 +126,7 @@ export interface AppState {
   setExtended: (on: boolean) => void
   setNotice: (n: Notice | null) => void
   setTour: (step: number | null) => void
+  setYamlGuide: (open: boolean) => void
 }
 
 /** Keep the chosen source if it still exists, else 'S', else the first router. */
@@ -209,6 +214,7 @@ export const useStore = create<AppState>()((set, get) => {
     linkStart: null,
     notice: null,
     tour: null,
+    yamlGuide: false,
 
     loadTopology: (t, source, warnings = []) => {
       const placed = edit.withPositions(t)
@@ -391,6 +397,7 @@ export const useStore = create<AppState>()((set, get) => {
     setExtended: (extended) => set({ settings: { ...get().settings, extended } }),
     setNotice: (notice) => set({ notice }),
     setTour: (tour) => set({ tour }),
+    setYamlGuide: (yamlGuide) => set({ yamlGuide }),
   }
 })
 

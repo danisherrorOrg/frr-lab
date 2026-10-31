@@ -46,12 +46,18 @@ export function Toolbar() {
   const undo = useStore((s) => s.undo)
   const redo = useStore((s) => s.redo)
   const setTour = useStore((s) => s.setTour)
+  const setYamlGuide = useStore((s) => s.setYamlGuide)
 
   const importFile = async (file: File) => {
     const { loadTopology, setNotice } = useStore.getState()
     const r = parseTopology(await file.text())
     if (!r.ok) {
-      setNotice({ kind: 'error', title: `Can't load ${file.name}`, lines: r.errors })
+      setNotice({
+        kind: 'error',
+        title: `Can't load ${file.name}: fix ${r.errors.length === 1 ? 'this' : `these ${r.errors.length} problems`} and import again`,
+        lines: r.errors,
+        yamlHelp: true,
+      })
       return
     }
     loadTopology(r.topology, undefined, r.warnings)
@@ -95,6 +101,14 @@ export function Toolbar() {
       />
       <button type="button" className={button} onClick={exportFile}>
         Export YAML
+      </button>
+      <button
+        type="button"
+        className={button}
+        onClick={() => setYamlGuide(true)}
+        title="What a topology file looks like, and a checker"
+      >
+        YAML format
       </button>
       <button type="button" className={button} onClick={() => void share()}>
         🔗 Share

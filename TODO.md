@@ -307,6 +307,7 @@ Things that fit the "learn and check FRR" goal and stay offline / no backend.
 - [ ] Find the weakest spots: links or routers whose failure leaves the most destinations unprotected
 
 **Data in / out**
+- [x] YAML format guide in the app (fields, rules, common mistakes, a live checker) and clearer import errors: unknown keys with "did you mean", line and column for syntax errors *(D40)*
 - [ ] Export the diagram as PNG / SVG for slides and docs
 - [ ] Random topology generator (ring, grid, leaf-spine, random mesh) with a size slider
 - [ ] Vendor CLI import (see Later #2)

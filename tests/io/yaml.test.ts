@@ -224,6 +224,112 @@ links:
   })
 })
 
+describe('parseTopology: errors that help fix the file', () => {
+  it('says when the file is empty', () => {
+    expect(errorsOf('')).toEqual(['The file is empty. See the YAML format guide for an example.'])
+    expect(errorsOf('# only a comment\n')[0]).toMatch(/empty/)
+  })
+
+  it('gives the line and column of a YAML syntax error', () => {
+    const errors = errorsOf('name: t\nnodes:\n  - { id: S, sid: 1\n')
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toMatch(/^The file is not valid YAML \(line \d+, column \d+\): /)
+  })
+
+  it('points at the duplicated key', () => {
+    expect(errorsOf('name: a\nname: b\nnodes: []\n')[0]).toMatch(
+      /line 2, column 1\): duplicated mapping key/,
+    )
+  })
+
+  it('explains a tab used for indentation', () => {
+    expect(errorsOf('nodes:\n\t- { id: S, sid: 1 }\n')[0]).toMatch(/use spaces, not tabs/)
+  })
+
+  it.each([
+    ['routers', 'nodes'],
+    ['edges', 'links'],
+    ['srgb', 'srgb_base'],
+  ])('flags the unknown top-level key "%s" and suggests "%s"', (bad, good) => {
+    const errors = errorsOf(`name: t\nnodes:\n  - { id: S, sid: 1 }\n${bad}: 1\n`)
+    expect(errors).toContainEqual(`Unknown key "${bad}". Did you mean "${good}"?`)
+  })
+
+  it('lists the allowed keys when there is no close match', () => {
+    const errors = errorsOf('name: t\nnodes: []\ncolour: red\n')
+    expect(errors).toContainEqual(
+      'Unknown key "colour". Allowed keys: name, srgb_base, nodes, links.',
+    )
+  })
+
+  it.each([
+    ['sid_index: 1', 'sid_index', 'sid'],
+    ['sid: 1, nmae: X', 'nmae', 'name'],
+    ['sid: 1, position: { x: 1, y: 2 }', 'position', 'pos'],
+  ])('flags a typo in a router field (%s)', (fields, bad, good) => {
+    const errors = errorsOf(`name: t\nnodes:\n  - { id: S, ${fields} }\n`)
+    expect(errors).toContainEqual(`Node #1 (S): unknown field "${bad}". Did you mean "${good}"?`)
+  })
+
+  it.each([
+    ['metrc: 5', 'metrc', 'metric'],
+    ['metric: 5, metric_ab: 7', 'metric_ab', 'metric'],
+    ['metric: 5, adj_sid: 24001', 'adj_sid', 'adj_sid_ab'],
+    ['metric: 5, cost_ba: 3', 'cost_ba', 'metric_ba'],
+  ])('flags a typo in a link field (%s)', (fields, bad, good) => {
+    const errors = errorsOf(twoNodes(`  - { a: S, b: E, ${fields} }`))
+    expect(errors).toContainEqual(`Link #1 (S–E): unknown field "${bad}". Did you mean "${good}"?`)
+  })
+
+  it('suggests a and b for from / to', () => {
+    const errors = errorsOf(twoNodes('  - { from: S, to: E, metric: 1 }'))
+    expect(errors).toContainEqual('Link #1: unknown field "from". Did you mean "a"?')
+    expect(errors).toContainEqual('Link #1: unknown field "to". Did you mean "b"?')
+    expect(errors).toContainEqual(expect.stringMatching(/Link #1: "a" and "b" must be router ids/))
+  })
+
+  it.each(['A-B', 'R 1', 'S#2', 'PE/1'])(
+    'rejects the router id "%s" (same rule as the editor)',
+    (id) => {
+      const errors = errorsOf(`name: t\nnodes:\n  - { id: "${id}", sid: 1 }\n`)
+      expect(errors).toContainEqual(
+        `Node #1: id "${id}" can only use letters, digits, "_" and "." (no spaces or "-").`,
+      )
+    },
+  )
+
+  it('names the first router when an id is used twice', () => {
+    const errors = errorsOf('name: t\nnodes:\n  - { id: S, sid: 1 }\n  - { id: S, sid: 2 }\n')
+    expect(errors).toContainEqual('Node #2: id "S" is already used by Node #1.')
+  })
+
+  it('does not call a router missing when it only has another error', () => {
+    const errors = errorsOf(twoNodes('  - { a: S, b: E, metric: 1 }').replace('sid: 2', 'sid: -2'))
+    expect(errors).toEqual(['Node #2 (E): "sid" must be a whole number from 0 to 1,048,575.'])
+  })
+
+  it('shows what a list item looked like when it is not a mapping', () => {
+    expect(errorsOf('name: t\nnodes:\n  - S\n')).toContainEqual(
+      'Node #1: must be a mapping like { id: S, sid: 1 }, not "S".',
+    )
+  })
+
+  it('accepts every key the format guide documents', () => {
+    const topo = expectOk(
+      parseTopology(`
+name: All keys
+srgb_base: 20000
+nodes:
+  - { id: S, sid: 1, name: Core, pos: { x: 0, y: 0 } }
+  - { id: E, sid: 2 }
+links:
+  - { a: S, b: E, metric: 1, metric_ba: 2, adj_sid_ab: 24001, adj_sid_ba: 24002 }
+`),
+    )
+    expect(topo.links[0]).toMatchObject({ adjSidAB: 24001, adjSidBA: 24002 })
+  })
+})
+
 describe('parseTopology: warnings', () => {
   it('warns (but still loads) when the graph is disconnected', () => {
     const result = parseTopology(`

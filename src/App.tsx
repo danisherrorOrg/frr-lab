@@ -22,6 +22,7 @@ import { ResultsTable } from './ui/ResultsTable'
 import { Sidebar } from './ui/Sidebar'
 import { Toolbar } from './ui/Toolbar'
 import { Tour } from './ui/Tour'
+import { YamlGuide } from './ui/YamlGuide'
 import { isFirstVisit, markTourSeen } from './ui/tour-steps'
 import { useResults } from './ui/useResults'
 import { useAllModes, useSimulation } from './ui/useSimulation'
@@ -405,6 +406,7 @@ export function App() {
         </main>
       </div>
       <Tour />
+      <YamlGuide />
     </div>
   )
 }

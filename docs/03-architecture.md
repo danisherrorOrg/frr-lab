@@ -167,6 +167,10 @@ links:
 - Metrics are integers from 1 to 16,777,215 (the IS-IS wide-metric range).
 - No self-loops. Two routers may have several links (parallel links, D29): the second `S`–`E` link gets id `S-E#2`, the third `S-E#3`.
 - Warn (don't block) if the graph is disconnected.
+- Router ids use letters, digits, `_` and `.` only (the same rule as the editor; `-` joins the ends in link ids).
+- Keys the format doesn't list are errors with a "did you mean" hint (e.g. `metrc` → `metric`, `from` → `a`), so a typo can't silently change the network.
+- A YAML syntax error gives its line and column; an empty file says so.
+- The key lists live in `src/io/yaml-format.ts`. The loader and the in-app **YAML format** guide (toolbar button, and a link in the import error box) both read them, so the guide always matches what loads. The guide has a checker: paste a file, see every problem as you type, then load it (D40).
 
 ## 6. UI layout
 ```

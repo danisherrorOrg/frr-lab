@@ -1,14 +1,11 @@
 // Topology edits for the canvas and properties panel (F1). Every function returns
 // a NEW topology and never changes its input: the engine caches by object (D15).
 import type { Link, NodeId, RouterNode, Topology } from '../engine/types'
-import { MAX_LABEL, MAX_METRIC, uniqueLinkId } from '../io/yaml'
+import { ID_PATTERN, MAX_LABEL, MAX_METRIC, uniqueLinkId } from '../io/yaml'
 
 export type EditResult = { ok: true; topology: Topology } | { ok: false; error: string }
 
 export type Pos = { x: number; y: number }
-
-/** Ids typed in the UI: letters, digits, "_" and "." (no "-", which joins link ids). */
-const ID_PATTERN = /^[A-Za-z0-9_.]+$/
 
 const fmt = (n: number) => n.toLocaleString('en-US')
 

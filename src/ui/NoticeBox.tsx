@@ -12,6 +12,7 @@ const COLORS = {
 export function NoticeBox() {
   const notice = useStore((s) => s.notice)
   const setNotice = useStore((s) => s.setNotice)
+  const setYamlGuide = useStore((s) => s.setYamlGuide)
   if (!notice) return null
   return (
     <div
@@ -29,6 +30,15 @@ export function NoticeBox() {
           <li key={i}>{l}</li>
         ))}
       </ul>
+      {notice.yamlHelp && (
+        <button
+          type="button"
+          className="mt-1 underline underline-offset-2"
+          onClick={() => setYamlGuide(true)}
+        >
+          Open the YAML format guide
+        </button>
+      )}
     </div>
   )
 }

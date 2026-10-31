@@ -364,3 +364,12 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Other options considered:** hover to highlight (no touch or keyboard support); several sets at once (the shading already does that).
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D40 – YAML format guide and clearer import errors (2026-10-31)
+- **Why:** user request. People writing a topology file by hand had no reference in the app, and some mistakes were silent: an unknown key such as `metrc` or `adj_sid` was dropped without a word, so the network could differ from the file.
+- **Validation (`src/io/yaml.ts`):** unknown keys at the top level, in a router or in a link are errors, with a "did you mean" hint from a short alias list (`from` → `a`, `routers` → `nodes`) or spelling distance; YAML syntax errors give the line and column, and a tab gets a "use spaces" hint; an empty file says so; router ids follow the editor's rule (letters, digits, `_`, `.`), which also keeps link ids like `S-E` unambiguous (D14, D21); a duplicate id names the router that has it first; a link to a router that exists but has another error no longer also says the router "does not exist". An empty `nodes: []` stays valid, since a network with every router deleted can be exported.
+- **One source for the format:** `src/io/yaml-format.ts` holds the key lists, rules text and the starter file. The loader's known-key check and the guide's tables both read it.
+- **UI:** a "YAML format" toolbar button opens a dialog: a starter file, block-style example, tables for top-level / router / link keys, rules, common mistakes, and a checker that runs `parseTopology` as you type, lists every problem, and loads the file when it is clean. A failed import says how many problems to fix and links to the guide. Escape or ✕ closes it.
+- **Other options considered:** unknown keys as warnings (the file would load with the typo still ignored, which is the problem being fixed); a separate Markdown page (needs leaving the app and could drift from the loader).
+- **No new dependencies.**
+- **Status:** Accepted.
