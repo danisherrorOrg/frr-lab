@@ -17,6 +17,11 @@ Read `README.md`, then the `docs/` files in number order, before changing anythi
 - `npm run lint && npm run typecheck`
 - `npm run build`: static build into `dist/`
 
+## Testing in the browser
+- You can use the Claude in Chrome extension (`mcp__claude-in-chrome__*` tools) to test UI changes in a real browser.
+- Start `npm run dev`, open the local URL in a new tab, then click through the change, take screenshots and read console messages for errors.
+- Browser checks add to `npm test`; they don't replace engine tests.
+
 ## Style
 - TypeScript strict; small pure functions; named exports.
 - Comments explain *why* (cite RFC sections like `// RFC 7490 §5.2.1`), not *what*.
