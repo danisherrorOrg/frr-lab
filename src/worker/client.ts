@@ -1,6 +1,7 @@
 import type { ComputeOptions, CoverageReport, SourceRows } from '../engine/index'
 import type { HeatMap } from '../engine/heat-map'
 import type { LinkView } from '../engine/link-view'
+import type { WhatIf } from '../engine/what-if'
 import type { FailureSimulation, RepairMode, SourceFailure } from '../engine/simulate'
 import type { DestinationResult, NodeId, Topology } from '../engine/types'
 import { handleRequest, type EngineRequest, type EngineResponse } from './protocol'
@@ -53,6 +54,13 @@ export interface EngineClient {
     options?: { extended?: boolean },
     onProgress?: (done: number, total: number, source: NodeId) => void,
   ): Promise<HeatMap>
+  /** Coverage before and after one change (docs/02-algorithms.md §13). */
+  whatIf(
+    before: Topology,
+    after: Topology,
+    options?: { extended?: boolean },
+    onProgress?: (done: number, total: number, source: NodeId) => void,
+  ): Promise<WhatIf>
   /** Stops the worker; pending calls reject. */
   terminate(): void
 }
@@ -122,6 +130,7 @@ export function createEngineClient(worker: WorkerLike = createDefaultWorker()): 
       p.resolve(data.sources as never)
     else if (data.kind === 'link') p.resolve(data.view as never)
     else if (data.kind === 'heat-map') p.resolve(data.map as never)
+    else if (data.kind === 'what-if') p.resolve(data.diff as never)
     else p.resolve(data.report as never)
   })
 
@@ -167,6 +176,8 @@ export function createEngineClient(worker: WorkerLike = createDefaultWorker()): 
       send({ kind: 'link', topology, link, ...(options && { options }) }),
     coverageMap: (topology, options, onProgress) =>
       send({ kind: 'heat-map', topology, ...(options && { options }) }, onProgress),
+    whatIf: (before, after, options, onProgress) =>
+      send({ kind: 'what-if', before, after, ...(options && { options }) }, onProgress),
     terminate: () => {
       worker.terminate()
       for (const p of pending.values()) p.reject(new Error('The engine worker was stopped.'))

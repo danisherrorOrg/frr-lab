@@ -23,6 +23,7 @@ import { ResultsTable } from './ui/ResultsTable'
 import { Sidebar } from './ui/Sidebar'
 import { Toolbar } from './ui/Toolbar'
 import { Tour } from './ui/Tour'
+import { WhatIf } from './ui/WhatIf'
 import { YamlGuide } from './ui/YamlGuide'
 import { isFirstVisit, markTourSeen } from './ui/tour-steps'
 import { useHeatMap } from './ui/useHeatMap'
@@ -415,6 +416,7 @@ export function App() {
               if (anyFailed) setSimDest(r.dest)
             }}
           />
+          <WhatIf />
           <CoverageReport source={source} />
         </main>
       </div>

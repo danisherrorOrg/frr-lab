@@ -91,6 +91,11 @@ export interface AppState {
    * share of their repairs protected in this repair mode; null = off.
    */
   heatMap: RepairMode | null
+  /**
+   * What-if diff (TODO backlog): null = closed, else the link whose metric is tried
+   * (null = none picked yet). The try is not an edit until "Apply".
+   */
+  whatIf: { link: string | null } | null
 
   loadTopology: (t: Topology, source?: NodeId, warnings?: string[]) => void
   loadExample: (key: string) => void
@@ -138,6 +143,9 @@ export interface AppState {
   openLinkView: (link: string | null) => void
   closeLinkView: () => void
   setHeatMap: (mode: RepairMode | null) => void
+  /** Open the what-if diff on this link (null = open with none picked) and select it. */
+  openWhatIf: (link: string | null) => void
+  closeWhatIf: () => void
 }
 
 /** Keep the chosen source if it still exists, else 'S', else the first router. */
@@ -165,6 +173,7 @@ function tidy(s: AppState, t: Topology): Partial<AppState> {
     simDest: s.simDest !== null && nodes.has(s.simDest) ? s.simDest : null,
     linkStart: s.linkStart !== null && nodes.has(s.linkStart) ? s.linkStart : null,
     linkView: s.linkView?.link != null && !links.has(s.linkView.link) ? { link: null } : s.linkView,
+    whatIf: s.whatIf?.link != null && !links.has(s.whatIf.link) ? { link: null } : s.whatIf,
   }
 }
 
@@ -229,6 +238,7 @@ export const useStore = create<AppState>()((set, get) => {
     yamlGuide: false,
     linkView: null,
     heatMap: null,
+    whatIf: null,
 
     loadTopology: (t, source, warnings = []) => {
       const placed = edit.withPositions(t)
@@ -353,13 +363,18 @@ export const useStore = create<AppState>()((set, get) => {
     setSource: (id) => set({ source: id, row: null, backup: 'auto' }),
     setAllSources: (allSources) => set({ allSources, row: null, backup: 'auto' }),
     pickRow: (source, row) => set({ source, row, backup: 'auto' }),
-    // A link clicked on the canvas while the per-link view is open becomes its link.
+    // A link clicked on the canvas while the per-link view or the what-if diff is
+    // open becomes its link.
     select: (selection) =>
       set({
         selection,
         ...(selection?.kind === 'link' &&
           get().linkView !== null && {
             linkView: { link: selection.id },
+          }),
+        ...(selection?.kind === 'link' &&
+          get().whatIf !== null && {
+            whatIf: { link: selection.id },
           }),
       }),
     selectRow: (row) => set({ row, backup: 'auto' }),
@@ -424,6 +439,9 @@ export const useStore = create<AppState>()((set, get) => {
       set({ linkView: { link }, ...(link !== null && { selection: { kind: 'link', id: link } }) }),
     closeLinkView: () => set({ linkView: null }),
     setHeatMap: (heatMap) => set({ heatMap }),
+    openWhatIf: (link) =>
+      set({ whatIf: { link }, ...(link !== null && { selection: { kind: 'link', id: link } }) }),
+    closeWhatIf: () => set({ whatIf: null }),
   }
 })
 

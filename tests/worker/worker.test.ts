@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { computeAllSources, computeCoverage, computeForSource } from '../../src/engine/index'
 import { coverageMap } from '../../src/engine/heat-map'
 import { linkView } from '../../src/engine/link-view'
+import { whatIf } from '../../src/engine/what-if'
 import { simulateAllSources, simulateFailure } from '../../src/engine/simulate'
 import { createEngineClient, createInlineWorker, type WorkerLike } from '../../src/worker/client'
 import { handleRequest, type EngineRequest, type EngineResponse } from '../../src/worker/protocol'
@@ -70,6 +71,21 @@ describe('heat-map requests', () => {
     const progress: number[] = []
     const map = await client.coverageMap(ring(), { extended: false }, (done) => progress.push(done))
     expect(map).toEqual(coverageMap(ring(), { extended: false }))
+    expect(progress).toEqual([1, 2, 3, 4, 5])
+  })
+})
+
+describe('what-if requests', () => {
+  it('the client resolves the same diff as the engine, with progress per router', async () => {
+    const client = createEngineClient(fakeWorker())
+    const before = loadFixture('03-ring5-highmetric.yaml')
+    const after = {
+      ...before,
+      links: before.links.map((l) => (l.id === 'C-B' ? { ...l, metricAB: 1, metricBA: 1 } : l)),
+    }
+    const progress: number[] = []
+    const diff = await client.whatIf(before, after, { extended: true }, (d) => progress.push(d))
+    expect(diff).toEqual(whatIf(before, after, { extended: true }))
     expect(progress).toEqual([1, 2, 3, 4, 5])
   })
 })

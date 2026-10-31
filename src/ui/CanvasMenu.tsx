@@ -77,6 +77,7 @@ export function CanvasMenu({
       },
       { text: '✎ Edit metric…', act: () => onEditMetric(target.id) },
       { text: '🔍 What uses this link?', act: () => st().openLinkView(target.id) },
+      { text: '⇄ What if the metric changes?', act: () => st().openWhatIf(target.id) },
       { text: `🗑 Delete link ${name}`, act: () => st().remove(target) },
     ]
   }

@@ -15,6 +15,7 @@ import {
 } from '../engine/simulate'
 import { coverageMap, type HeatMap } from '../engine/heat-map'
 import { linkView, type LinkView } from '../engine/link-view'
+import { whatIf, type WhatIf } from '../engine/what-if'
 import type { DestinationResult, NodeId, Topology } from '../engine/types'
 
 // Messages between the page and engine.worker.ts. Plain data only, so they
@@ -60,6 +61,14 @@ export type EngineRequest =
   | { id: number; kind: 'link'; topology: Topology; link: string; options?: { extended?: boolean } }
   /** Coverage heat map (TODO backlog, docs/02-algorithms.md §12), with progress. */
   | { id: number; kind: 'heat-map'; topology: Topology; options?: { extended?: boolean } }
+  /** What-if diff (TODO backlog, docs/02-algorithms.md §13), with progress. */
+  | {
+      id: number
+      kind: 'what-if'
+      before: Topology
+      after: Topology
+      options?: { extended?: boolean }
+    }
 
 export type EngineResponse =
   | { id: number; kind: 'progress'; done: number; total: number; source: NodeId }
@@ -70,6 +79,7 @@ export type EngineResponse =
   | { id: number; kind: 'simulate-all'; sources: SourceFailure[] }
   | { id: number; kind: 'link'; view: LinkView }
   | { id: number; kind: 'heat-map'; map: HeatMap }
+  | { id: number; kind: 'what-if'; diff: WhatIf }
   | { id: number; kind: 'error'; message: string }
 
 /**
@@ -122,6 +132,12 @@ export function handleRequest(req: EngineRequest, post: (res: EngineResponse) =>
         id: req.id,
         kind: 'heat-map',
         map: coverageMap(req.topology, { ...req.options, onProgress }),
+      })
+    } else if (req.kind === 'what-if') {
+      post({
+        id: req.id,
+        kind: 'what-if',
+        diff: whatIf(req.before, req.after, { ...req.options, onProgress }),
       })
     } else {
       const report = computeCoverage(req.topology, { ...req.options, onProgress })

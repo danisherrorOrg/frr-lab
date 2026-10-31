@@ -15,6 +15,7 @@ import type {
   Through,
 } from '../engine/simulate'
 import type { NodeId, Protection, Segment, Topology } from '../engine/types'
+import type { PairMethod } from '../engine/what-if'
 import type { BackupKind, Selection } from '../state/store'
 import type { Highlight } from './canvas'
 
@@ -423,4 +424,54 @@ export function heatLines(counts: CoverageCounts, kind: 'node' | 'link'): string
       : `Heat map: ${n} repair${n === 1 ? '' : 's'} if this link fails (both ends)`,
     `${share('lfa')} · ${share('rlfa')} · ${share('tilfa')}`,
   ]
+}
+
+/** One repair mode's share before and after a what-if change (docs/02-algorithms.md §13). */
+export interface ShareChange {
+  mode: RepairMode
+  /** "40% (8/20)", or "–" with nothing to protect. */
+  before: string
+  after: string
+  /** Percentage points, one decimal; undefined when either side has no pairs. */
+  delta: number | undefined
+  /** "40% → 50%". */
+  change: string
+  /** "LFA 40% → 50%", the short form for headings and screen readers. */
+  text: string
+}
+
+export function shareChange(
+  before: CoverageCounts,
+  after: CoverageCounts,
+  mode: RepairMode,
+): ShareChange {
+  const pb = percent(protectedIn(before, mode), before.pairs)
+  const pa = percent(protectedIn(after, mode), after.pairs)
+  const side = (c: CoverageCounts, p: number | undefined) =>
+    p === undefined ? '–' : `${p}% (${protectedIn(c, mode)}/${c.pairs})`
+  const short = (p: number | undefined) => (p === undefined ? '–' : `${p}%`)
+  const change = `${short(pb)} → ${short(pa)}`
+  return {
+    mode,
+    before: side(before, pb),
+    after: side(after, pa),
+    delta: pb === undefined || pa === undefined ? undefined : Math.round((pa - pb) * 10) / 10,
+    change,
+    text: `${HEAT_MODE_NAME[mode]} ${change}`,
+  }
+}
+
+/** "+10 points", "−20 points", "no change". */
+export const deltaText = (d: number | undefined) =>
+  d === undefined || d === 0 ? 'no change' : `${d > 0 ? '+' : '−'}${Math.abs(d)} points`
+
+/** A destination's pairs on one side: "via E: TI-LFA", "via A: LFA · via C: ✗ none". */
+export function pairsText(source: NodeId, pairs: PairMethod[], b?: Bundles): string {
+  if (pairs.length === 0) return 'unreachable'
+  return pairs
+    .map(
+      (p) =>
+        `via ${hopName(b, source, p.via, p.link)}: ${p.by === null ? '✗ none' : METHOD_NAME[p.by]}`,
+    )
+    .join(' · ')
 }

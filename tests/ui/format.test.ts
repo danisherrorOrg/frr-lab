@@ -7,6 +7,9 @@ import { adjLabel } from '../../src/engine/labels'
 import { simulateAllSources, simulateFailure, type FailureSummary } from '../../src/engine/simulate'
 import {
   bundles,
+  deltaText,
+  pairsText,
+  shareChange,
   dutSummary,
   howText,
   walkMarks,
@@ -517,5 +520,59 @@ describe('heat map labels', () => {
     expect(heatLines(c(0, 0, 0, 0), 'link')).toEqual([
       'Heat map: carries no traffic, so nothing to repair (only a backup)',
     ])
+  })
+})
+
+// What-if diff, docs/02-algorithms.md §13.
+describe('what-if text', () => {
+  const c = (pairs: number, lfa: number, rlfa: number, tilfa: number) => ({
+    pairs,
+    ecmp: 0,
+    lfa,
+    rlfa,
+    tilfa,
+  })
+
+  it('Example 3 → 2: LFA 40% → 50%, +10 points', () => {
+    expect(shareChange(c(20, 8, 8, 20), c(20, 10, 20, 20), 'lfa')).toEqual({
+      mode: 'lfa',
+      before: '40% (8/20)',
+      after: '50% (10/20)',
+      delta: 10,
+      change: '40% → 50%',
+      text: 'LFA 40% → 50%',
+    })
+    expect(shareChange(c(20, 8, 8, 20), c(20, 10, 20, 20), 'rlfa').text).toBe(
+      'LFA + Remote LFA 40% → 100%',
+    )
+  })
+
+  it('nothing to protect shows "–" and no delta', () => {
+    const s = shareChange(c(0, 0, 0, 0), c(0, 0, 0, 0), 'tilfa')
+    expect([s.before, s.delta, s.text]).toEqual(['–', undefined, 'TI-LFA – → –'])
+  })
+
+  it('deltas read as points, with a real minus sign', () => {
+    expect([deltaText(10), deltaText(-20), deltaText(0), deltaText(undefined)]).toEqual([
+      '+10 points',
+      '−20 points',
+      'no change',
+      'no change',
+    ])
+  })
+
+  it('names the next hop, and the link only in a bundle', () => {
+    expect(pairsText('S', [{ link: 'S-E', via: 'E', by: 'tilfa' }])).toBe('via E: TI-LFA')
+    expect(
+      pairsText(
+        'S',
+        [
+          { link: 'S-E#2', via: 'E', by: null },
+          { link: 'S-A', via: 'A', by: 'ecmp' },
+        ],
+        bundles(loadFixture('07-parallel.yaml')),
+      ),
+    ).toBe('via E (S-E#2): ✗ none · via A: ECMP')
+    expect(pairsText('S', [])).toBe('unreachable')
   })
 })

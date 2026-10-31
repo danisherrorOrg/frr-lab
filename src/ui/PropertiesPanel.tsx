@@ -86,6 +86,7 @@ function RouterForm({ node, topology: t }: { node: RouterNode; topology: Topolog
 function LinkForm({ link, topology: t }: { link: Link; topology: Topology }) {
   const update = useStore((s) => s.updateLink)
   const openLinkView = useStore((s) => s.openLinkView)
+  const openWhatIf = useStore((s) => s.openWhatIf)
   const remove = useStore((s) => s.deleteSelection)
   const { a, b } = link
   const adj = (key: 'adjSidAB' | 'adjSidBA', from: string, to: string) => {
@@ -132,6 +133,13 @@ function LinkForm({ link, topology: t }: { link: Link; topology: Topology }) {
         onClick={() => openLinkView(link.id)}
       >
         What uses this link?
+      </button>
+      <button
+        type="button"
+        className="mt-1 mr-2 rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
+        onClick={() => openWhatIf(link.id)}
+      >
+        What if the metric changes?
       </button>
       <button type="button" className={danger} onClick={remove}>
         Delete link

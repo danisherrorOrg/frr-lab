@@ -392,3 +392,13 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Other options considered:** a continuous colour ramp (hard to read on small nodes, and a ramp can't say "fully protected" clearly); router colour = "what if it fails" (needs node protection); colouring only links (the TODO asks for routers too, and the coverage report is per router).
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D43 – What-if diff: coverage before vs after a metric change (2026-10-31)
+- **Why:** TODO backlog "Design checks". Tuning a metric to fix one repair can quietly break others. Before, you had to note the coverage report's numbers, edit, rerun and compare by hand.
+- **Engine:** `whatIf()` in `src/engine/what-if.ts` (pure, `docs/02-algorithms.md` §13): §5 coverage of both versions, in total and per router, and every (source, destination) whose primary links or protection strength change, as `better`, `worse` or `rerouted`. ECMP ↔ LFA is not a change. Runs in the worker with progress; 200 routers / 600 links under 4 s (twice the coverage work, speed test).
+- **Per destination, not per pair:** a new metric often moves a destination to another primary link, so the old and new pairs don't match one to one. Grouping by destination and comparing the weakest pair keeps the list readable ("via E: TI-LFA → via E: Remote LFA").
+- **UI:** "What-if: change a metric" under the results, also from a link's properties and right-click menu ("What if the metric changes?"). Pick a link (or click one on the diagram), type the new metric, press Compare. Like the metric editor, one box sets both directions; "Each direction" gives one box per direction, and a link whose metrics already differ starts that way. (The first version always showed two boxes, so typing in the first one changed the link one way only, which nobody expects for a symmetric link.) It shows a before / after / change table per repair mode (▲ / ▼ and the numbers, not colour alone), the routers whose coverage changes, and the changed destinations, worse first (first 100). Nothing is edited until "Apply this metric", one undo step. The metric is checked like an edit, so Apply can't fail. The try is applied to the current topology, so edits elsewhere are counted. While anything is down, a note says it shows the plan on the full network.
+- **Compare button, not live:** each try is two all-sources runs; recomputing on every keystroke would queue slow runs on a big network.
+- **Other options considered:** diff against the last undo step (only after an edit, and an edit is what this avoids); any change, not just a metric (the engine takes two topologies, so it can grow later; the TODO asks for metrics).
+- **No new dependencies.**
+- **Status:** Accepted.

@@ -300,7 +300,7 @@ Things that fit the "learn and check FRR" goal and stay offline / no backend.
 **Design checks (for engineers)**
 - [x] Per-link view: pick a link, list every (source, destination) it protects and how *(D41, `02-algorithms.md` §11)*
 - [x] Coverage heat-map on the canvas: colour links / routers by how well they are protected *(D42, `02-algorithms.md` §12)*
-- [ ] What-if diff: change a metric and see coverage before vs after ("LFA 60% → 80%")
+- [x] What-if diff: change a metric and see coverage before vs after ("LFA 60% → 80%") *(D43, `02-algorithms.md` §13)*
 - [ ] Max SID depth (MSD) setting: flag TI-LFA repairs whose label stack is too deep for the hardware
 - [ ] LFA policy knobs (RFC 7916): prefer node-protecting, prefer downstream, exclude a neighbor
 - [ ] Overload bit / max-metric router: excluded from transit, see how coverage changes

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { coverageMap } from '../../src/engine/heat-map'
 import { computeAllSources, computeCoverage } from '../../src/engine/index'
+import { whatIf } from '../../src/engine/what-if'
 import { simulateAllSources } from '../../src/engine/simulate'
 import type { Link, Topology } from '../../src/engine/types'
 
@@ -55,6 +56,20 @@ describe('coverage speed', () => {
     expect(Object.keys(m.routers)).toHaveLength(200)
     expect(Object.keys(m.links)).toHaveLength(600)
     expect(ms).toBeLessThan(2000)
+  })
+
+  // TODO backlog: the what-if diff runs coverage twice (before and after), so 2 × 2 s.
+  it('200 routers, 600 links, what-if diff: under 4 s', () => {
+    const topo = bigTopology()
+    const after = {
+      ...topo,
+      links: topo.links.map((l, i) => (i === 0 ? { ...l, metricAB: 1, metricBA: 1 } : l)),
+    }
+    const start = performance.now()
+    const w = whatIf(topo, after)
+    const ms = performance.now() - start
+    expect(w.sources).toHaveLength(200)
+    expect(ms).toBeLessThan(4000)
   })
 })
 

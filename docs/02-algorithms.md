@@ -466,3 +466,25 @@ Worked checks:
 | 7, link S-E#2 | – (0 pairs, only a backup) | – | – |
 
 A property test (random networks, with and without bundles, both P-space settings) checks that each router's counts equal its coverage row, that the link counts add up to the total, and that a link's counts match the per-link view's rows.
+
+---
+
+## 13. What-if diff (TODO backlog, D43)
+`whatIf(before, after)` (`src/engine/what-if.ts`) compares two versions of the network, in the app the same network with one link's metric changed. It decides nothing new: each side is the "all sources" coverage of §5, and each pair's method is the results table's `protectedBy` (§5).
+
+- **Totals and per router:** the §5 counts of both sides, in total and for every router as the source. The UI shows each repair mode's share as "before → after" and the change in percentage points, e.g. "LFA 40% → 50% (+10 points)".
+- **Per destination:** for each (source S, destination D), the list of D's pairs on each side: (primary link S–E, simplest method). If the lists differ (other links, or a method of another strength), the destination is listed:
+  - strength follows the repair modes: LFA (ECMP counts as LFA) 3, Remote LFA 2, TI-LFA 1, none 0. ECMP ↔ LFA is not a change.
+  - `better` / `worse`: the weakest pair's strength went up / down
+  - `rerouted`: the primary links changed but the weakest strength did not
+  - D with no pairs on one side (it can't be reached) is `rerouted`; a metric change never does this.
+- The diff is about the plan on the full network, like the coverage report: links and routers failed in the simulation are not taken out.
+
+Worked checks:
+
+| Example, change | LFA | LFA + Remote LFA | TI-LFA | Destinations |
+|---|---|---|---|---|
+| 3, C–B 10 → 1 (gives Example 2) | 8/20 = 40% → 10/20 = 50% | 40% → 100% | 100% → 100% | 4 worse, 12 better, 2 rerouted. S→E: TI-LFA → Remote LFA (§6). B→A: LFA → Remote LFA (C is no longer loop-free: 2 = 1 + 1) |
+| 2, S–E 1 → 3 | 50% → 50% | 100% → 80% | 100% → 100% | worse: A→C, B→A, B→C, B→E, B→S, C→A |
+
+A property test (random networks, with and without bundles, both P-space settings, a random link given a random metric) checks that each side equals `computeCoverage()` in total and per router, that a router with no listed destination keeps its counts, and that swapping the sides swaps `better` and `worse`.
