@@ -38,6 +38,8 @@ export interface Notice {
   kind: 'error' | 'warning' | 'info'
   title: string
   lines: string[]
+  /** A "back up" notice: the routers it says are back, so failing one again can update it. */
+  backUp?: NodeId[]
 }
 
 const HISTORY_LIMIT = 100
@@ -154,6 +156,7 @@ function backUpNotice(ids: NodeId[]): Notice {
   const many = ids.length > 1
   return {
     kind: 'info',
+    backUp: ids,
     title: `${many ? 'Routers' : 'Router'} ${ids.join(', ')} ${many ? 'are' : 'is'} back up`,
     lines: [
       `${many ? 'Their' : 'Its'} links are up again, so traffic goes back to the normal paths in the results table.`,
@@ -352,13 +355,20 @@ export const useStore = create<AppState>()((set, get) => {
       })
     },
     toggleFailedNode: (id) => {
-      const down = get().failedNodes
+      const { failedNodes: down, notice } = get()
       const back = down.includes(id)
+      // Failed again: the "back up" notice must stop saying so.
+      const stillUp = notice?.backUp?.filter((x) => x !== id)
       set({
         failedNodes: back ? down.filter((x) => x !== id) : [...down, id],
         converged: false,
         simDest: null,
-        ...(back && { notice: backUpNotice([id]) }),
+        ...(back
+          ? { notice: backUpNotice([id]) }
+          : stillUp !== undefined &&
+            stillUp.length < notice!.backUp!.length && {
+              notice: stillUp.length > 0 ? backUpNotice(stillUp) : null,
+            }),
       })
     },
     restoreAll: () => {

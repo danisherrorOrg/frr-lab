@@ -93,6 +93,27 @@ describe('store', () => {
     expect(s().failedLinks).toEqual([])
   })
 
+  it('the "back up" notice stops naming a router that fails again', () => {
+    s().toggleFailedNode('C')
+    s().toggleFailedNode('C')
+    expect(s().notice?.title).toBe('Router C is back up')
+    s().toggleFailedNode('C')
+    expect(s().notice).toBeNull()
+
+    // Two routers back at once: failing one leaves the other in the notice.
+    s().toggleFailedNode('A')
+    s().restoreAll()
+    s().toggleFailedNode('B')
+    expect(s().notice?.title).toBe('Routers C, A are back up')
+    s().toggleFailedNode('A')
+    expect(s().notice?.title).toBe('Router C is back up')
+
+    // Other notices are left alone.
+    s().setNotice({ kind: 'warning', title: 'Loaded with warnings', lines: [] })
+    s().toggleFailedNode('C')
+    expect(s().notice?.title).toBe('Loaded with warnings')
+  })
+
   it('changing the repair mode goes back to the repair view', () => {
     s().toggleFailedLink('S-E')
     s().setConverged(true)
