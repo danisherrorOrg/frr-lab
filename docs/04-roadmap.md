@@ -67,6 +67,13 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 - [ ] Blog / LinkedIn post: "TI-LFA explained with pictures" (use Examples 2 and 3)
 - [ ] Add `projects/lfa-lab.md` + an `INDEX.md` row in the profile folder; update the resume bullet
 
+## Phase 9 – User feedback, v0.2
+- [ ] Close button / Escape for the detail panel
+- [ ] Fail several links; show which repairs survive or break
+- [ ] Fail a router (down or rebooting): show which link-protecting repairs break because they go through it
+- [ ] Parallel links between two routers (replaces D4)
+- [ ] Canvas usability: obvious dragging, tooltips, right-click menu, click-to-select destination
+
 ## Later (v0.2+), in priority order
 1. Node protection (RLFA per RFC 8102, TI-LFA with node E removed)
 2. Import from FRR `show isis database detail`

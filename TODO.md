@@ -183,11 +183,113 @@ clear "done when".
 
 ---
 
+## Phase 9 – User feedback, v0.2 (from hands-on testing, 2026-10-31)
+
+Feedback from a user who knows LFA / RLFA / TI-LFA. Do these first: they fix friction in
+the current UI before the bigger features below.
+
+### 9.1 Close the detail panel (small)
+- [ ] ✕ button on `DetailPanel.tsx` that calls `selectRow(null)` and clears the path highlight
+- [ ] `Escape` closes it too (keyboard rule from Phase 7)
+- [ ] Clicking the same row again toggles it closed; clicking empty canvas also closes it
+- [ ] UI test: open a row, press ✕, panel and highlight are gone
+
+**Done when:** you can always get back to the plain diagram in one click or one key.
+
+### 9.2 Fail more than one link
+Today `failedLink` is a single id. FRR protects against one failure, so the tool must
+*show* what goes wrong when a second link fails, not hide it.
+- [ ] Store: `failedLinks: string[]` (keep share URL / old state readable)
+- [ ] Fail-link tool toggles each link on/off; a "Restore all" button
+- [ ] Engine (`simulate.ts`, tests first): with several links down, for each affected destination say
+      - repair still works, or
+      - **repair broken**: the pre-computed backup path uses another failed link (show which one), or
+      - destination unreachable (network partitioned)
+- [ ] "Converge" uses SPF with all failed links removed
+- [ ] Explain text with real numbers, e.g. "TI-LFA repair to D goes via B–C, which is also down"
+- [ ] `DECISIONS.md` entry: how a multi-failure result is shown and why
+
+**Done when:** failing two links on Example 2 shows which repairs survive and which break.
+
+### 9.3 Router failure (router down or rebooting)
+When router E goes down, every link to it goes down at once and its Prefix-SID stops
+working. The neighbors only see "my link to E failed", so they use their **link-protecting**
+backups, and some of those still go through E. This is the main reason node protection
+exists.
+- [ ] "Fail router" tool + right-click "Fail router"; failed router greyed out, all its links shown as down
+- [ ] Engine (`simulate.ts`, tests first): fail a node = remove E and all its links. For each source S and destination D:
+      - D = E: unreachable, which is expected (say so plainly, not as a protection failure)
+      - repair survives: the backup path never goes through E
+      - **repair broken by the node failure**: the backup goes through E (show where), e.g.
+        - link-protecting LFA whose path from N to D goes through E (failed node-protecting check, `dist(N,D) < dist(N,E) + dist(E,D)` ✗)
+        - RLFA whose PQ node is reached through E, or whose path from PQ to D goes through E
+        - TI-LFA link-protection stack that contains `PrefixSID(E)` or an Adj-SID on a link of E
+      - not affected: traffic to D never went through E
+- [ ] Per-source summary: "E down: 6 destinations affected, 4 repairs survive, 2 break"
+- [ ] "Converge" view: SPF with E removed; compare it with the repair path
+- [ ] Explain text with real numbers for each broken repair
+- [ ] Router comes back (restore): show that the old paths return. (opt) Show the overload bit on startup (ISO 10589 / RFC 3787): the rebooted router stays out of transit paths until it is ready
+- [ ] Tests on Examples 1–3: fail E and check each repair's survive/break result by hand first
+- [ ] `DECISIONS.md` entry: what "broken" means for each backup type
+- [ ] Out of scope (non-goal): reboot timing, BFD / hold timers, graceful restart. We show the *state* before and after, not the timing.
+
+**Done when:** failing a router on Example 1 shows the node-protecting LFA survives, and an example with only link-protecting backups shows them breaking, with the reason. This leads into Later #1 (node protection).
+
+### 9.4 Parallel links between two routers
+Needs a rule change: the MVP bans parallel links (D4).
+- [ ] Re-read RFC 5286 on parallel links and how they act as alternates; log the result in `DECISIONS.md` (replaces D4)
+- [ ] Types: links already have their own id; drop the "no parallel links" check in `io/yaml.ts` and `state/edit.ts`
+- [ ] Tests first (engine):
+      - SPF/ECMP: two equal links to E give ECMP; failing one is ECMP-protected
+      - LFA: the other parallel link to E protects the link (not the node)
+      - TI-LFA: each parallel link gets its own Adj-SID; `AdjSID(S→N)` must name the link, not just the neighbor
+- [ ] Canvas: draw parallel links as curved bundles (Cytoscape `curve-style: bezier`) with separate metric labels
+- [ ] Add-link tool lets you add a second link between the same pair
+- [ ] New example `06-parallel.yaml` + expected results
+
+**Done when:** a 2-link bundle shows ECMP / link-protecting LFA correctly and each link can be failed on its own.
+
+### 9.5 Canvas usability
+- [ ] Make dragging obvious: allow dragging routers in every tool (a drag isn't a click), or show a hint "switch to Select to move routers"
+- [ ] Hover tooltip on a router (name, SID, label) and link (metrics both ways, Adj-SIDs)
+- [ ] Right-click menu: set as source, fail/restore link, fail router, delete
+- [ ] Double-click a link to edit its metric in place
+- [ ] Click a router on the canvas as destination → selects that row in the results table
+- [ ] "Auto layout" and "Fit to screen" buttons; zoom +/− buttons for touch/trackpad users
+
+---
+
+## Ideas backlog (suggested, not yet prioritised)
+
+Things that fit the "learn and check FRR" goal and stay offline / no backend.
+
+**Teaching**
+- [ ] Packet walk: step through a TI-LFA repair hop by hop, showing the label stack at each router (push, pop at the end of each segment, PHP)
+- [ ] Compare view: LFA, RLFA and TI-LFA paths for one destination side by side
+- [ ] Guided tour on first visit (load Example 2, fail S–E, read the TI-LFA stack)
+- [ ] Clickable P / Q / PQ sets in the detail panel that highlight those routers on the canvas
+
+**Design checks (for engineers)**
+- [ ] Per-link view: pick a link, list every (source, destination) it protects and how
+- [ ] Coverage heat-map on the canvas: colour links / routers by how well they are protected
+- [ ] What-if diff: change a metric and see coverage before vs after ("LFA 60% → 80%")
+- [ ] Max SID depth (MSD) setting: flag TI-LFA repairs whose label stack is too deep for the hardware
+- [ ] LFA policy knobs (RFC 7916): prefer node-protecting, prefer downstream, exclude a neighbor
+- [ ] Overload bit / max-metric router: excluded from transit, see how coverage changes
+- [ ] Find the weakest spots: links or routers whose failure leaves the most destinations unprotected
+
+**Data in / out**
+- [ ] Export the diagram as PNG / SVG for slides and docs
+- [ ] Random topology generator (ring, grid, leaf-spine, random mesh) with a size slider
+- [ ] Vendor CLI import (see Later #2)
+
+---
+
 ## Later (v0.2+), in priority order
 
 1. [ ] Node protection: RLFA per RFC 8102, TI-LFA with node E removed (`02-algorithms.md` §4.4)
 2. [ ] Import from FRR `show isis database detail`
-3. [ ] SRLG (links that fail together)
+3. [ ] SRLG (links that fail together; builds on 9.2 multi-failure)
 4. [ ] Quiz mode for students
 5. [ ] LAN links / pseudonodes, multi-level IS-IS
 6. [ ] Microloop view, Flex-Algo, SRv6
