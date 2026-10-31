@@ -21,8 +21,13 @@ const cell = 'px-2 py-1 align-top'
 const arrow = (ids: NodeId[]) => ids.join('→')
 
 function Match({ f }: { f: Flow }) {
+  // The comparison is made at the PLR (D22), so say so when that isn't S.
   if (f.match === 'same')
-    return <span className="text-green-700 dark:text-green-400">✓ same path</span>
+    return (
+      <span className="text-green-700 dark:text-green-400">
+        ✓ same path{f.plr !== f.before[0] && ` from ${f.plr}`}
+      </span>
+    )
   if (f.match === 'same-cost')
     return <span className="text-amber-700 dark:text-amber-400">≈ same cost, other path</span>
   if (f.match === 'longer')
@@ -46,20 +51,29 @@ const pathText = (f: Flow) => `${arrow(f.repair!)}${f.loopAt !== undefined ? '�
 function Chain({ f }: { f: Flow }) {
   const more = (f.repairs ?? []).slice(1)
   const drop = f.drop
+  // A packet can meet the same failed link twice (it came back with other labels).
+  const met = new Set([f.hitLink])
+  const word = (link: string) => {
+    const w = met.has(link) ? 'again' : 'too'
+    met.add(link)
+    return w
+  }
+  const words = more.map((r) => word(r.link))
+  const dropWord = drop?.reason === 'no-backup' ? word(drop.link) : ''
   return (
     <>
       {more.map((r, k) => (
         <span key={k}>
           {' '}
-          At {r.at} it finds <strong>{dash(r.at, r.next)}</strong> down too, and {r.at} switches to
-          its own {METHOD[r.method]} backup.
+          At {r.at} it finds <strong>{dash(r.at, r.next)}</strong> down {words[k]}, and {r.at}{' '}
+          switches to its own {METHOD[r.method]} backup.
         </span>
       ))}
       {drop?.reason === 'no-backup' && (
         <>
           {' '}
-          At {drop.at} it finds <strong>{dash(drop.at, drop.next)}</strong> down too, and {drop.at}{' '}
-          has no backup for it: traffic is <strong>dropped</strong>.
+          At {drop.at} it finds <strong>{dash(drop.at, drop.next)}</strong> down {dropWord}, and{' '}
+          {drop.at} has no backup for it: traffic is <strong>dropped</strong>.
         </>
       )}
       {drop?.reason === 'backup-down' && (
@@ -72,8 +86,8 @@ function Chain({ f }: { f: Flow }) {
       {f.loopAt !== undefined && (
         <>
           {' '}
-          The backups send it back to {f.loopAt}, where it has already been: traffic goes round in a{' '}
-          <strong>loop</strong>.
+          {more.length > 0 ? 'The backups send' : 'The backup sends'} it back to {f.loopAt}, where
+          it has already been: traffic goes round in a <strong>loop</strong>.
         </>
       )}
     </>
@@ -128,6 +142,9 @@ function Story({ f, converged, source }: { f: Flow; converged: boolean; source: 
         ✗ After reconverging, {source} still can&apos;t reach {f.dest}: the failed links cut it off.
       </p>
     )
+  // Repair = final? is judged at the PLR (D22). When the PLR isn't S, S's own path can
+  // still change even though the PLR's part was already final.
+  const sMoves = f.repair !== undefined && f.after.join() !== f.repair.join()
   const plrNote =
     f.plrAfter && f.plr !== source ? (
       <>
@@ -141,11 +158,14 @@ function Story({ f, converged, source }: { f: Flow; converged: boolean; source: 
       <span className="font-mono">{arrow(f.after)}</span> (cost {f.afterCost}).{plrNote}{' '}
       {f.status === 'dropped' && 'During FRR the traffic was dropped, so it was lost until now.'}
       {f.status === 'looped' && 'During FRR the traffic was looping, so it was lost until now.'}
-      {f.match === 'same' && 'The repair path was already this path, so nothing moves again.'}
+      {f.match === 'same' &&
+        (sMoves
+          ? `From ${f.plr} on, the repair already followed ${f.plr}'s final path, but ${source} now sends the traffic another way.`
+          : 'The repair path was already this path, so nothing moves again.')}
       {f.match === 'same-cost' &&
-        'The repair path cost the same but used other routers, so traffic moves once more.'}
+        `From ${f.plr}, the repair cost the same as ${f.plr}'s final path but went another way, so traffic moves once more.`}
       {f.match === 'longer' &&
-        `The repair path cost ${f.plrRepairCost} from ${f.plr}; the final one costs ${f.plrAfterCost}, so traffic moves again.`}
+        `From ${f.plr}, the repair cost ${f.plrRepairCost}; ${f.plr}'s final path costs ${f.plrAfterCost}, so traffic moves again.`}
     </p>
   )
 }

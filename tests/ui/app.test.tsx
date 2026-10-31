@@ -189,6 +189,59 @@ describe('Phase 7: failure simulation, coverage, sharing, keyboard', () => {
     expect(screen.queryByRole('region', { name: 'Failure simulation' })).toBeNull()
   })
 
+  it('a failure away from S: E’s repair is E’s final path, but S itself moves (ring, E–C)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    useStore.getState().toggleFailedLink('E-C')
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    await within(panel).findByText(/1 of 4 destinations cross E–C/)
+    const row = within(panel)
+      .getAllByRole('row')
+      .find((r) => r.querySelector('td')?.textContent === 'C')!
+    // Repair S→E→S→A→B→C; E's part is E's final path, S's own final path is S→A→B→C.
+    expect(row.textContent).toContain('✓ same path from E')
+
+    await user.click(within(panel).getByRole('button', { name: /Converge/ }))
+    expect(panel.textContent).toContain('S→A→B→C (cost 3)')
+    expect(panel.textContent).not.toContain('nothing moves again')
+    expect(panel.textContent).toContain(
+      "From E on, the repair already followed E's final path, but S now sends the traffic another way.",
+    )
+  })
+
+  it('a router that meets the same failed link twice says "again" (square, E–D and S–N)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'square')
+    useStore.getState().toggleFailedLink('E-D')
+    useStore.getState().toggleFailedLink('S-N')
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    await user.click(within(panel).getByLabelText('LFA + Remote LFA'))
+    const row = (await within(panel).findAllByRole('row')).find(
+      (r) => r.querySelector('td')?.textContent === 'D',
+    )!
+    await user.click(row)
+    // E tunnels towards N, S's LFA for N sends it back to E, E repairs E–D a second time.
+    expect(panel.textContent).toContain('At S it finds S–N down too')
+    expect(panel.textContent).toContain('At E it finds E–D down again')
+    expect(panel.textContent).toContain('The backups send it back to S')
+  })
+
+  it('a loop closed after one router’s repair says "the backup", not "the backups"', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'isp-core')
+    // PE1→PE2 goes PE1-P1-P3-PE2; P3 repairs and its backup heads back through P1.
+    useStore.getState().toggleFailedLink('P1-P4')
+    useStore.getState().toggleFailedLink('P3-PE2')
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    const row = (await within(panel).findAllByRole('row')).find(
+      (r) => r.querySelector('td')?.textContent === 'PE2',
+    )!
+    await user.click(row)
+    expect(panel.textContent).toContain('The backup sends it back to P1')
+  })
+
   it('C toggles the converged view while a link is failed', async () => {
     const user = userEvent.setup()
     render(<App />)

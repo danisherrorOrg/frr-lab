@@ -336,7 +336,8 @@ function forward(
       'hop' in top && table.from.get(at)!.firstHops.get(target)![0] !== target
         ? { method: 'tilfa' as const, instrs: [{ to: target }] }
         : undefined
-    const r = viaNormal ?? repairAt(table, resultsAt(at), next, target, mode)
+    const isUp = (n: NodeId) => downBetween(at, n) === undefined
+    const r = viaNormal ?? repairAt(table, resultsAt(at), next, target, mode, isUp)
     if (r === undefined) {
       return {
         path,
@@ -370,7 +371,9 @@ function ttlLoop(path: NodeId[], repairs: RepairStep[], repairIdx: number[]): Wa
 /**
  * The PLR's backup for target `t` when its next hop `next` is unreachable, by the
  * routers' FRR mode, as what it puts on the packet. Built on the full topology:
- * a backup protects one link (RFC 5286 §1, RFC 9855 §3).
+ * a backup protects one link (RFC 5286 §1, RFC 9855 §3). `isUp` says which of the
+ * PLR's links still work; only the ECMP choice uses it, since a forwarding entry
+ * holds one backup and the other methods have no second one to try.
  */
 function repairAt(
   table: AllPairs,
@@ -378,14 +381,19 @@ function repairAt(
   next: NodeId,
   t: NodeId,
   mode: RepairMode,
+  isUp: (neighbor: NodeId) => boolean,
 ): { method: RepairMethod; instrs: Instr[] } | undefined {
   const r = results.find((x) => x.dest === t)
   const p = r?.protections.find((x) => x.protectedLink.to === next)
   if (r === undefined || p === undefined) return undefined
 
   // Another primary next hop is always loop-free and avoids the link (D16). It comes
-  // first in every mode: the router just stops using the failed member (D22).
-  const other = r.nextHops.find((n) => n !== next)
+  // first in every mode: the router just stops using the failed member (D22), and
+  // every other failed member too, so it picks one that is still up (D25). If none
+  // is, it keeps the lowest-id one and the packet is dropped there: the members are
+  // each other's backups, so the entry has nothing left.
+  const others = r.nextHops.filter((n) => n !== next)
+  const other = others.find(isUp) ?? others[0]
   if (p.ecmpProtected && other !== undefined) {
     return { method: 'ecmp', instrs: [{ hop: other }, { to: t }] }
   }

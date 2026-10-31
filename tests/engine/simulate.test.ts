@@ -169,6 +169,52 @@ describe('simulateFailure: repair vs post-convergence path', () => {
     const t = flow(simulateFailure(u, 'S', ['S-A'], 'tilfa').flows, 'D')
     expect(t).toMatchObject({ method: 'ecmp', repair: ['S', 'B', 'D'], match: 'same' })
   })
+
+  it('ECMP with several members down: the router uses a member that is still up', () => {
+    // Example 5: SP1 reaches SP2 through all four leaves (cost 20); the drawn path is via L1.
+    // A router drops failed members from its ECMP set and keeps using the rest (D25).
+    const ls = loadFixture('05-leaf-spine.yaml')
+    for (const mode of ['lfa', 'tilfa'] as const) {
+      const f = flow(simulateFailure(ls, 'SP1', ['L1-SP1', 'L2-SP1'], mode).flows, 'SP2')
+      expect(f).toMatchObject({
+        plr: 'SP1',
+        method: 'ecmp',
+        repair: ['SP1', 'L3', 'SP2'],
+        repairs: [{ at: 'SP1', link: 'L1-SP1', target: 'SP2', method: 'ecmp' }],
+        status: 'repaired',
+        match: 'same',
+      })
+      expect(f.drop).toBeUndefined()
+    }
+    const last = flow(
+      simulateFailure(ls, 'SP1', ['L1-SP1', 'L2-SP1', 'L3-SP1'], 'tilfa').flows,
+      'SP2',
+    )
+    expect(last).toMatchObject({ repair: ['SP1', 'L4', 'SP2'], status: 'repaired' })
+  })
+
+  it('ECMP with every other member down too: dropped (the members are their own backups)', () => {
+    // S reaches D via A or B (cost 2). B is also A's best LFA (downstream, D7), so with
+    // S–A and S–B down the entry has nothing left, although C (cost 3) still works.
+    const u = topo(
+      ['S', 'A', 'B', 'C', 'D'],
+      [
+        ['S', 'A', 1],
+        ['S', 'B', 1],
+        ['S', 'C', 1],
+        ['A', 'D', 1],
+        ['B', 'D', 1],
+        ['C', 'D', 2],
+      ],
+    )
+    const d = flow(simulateFailure(u, 'S', ['S-A', 'S-B'], 'lfa').flows, 'D')
+    expect(d).toMatchObject({
+      method: 'ecmp',
+      status: 'dropped',
+      drop: { at: 'S', link: 'S-B', reason: 'backup-down' },
+      after: ['S', 'C', 'D'],
+    })
+  })
 })
 
 describe('simulateFailure: bridges and bad input', () => {
@@ -371,6 +417,18 @@ describe('simulateFailure: several failed links (Phase 9.2, D24)', () => {
       status: 'looped',
     })
     expect(p1.drop).toBeUndefined()
+  })
+
+  it('TI-LFA repaired by several routers in turn can be costlier than the final path (§8 step 6)', () => {
+    const isp = loadFixture('04-isp-core.yaml')
+    const p3 = flow(simulateFailure(isp, 'PE1', ['PE1-P1', 'P2-P4'], 'tilfa').flows, 'P3')
+    expect(p3).toMatchObject({
+      status: 'repaired',
+      plrRepairCost: 100,
+      plrAfterCost: 50,
+      match: 'longer',
+    })
+    expect(p3.repairs?.map((r) => r.at)).toEqual(['PE1', 'P2', 'PE1'])
   })
 
   it('a single failure is repaired by one router at most; repeats are ignored; none is an error', () => {

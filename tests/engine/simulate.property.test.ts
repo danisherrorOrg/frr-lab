@@ -92,6 +92,28 @@ describe('simulateFailure properties (random connected graphs)', () => {
     )
   })
 
+  it('ECMP never sends traffic onto a failed member while another member is up (D25)', () => {
+    fc.assert(
+      fc.property(input, ({ t, s, links, mode }) => {
+        const sim = simulateFailure(t, s, links, mode)
+        const down = (x: NodeId, y: NodeId) =>
+          sim.links.some((l) => (l.a === x && l.b === y) || (l.a === y && l.b === x))
+        for (const f of sim.flows) {
+          if (f.drop?.reason !== 'backup-down') continue
+          // backup-down is decided at the router that just repaired: the last step.
+          const last = f.repairs!.at(-1)!
+          expect(last.at).toBe(f.drop.at)
+          if (last.method !== 'ecmp') continue
+          const r = computeForSource(t, last.at, { explain: false }).find(
+            (x) => x.dest === last.target,
+          )!
+          expect(r.nextHops.every((n) => down(last.at, n))).toBe(true)
+        }
+      }),
+      { numRuns: 200 },
+    )
+  })
+
   it('TI-LFA: traffic repaired by one router follows its post-convergence path (RFC 9855 §3)', () => {
     fc.assert(
       fc.property(input, ({ t, s, links }) => {
