@@ -55,6 +55,7 @@
 **F4 – Visual results**
 - Results table: destination · primary next hop(s) · cost · LFA · RLFA · TI-LFA · status (✓ / ✗).
 - Click a row (or a router on the diagram, as the destination): primary path in blue, backup path in orange dashed, P-space / Q-space nodes shaded, PQ node marked.
+- (v0.2) Compare view: LFA, Remote LFA and TI-LFA for the selected row side by side, each with its path on a small diagram, cost, labels and whether it matches the final path.
 
 **F5 – Failure simulation**
 - "Fail" a link (click it). Traffic for affected destinations moves along the backup path (animated). Then a "Converge" button shows the final path after the network recomputes.

@@ -116,7 +116,10 @@ export function DetailPanel({
           </>
         ) : (
           'No backup path to draw.'
-        )}
+        )}{' '}
+        <a href="#compare" className="text-indigo-700 underline dark:text-indigo-300">
+          Compare all three side by side ↓
+        </a>
       </p>
 
       <h3 className={h3}>LFA (RFC 5286)</h3>

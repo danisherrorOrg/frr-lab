@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { compareBackups } from './engine/compare'
 import { convergedWalk, flowWalk, packetWalk, primaryWalk } from './engine/packet-walk'
 import { hopLinks, protectionPaths } from './engine/paths'
 import { readShareHash } from './io/share-url'
@@ -6,6 +7,7 @@ import { isRow, useStore, type Tool } from './state/store'
 import type { NodeId } from './engine/types'
 import { AllResults } from './ui/AllResults'
 import type { Highlight } from './ui/canvas'
+import { CompareView } from './ui/CompareView'
 import { CoverageReport } from './ui/CoverageReport'
 import { DetailPanel } from './ui/DetailPanel'
 import { FailureByDut } from './ui/FailureByDut'
@@ -132,8 +134,11 @@ export function App() {
     const protection = result?.protections.find((p) => isRow(row, row.dest, p))
     if (!result || !protection) return null
     const paths = protectionPaths(topology, source, result.dest, protection)
-    return { result, protection, paths, drawn: pickBackup(paths, backup) }
-  }, [results, row, source, topology, backup])
+    const comparison = compareBackups(topology, source, result.dest, protection.protectedLink.id, {
+      extended,
+    })
+    return { result, protection, paths, comparison, drawn: pickBackup(paths, backup) }
+  }, [results, row, source, topology, backup, extended])
 
   // Packet walk (TODO backlog): the step belongs to one row, so a new row starts fresh.
   const [php, setPhp] = useState(true)
@@ -349,6 +354,15 @@ export function App() {
               )}
             </div>
           </div>
+          {selected && (
+            <CompareView
+              comparison={selected.comparison}
+              paths={selected.paths}
+              drawn={selected.drawn?.kind ?? null}
+              onBackup={setBackup}
+              drawOff={anyFailed}
+            />
+          )}
           <CoverageReport source={source} />
         </main>
       </div>

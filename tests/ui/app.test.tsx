@@ -818,3 +818,54 @@ describe('Phase 9.6: every router as the DUT', () => {
     await within(panel).findByText(/From D:/)
   })
 })
+
+// TODO backlog: compare LFA, Remote LFA and TI-LFA for one destination side by side.
+describe('Compare view', () => {
+  const card = (name: string) =>
+    within(screen.getByRole('region', { name: 'Compare backups' })).getByRole('listitem', {
+      name,
+    })
+
+  it('Example 2: no LFA, Remote LFA is used, TI-LFA takes the same path', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'ring5')
+    expect(screen.queryByRole('region', { name: 'Compare backups' })).toBeNull()
+    await user.click(await rowFor('E'))
+
+    const compare = screen.getByRole('region', { name: 'Compare backups' })
+    expect(compare.textContent).toContain('S → E, link S–E fails')
+    expect(compare.textContent).toContain('uses S→A→B→C→E (cost 4)')
+    expect(compare.textContent).toContain('Remote LFA is the simplest that works')
+    expect(card('LFA').textContent).toContain('✗ No backup')
+    expect(card('LFA').textContent).toContain('Inequality 1')
+    expect(card('Remote LFA').textContent).toContain('✓ Used')
+    expect(card('Remote LFA').textContent).toContain('Tunnel to PQ node B')
+    expect(card('Remote LFA').textContent).toContain('16004, 16002 (1 extra)')
+    expect(card('Remote LFA').textContent).toContain('4 (+3 vs normal 1)')
+    expect(card('TI-LFA').textContent).toContain('✓ Also works')
+    expect(card('TI-LFA').textContent).toContain('Same path')
+    // Each card has its own small diagram of the path.
+    expect(within(card('TI-LFA')).getByRole('img').getAttribute('aria-label')).toBe(
+      'TI-LFA path S→A→B→C→E',
+    )
+
+    // "Draw on the diagram" draws that backup on the main canvas.
+    await user.click(within(card('TI-LFA')).getByRole('button', { name: /Draw TI-LFA/ }))
+    expect(canvas.highlight?.backup).toEqual(['S', 'A', 'B', 'C', 'E'])
+    expect(within(card('TI-LFA')).getByRole('button').textContent).toBe('Drawn on the diagram')
+  })
+
+  it('Example 1: Remote LFA would work but is not run, since there is an LFA', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'square')
+    await user.click(await rowFor('D'))
+    expect(card('LFA').textContent).toContain('✓ Used')
+    expect(card('LFA').textContent).toContain('Send to neighbor N (node-protecting)')
+    expect(card('Remote LFA').textContent).toContain('✓ Also works')
+    expect(card('Remote LFA').textContent).toContain('Not run here')
+    // The main diagram only draws a Remote LFA that is used.
+    expect(within(card('Remote LFA')).getByRole('button').hasAttribute('disabled')).toBe(true)
+  })
+})

@@ -372,3 +372,30 @@ Worked checks (failure simulation):
 - Source E, fail `E-D`: D is repaired by ECMP on `E-D#2` (cost 10). Fail `E-D#2` instead: D is not affected (its flow uses `E-D`). Fail both: dropped at E (the members are each other's backup, D25); after convergence E→S→A→D.
 - Fail router E (from S, LFA only): E unreachable (expected); D's LFA A is node-protecting and survives.
 - Ring of Example 3 with B–C as a bundle 12 (`B-C`) and 10 (`B-C#2`), fail S–E, D = E: post-convergence path S-A-B-C-E (13), segments `[PrefixSID(B), AdjSID(B→C over B-C#2), PrefixSID(E)]` = `16004, 24002, 16002`.
+
+---
+
+## 10. Compare view (TODO backlog, D36)
+`compareBackups()` (`src/engine/compare.ts`) puts LFA, Remote LFA and TI-LFA for one (S, D, protected link S–E) side by side. It decides nothing new: each method's own rules (§2, §3, §4) pick the backup, and this lines up what each one does.
+
+For each method it gives:
+- **found / used:** whether the method has a backup, and whether it is the one the results table names (the simplest that protects, in the §5 order ECMP → LFA → Remote LFA → TI-LFA).
+- **path and links:** LFA: S → N, then N's normal path to D. Remote LFA: S's tunnel to the PQ node (through the exit neighbor for extended P-space, D11), then the PQ node's normal path to D. TI-LFA: the post-convergence path (§4.1). The same paths the diagram draws (`src/engine/paths.ts`). Links name the link of a bundle (D29).
+- **cost:** the metrics of the links walked. For LFA it equals `c(S,N) + dist(N,D)`; for Remote LFA the PQ node's cost (RFC 7490 §5.2.2) plus `dist(PQ,D)`; for TI-LFA the post-convergence cost.
+- **labels S puts on the packet,** top first, before PHP: LFA adds nothing (D's own Prefix-SID only, 0 extra); Remote LFA puts the PQ node's Prefix-SID on top (LFA Lab is SR-MPLS, D35: 1 extra, or 0 when the PQ node is D); TI-LFA its segment list (§4.3).
+- **vs final:** the path against S's path after reconvergence (the post-convergence path): `same` (same routers), `same-cost` (other path, equal cost) or `longer`. A backup is never cheaper: it avoids S–E, and the final path is the cheapest path without S–E. TI-LFA is always `same` (RFC 9855 §3).
+
+**Remote LFA when an LFA exists:** a router only runs Remote LFA when there is no LFA (RFC 7490 §1), so `Protection.rlfa` has no chosen PQ node then (§3). The compare view still works out the tunnel from the same P- and Q-spaces, marked "not run here", because seeing both is the point. With ECMP, none of the three is used.
+
+A property test (random networks, asymmetric metrics, bundles) checks that every path starts at S, ends at D, never crosses S–E or comes back through S, and costs what its links add up to; that no backup beats the final path; and that the LFA, PQ node, TI-LFA path and labels and the "used" method agree with the results.
+
+Worked checks:
+
+| Example | LFA | Remote LFA | TI-LFA |
+|---|---|---|---|
+| 1, S→D, link S–E | **used**: N, S-N-D, 25, `16004`, same | not run: PQ = N, S-N-D, 25, `16003 16004` | S-N-D, 25, `16004`, same |
+| 2, S→E, link S–E | none | **used**: PQ = B, S-A-B-C-E, 4, `16004 16002`, same | S-A-B-C-E, 4, `16004 16002`, same |
+| 3, S→E, link S–E | none | none (no PQ node) | **used**: S-A-B-C-E, 13, `16004 24005 16002`, same |
+| 4, PE1→P1, link PE1–P1 | none | **used**: PQ = PE2 via P2, PE1-P2-P4-PE2-P3-P1, 50, **longer** than 40 | PE1-P2-P1, 40, `24000 16001`, same |
+
+A case where the LFA is longer: S–E 1, E–D 1, S–N 5, N–D 1, S–M 1, M–N 1. M and N are both node-protecting LFAs; N is downstream (`1 < 2`) and M is not (`2 < 2` ✗), so N wins (D7): S-N-D costs 6, but after reconvergence S uses S-M-N-D (3).

@@ -325,3 +325,14 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Other options considered:** derive labels in the UI from the flow's path — it can't tell a Remote LFA tunnel or a TI-LFA repair list from normal forwarding; a second label simulator — two models that could disagree.
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D36 – Compare view: LFA, Remote LFA and TI-LFA side by side (2026-10-31)
+- **Why:** TODO backlog "Compare view". The detail panel shows each method in its own block and draws one backup at a time, so students couldn't see at a glance how the three differ for the same failure: which works, how long each path is, how many labels it needs, and whether traffic moves again after reconvergence.
+- **Engine:** `compareBackups()` in `src/engine/compare.ts` (pure, `docs/02-algorithms.md` §10). It reuses `computeLfa`, `computeRlfa` and `computeTilfa`; the LFA and Remote LFA path rules moved into `lfaPath()` / `rlfaPath()` in `paths.ts`, so the diagram and the compare view can't disagree. Fixed tests on Examples 1, 2, 3, 4 and 7 plus a hand-made "LFA is longer" case; a property test on random networks (with and without bundles) checks every path against the results.
+- **Remote LFA is shown even when an LFA exists:** the router wouldn't run it (RFC 7490 §1), and `Protection.rlfa` has no chosen PQ node then (D17). The compare view works out the tunnel from the same spaces and labels it "not run here". The main diagram still only draws a Remote LFA that is used, so its "Draw" button is off in that case.
+- **"vs final"** uses the same three words as the failure panel's "Repair = final?" (`same` / `same-cost` / `longer`, §8 step 6), judged at S against the post-convergence path.
+- **Labels:** what S puts on the packet, before PHP (§4.3): LFA none extra; Remote LFA the PQ node's Prefix-SID (SR-MPLS, D35); TI-LFA its segment list.
+- **UI:** a full-width "Compare backups" section under the results when a row is open (three cards need more room than the half-width detail panel), linked from the detail panel. Each card: status (used / also works / no backup), a small SVG copy of the diagram with only that path (failed link red ✕, S blue, D orange, LFA neighbor or PQ node ringed, ★ on the PQ node, bundle links spread apart), how, path, cost against the normal cost, labels, vs final, and "Draw on the diagram". On phones the cards stack. While something is down the main diagram shows the simulated traffic, so the Draw buttons are off and a note says so. Checked in Chrome: light, dark and phone width, no console errors.
+- **Other options considered:** draw all three on the main canvas at once (paths overlap on small networks and the colours would need a new key); a three-column table without diagrams (loses the "see it" part, which is the point for students).
+- **No new dependencies.**
+- **Status:** Accepted.

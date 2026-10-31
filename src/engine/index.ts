@@ -160,3 +160,12 @@ export {
   type HopLinkOptions,
   type ProtectionPaths,
 } from './paths'
+export {
+  compareBackups,
+  type BackupComparison,
+  type BackupOption,
+  type CompareMethod,
+  type CompareOptions,
+  type RoutePath,
+  type VsFinal,
+} from './compare'

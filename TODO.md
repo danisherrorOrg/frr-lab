@@ -292,7 +292,7 @@ Things that fit the "learn and check FRR" goal and stay offline / no backend.
   - [x] Walk the **primary path** too, not only the TI-LFA backup: S's normal label (Prefix-SID of D) hop by hop, PHP at the penultimate router; let the user pick primary or backup to show on the diagram *(D35)*
   - [x] Walk the **simulated traffic** when links or a router are down (failure view, `simulate.ts` flows): the labels on each hop of the real repair, including a second router's repair, drops and loops; and the path after convergence in the "Converge" step *(D35, `02-algorithms.md` §8.3)*
 - [x] Bug: fail a router, restore it, and the "back up" notice appears at the top; until that notice is closed with ✕, the router can't be failed again. Check in Chrome, find the cause, add a UI test *(Cytoscape only re-reads where its box is when the box changes size; the notice moved it without resizing, so clicks landed one notice-height off. The canvas now re-measures when a notice opens or closes and before each click. Failing the router again also takes it off the notice, or closes the notice if no router in it is still up.)*
-- [ ] Compare view: LFA, RLFA and TI-LFA paths for one destination side by side
+- [x] Compare view: LFA, RLFA and TI-LFA paths for one destination side by side *(D36, `02-algorithms.md` §10)*
 - [ ] Guided tour on first visit (load Example 2, fail S–E, read the TI-LFA stack)
 - [ ] Clickable P / Q / PQ sets in the detail panel that highlight those routers on the canvas
 

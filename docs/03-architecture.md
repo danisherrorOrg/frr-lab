@@ -51,6 +51,7 @@ LFA LAB/
 │   │   ├── coverage.ts      per-source and all-sources reports
 │   │   ├── explain.ts       turns checks into readable steps with numbers
 │   │   ├── paths.ts         node-by-node paths to draw (primary, LFA, RLFA, TI-LFA)
+│   │   ├── compare.ts       LFA / RLFA / TI-LFA side by side for one row (§10 of 02)
 │   │   ├── rows.ts          compact results-table rows (every router as the DUT, D31)
 │   │   ├── simulate.ts      failure simulation, per source and for every router
 │   │   └── index.ts         computeForSource(), computeCoverage()
@@ -79,6 +80,7 @@ LFA LAB/
 │   │   ├── FailurePanel.tsx failure simulation for the drawn source
 │   │   ├── FailureByDut.tsx the same failure from every router (D31)
 │   │   ├── DetailPanel.tsx  P/Q spaces, segment list, explain steps
+│   │   ├── CompareView.tsx  the three backups side by side, each with a small diagram
 │   │   ├── CoverageReport.tsx
 │   │   └── PropertiesPanel.tsx  edit selected node/link
 │   ├── App.tsx  main.tsx

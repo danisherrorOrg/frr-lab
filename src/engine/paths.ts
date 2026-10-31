@@ -33,6 +33,30 @@ export interface ProtectionPaths {
   tilfa?: NodeId[]
 }
 
+/** S → `first`'s last router, then its normal shortest path to D. */
+function via(table: AllPairs, first: NodeId[], d: NodeId): NodeId[] | undefined {
+  const rest = shortestPath(table, first[first.length - 1]!, d)
+  return rest && [...first, ...rest.slice(1)]
+}
+
+/** The LFA's path: S → N, then N's normal path to D (RFC 5286 §4). */
+export const lfaPath = (table: AllPairs, s: NodeId, n: NodeId, d: NodeId) => via(table, [s, n], d)
+
+/**
+ * The Remote LFA path: S's tunnel to the PQ node (through the exit neighbor for
+ * extended P-space, D11), then the PQ node's normal path to D (RFC 7490 §5.2).
+ */
+export function rlfaPath(
+  table: AllPairs,
+  s: NodeId,
+  pq: NodeId,
+  exit: NodeId | undefined,
+  d: NodeId,
+): NodeId[] | undefined {
+  const toPq = exit === undefined ? shortestPath(table, s, pq) : via(table, [s, exit], pq)
+  return toPq && via(table, toPq, d)
+}
+
 /** Paths for one (S, D, protected link S–E) result. */
 export function protectionPaths(
   topology: Topology,
@@ -41,23 +65,16 @@ export function protectionPaths(
   p: Protection,
 ): ProtectionPaths {
   const table = allPairs(topology)
-  const via = (first: NodeId[], to: NodeId): NodeId[] | undefined => {
-    const rest = shortestPath(table, first[first.length - 1]!, to)
-    return rest && [...first, ...rest.slice(1)]
-  }
-
   const e = p.protectedLink.to
-  const out: ProtectionPaths = { primary: via([s, e], d) ?? [s, e] }
+  const out: ProtectionPaths = { primary: via(table, [s, e], d) ?? [s, e] }
 
   const n = p.lfa.best
-  const lfa = n === undefined ? undefined : via([s, n], d)
+  const lfa = n === undefined ? undefined : lfaPath(table, s, n, d)
   if (lfa) out.lfa = lfa
 
   const pq = p.rlfa.needed ? p.rlfa.best : undefined
   if (pq !== undefined) {
-    const exit = p.rlfa.exitVia[pq]
-    const toPq = exit === undefined ? shortestPath(table, s, pq) : via([s, exit], pq)
-    const rlfa = toPq && via(toPq, d)
+    const rlfa = rlfaPath(table, s, pq, p.rlfa.exitVia[pq], d)
     if (rlfa) out.rlfa = rlfa
   }
 
