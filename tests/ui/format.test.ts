@@ -20,7 +20,11 @@ import {
   spaceMarks,
   throughText,
   tooltipLines,
+  heatLines,
+  heatMark,
+  heatMarks,
 } from '../../src/ui/format'
+import { coverageMap } from '../../src/engine/heat-map'
 import { toRows } from '../../src/engine/rows'
 import { parseTopology } from '../../src/io/yaml'
 import { connectedTopology } from '../arbitraries'
@@ -468,5 +472,50 @@ describe('howText (per-link view)', () => {
     expect(howText(toRows('A', computeForSource(r.topology, 'A'))[0]!)).toBe(
       'Nothing: B is cut off from A when the link fails',
     )
+  })
+})
+
+// Coverage heat map (docs/02-algorithms.md §12).
+describe('heat map labels', () => {
+  const c = (pairs: number, lfa: number, rlfa: number, tilfa: number) => ({
+    pairs,
+    ecmp: 0,
+    lfa,
+    rlfa,
+    tilfa,
+  })
+
+  it('buckets by the exact share, and never rounds up to ✓', () => {
+    expect(heatMark(c(4, 4, 4, 4), 'lfa')).toEqual({ level: 'full', text: '✓ 100%' })
+    expect(heatMark(c(4, 3, 4, 4), 'lfa')).toEqual({ level: 'most', text: '75%' })
+    expect(heatMark(c(4, 2, 4, 4), 'lfa')).toEqual({ level: 'part', text: '50%' })
+    expect(heatMark(c(4, 2, 4, 4), 'rlfa')).toEqual({ level: 'full', text: '✓ 100%' })
+    expect(heatMark(c(3, 1, 1, 3), 'lfa')).toEqual({ level: 'low', text: '33.3%' })
+    expect(heatMark(c(5, 0, 0, 5), 'rlfa')).toEqual({ level: 'low', text: '0%' })
+    expect(heatMark(c(10000, 9999, 9999, 9999), 'lfa')).toEqual({ level: 'most', text: '99.9%' })
+    // 2999/4000 = 74.975% rounds to 75.0 but is below 75%.
+    expect(heatMark(c(4000, 2999, 2999, 4000), 'lfa').level).toBe('part')
+    expect(heatMark(c(0, 0, 0, 0), 'tilfa')).toEqual({ level: 'idle', text: '–' })
+  })
+
+  it('marks every router and link of Example 3', () => {
+    const marks = heatMarks(coverageMap(loadFixture('03-ring5-highmetric.yaml')), 'lfa')
+    expect(marks.links['S-E']).toEqual({ level: 'low', text: '0%' })
+    expect(marks.links['B-A']).toEqual({ level: 'most', text: '80%' })
+    expect(marks.links['C-B']).toEqual({ level: 'idle', text: '–' })
+    expect(marks.nodes.B).toEqual({ level: 'full', text: '✓ 100%' })
+  })
+
+  it('tooltip lines give every mode, with counts', () => {
+    expect(heatLines(c(5, 0, 0, 5), 'link')).toEqual([
+      'Heat map: 5 repairs if this link fails (both ends)',
+      'LFA 0/5 (0%) · LFA + Remote LFA 0/5 (0%) · TI-LFA 5/5 (100%)',
+    ])
+    expect(heatLines(c(1, 1, 1, 1), 'node')[0]).toBe(
+      'Heat map: repairs 1 destination as the router before a failed link',
+    )
+    expect(heatLines(c(0, 0, 0, 0), 'link')).toEqual([
+      'Heat map: carries no traffic, so nothing to repair (only a backup)',
+    ])
   })
 })

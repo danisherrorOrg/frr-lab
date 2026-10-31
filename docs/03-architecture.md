@@ -54,6 +54,7 @@ LFA LAB/
 │   │   ├── compare.ts       LFA / RLFA / TI-LFA side by side for one row (§10 of 02)
 │   │   ├── rows.ts          compact results-table rows (every router as the DUT, D31)
 │   │   ├── link-view.ts     per-link view: what one link carries and how it is protected (§11 of 02)
+│   │   ├── heat-map.ts      coverage per router and per link, for the canvas heat map (§12 of 02)
 │   │   ├── simulate.ts      failure simulation, per source and for every router
 │   │   └── index.ts         computeForSource(), computeCoverage()
 │   ├── io/

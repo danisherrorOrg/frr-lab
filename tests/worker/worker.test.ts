@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeAllSources, computeCoverage, computeForSource } from '../../src/engine/index'
+import { coverageMap } from '../../src/engine/heat-map'
 import { linkView } from '../../src/engine/link-view'
 import { simulateAllSources, simulateFailure } from '../../src/engine/simulate'
 import { createEngineClient, createInlineWorker, type WorkerLike } from '../../src/worker/client'
@@ -60,6 +61,16 @@ describe('per-link view requests', () => {
       linkView(ring(), 'S-E', { extended: false }),
     )
     await expect(client.linkView(ring(), 'nope')).rejects.toThrow('Unknown link "nope".')
+  })
+})
+
+describe('heat-map requests', () => {
+  it('the client resolves the same map as the engine, with progress per router', async () => {
+    const client = createEngineClient(fakeWorker())
+    const progress: number[] = []
+    const map = await client.coverageMap(ring(), { extended: false }, (done) => progress.push(done))
+    expect(map).toEqual(coverageMap(ring(), { extended: false }))
+    expect(progress).toEqual([1, 2, 3, 4, 5])
   })
 })
 

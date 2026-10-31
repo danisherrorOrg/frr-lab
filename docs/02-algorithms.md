@@ -442,3 +442,27 @@ Worked checks:
 | 7, S-E#2 | both | nothing: 20 > 10, only a backup |
 
 A property test (random networks, with and without bundles) checks that the rows equal the repairing router's own rows for the link, and that (W, D) is listed exactly when the §1.5 test says some shortest path W→D uses the link.
+
+---
+
+## 12. Coverage heat map (TODO backlog, D42)
+`coverageMap()` (`src/engine/heat-map.ts`) gives the §5 coverage numbers grouped two ways, so the canvas can colour each router and link by how well it is protected. It decides nothing new: it runs `computeForSource()` once per router (as "all sources" coverage does) and counts each (D, link S–E) pair twice.
+
+- **Per router R:** the pairs R repairs as the router before a failed link (the PLR), i.e. R's own coverage row (§5). This is link protection, so it answers "if one of R's links fails, how much of R's traffic has a backup", not "what if R fails" (node protection is Later #1).
+- **Per link:** the pairs whose protected link is this one, both directions added up. Each is a row of the router before the link (FRR is local repair, §11), so the link's numbers are the per-link view's rows counted. A link on no shortest path has 0 pairs: it can only be a backup.
+
+Every pair belongs to exactly one router and one link, so both groupings add up to the all-sources total.
+
+**Share in a repair mode** (the simulation's modes): LFA (ECMP counts as LFA, §5), LFA or Remote LFA, or TI-LFA, over all pairs. The canvas buckets the exact fraction: 100% (✓), 75–99%, 50–74%, under 50%, and "–" for 0 pairs. The percentage is written on each router and link, so colour is never the only signal.
+
+Worked checks:
+
+| Example | LFA | LFA + Remote LFA | TI-LFA |
+|---|---|---|---|
+| 2, every router and every link | 2/4 = 50% | 4/4 | 4/4 |
+| 3, link S–E (S repairs E, C; E repairs S, A, B) | 0/5 | 0/5 | 5/5 |
+| 3, link C–B (metric 10) | – (0 pairs) | – | – |
+| 3, router B | 4/4 | 4/4 | 4/4 |
+| 7, link S-E#2 | – (0 pairs, only a backup) | – | – |
+
+A property test (random networks, with and without bundles, both P-space settings) checks that each router's counts equal its coverage row, that the link counts add up to the total, and that a link's counts match the per-link view's rows.

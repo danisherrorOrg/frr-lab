@@ -382,3 +382,13 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Other options considered:** draw the flows on the canvas (busy with 10+ flows, and the canvas already shows the open row); list only the two end routers' rows (misses the transit traffic the TODO asks for).
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D42 – Coverage heat map on the canvas (2026-10-31)
+- **Why:** TODO backlog "Design checks". The coverage report gives one number per router and a long unprotected list; on a big network you can't see *where* the weak spots are. Colouring the diagram shows it at a glance.
+- **Engine:** `coverageMap()` in `src/engine/heat-map.ts` (pure, `docs/02-algorithms.md` §12): each router's results once, counted per router (its own coverage row, as the PLR) and per protected link (both directions). The §5 counts, nothing new. `countPair()` in `coverage.ts` is now shared by the report and the map. Runs in the worker with progress; 200 routers / 600 links under 2 s (speed test).
+- **What a router's colour means:** link protection at that router (the repairs it makes), not "what if this router fails": node protection isn't computed yet (Later #1). The key and the tooltip say so.
+- **UI:** "Coverage heat map" in the sidebar: Off (default) / LFA / LFA + Remote LFA / TI-LFA, the simulation's repair modes. Routers get a light tint (dark labels stay readable), links a coloured line; each shows its percentage ("✓ 100%", "50%", "–"), so colour is never the only signal. A link that carries nothing is thin and dashed. Hovering gives the counts in all three modes. The key above the legend shows progress while it computes. The picked row's paths, P/Q shading and failed links draw on top. While anything is down it still shows the plan, and says so.
+- **Colours:** the fixed status scale from the dataviz guidance (good `#0ca30c`, warning `#fab219`, serious `#ec835a`, critical `#d03b3b`), buckets 100% / 75–99% / 50–74% / under 50%, on the exact fraction so 99.96% never shows as ✓.
+- **Other options considered:** a continuous colour ramp (hard to read on small nodes, and a ramp can't say "fully protected" clearly); router colour = "what if it fails" (needs node protection); colouring only links (the TODO asks for routers too, and the coverage report is per router).
+- **No new dependencies.**
+- **Status:** Accepted.

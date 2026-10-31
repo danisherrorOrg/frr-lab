@@ -1,4 +1,4 @@
-import type { DestinationResult, NodeId } from './types'
+import type { DestinationResult, NodeId, Protection } from './types'
 
 /**
  * Counts of (D, primary link S–E) pairs for one source or many (docs/02-algorithms.md §5).
@@ -61,6 +61,22 @@ export function addCounts(a: CoverageCounts, b: CoverageCounts): CoverageCounts 
   }
 }
 
+/**
+ * Add one (D, link) pair to `counts` (§5) and say which methods protect it.
+ * RLFA only runs when there's no LFA (§3), so `rlfa` is "LFA or RLFA".
+ */
+export function countPair(counts: CoverageCounts, p: Protection) {
+  const lfa = p.lfa.best !== undefined
+  const rlfa = lfa || p.rlfa.best !== undefined
+  const tilfa = p.tilfa.path !== undefined
+  counts.pairs += 1
+  if (p.ecmpProtected) counts.ecmp += 1
+  if (lfa) counts.lfa += 1
+  if (rlfa) counts.rlfa += 1
+  if (tilfa) counts.tilfa += 1
+  return { lfa, rlfa, tilfa }
+}
+
 /** Coverage numbers and the unprotected list for one source's results (§5). */
 export function summarizeSource(
   source: NodeId,
@@ -71,15 +87,7 @@ export function summarizeSource(
 
   for (const r of results) {
     for (const p of r.protections) {
-      const lfa = p.lfa.best !== undefined
-      // RLFA only runs when there's no LFA (§3), so "LFA or RLFA".
-      const rlfa = lfa || p.rlfa.best !== undefined
-      const tilfa = p.tilfa.path !== undefined
-      counts.pairs += 1
-      if (p.ecmpProtected) counts.ecmp += 1
-      if (lfa) counts.lfa += 1
-      if (rlfa) counts.rlfa += 1
-      if (tilfa) counts.tilfa += 1
+      const { lfa, rlfa, tilfa } = countPair(counts, p)
       if (lfa) continue
 
       const { from, to } = p.protectedLink

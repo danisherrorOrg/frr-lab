@@ -2,6 +2,7 @@
 // run it headless (jsdom has no <canvas>).
 import type cytoscape from 'cytoscape'
 import type { NodeId, Topology } from '../engine/types'
+import type { HeatLevel, HeatMarks } from './format'
 
 /** What to mark on the canvas for the selected results row (F4). */
 export interface Highlight {
@@ -42,6 +43,25 @@ export interface Highlight {
 
 export const COLORS = { primary: '#2563eb', backup: '#ea580c', final: '#16a34a' }
 
+/**
+ * Coverage heat map: a fixed good → critical status scale. Links use the full colour;
+ * routers a light tint so their dark labels stay readable. The percentage is always
+ * written too, so colour is never the only signal (docs/01-requirements.md §6).
+ */
+export const HEAT_COLORS: Record<HeatLevel, { line: string; fill: string }> = {
+  full: { line: '#0ca30c', fill: '#92d692' },
+  most: { line: '#fab219', fill: '#fddc98' },
+  part: { line: '#ec835a', fill: '#f6c7b5' },
+  low: { line: '#d03b3b', fill: '#eaa7a7' },
+  idle: { line: '#94a3b8', fill: '#e2e8f0' },
+}
+
+// Before the path and P/Q styles, so the row picked in the results still shows on top.
+const HEAT_STYLE: cytoscape.StylesheetJson = Object.entries(HEAT_COLORS).flatMap(([level, c]) => [
+  { selector: `node.heat-${level}`, style: { 'background-color': c.fill } },
+  { selector: `edge.heat-${level}`, style: { 'line-color': c.line, width: 4 } },
+])
+
 // Colours are mid-tones so they read on light and dark backgrounds. Line style
 // and arrows carry the meaning too, not only colour (docs/01-requirements.md §6).
 export const STYLE: cytoscape.StylesheetJson = [
@@ -81,6 +101,9 @@ export const STYLE: cytoscape.StylesheetJson = [
       'text-rotation': 'none',
     },
   },
+  ...HEAT_STYLE,
+  // A link that carries nothing stays thin and dashed: it is only a backup.
+  { selector: 'edge.heat-idle', style: { width: 2, 'line-style': 'dashed' } },
   { selector: 'node.p-space', style: { 'background-color': '#bfdbfe' } },
   { selector: 'node.q-space', style: { 'background-color': '#bbf7d0' } },
   {
@@ -205,9 +228,15 @@ export const STYLE: cytoscape.StylesheetJson = [
   },
 ]
 
-function nodeLabel(id: NodeId, name: string | undefined, star: boolean, down: boolean) {
+function nodeLabel(
+  id: NodeId,
+  name: string | undefined,
+  star: boolean,
+  down: boolean,
+  heat?: string,
+) {
   const top = down ? `✕ ${id}` : star ? `★ ${id}` : id
-  return name ? `${top}\n${name}` : top
+  return [top, name, heat].filter((x) => x).join('\n')
 }
 
 /** Metric labels: one in the middle, or one near each end when they differ (cost leaving that end). */
@@ -249,8 +278,9 @@ export function sync(cy: cytoscape.Core, t: Topology) {
   })
 }
 
-const CLASSES =
-  'p-space q-space pq spot faded down source dest sel link-start primary backup final primary-fwd primary-rev backup-fwd backup-rev final-fwd final-rev flowing failed packet-at packet-hop walk-stack walk-current'
+const HEAT_CLASSES = 'heat-full heat-most heat-part heat-low heat-idle'
+
+const CLASSES = `${HEAT_CLASSES} p-space q-space pq spot faded down source dest sel link-start primary backup final primary-fwd primary-rev backup-fwd backup-rev final-fwd final-rev flowing failed packet-at packet-hop walk-stack walk-current`
 
 export function decorate(
   cy: cytoscape.Core,
@@ -262,6 +292,8 @@ export function decorate(
     failed: string[]
     /** Failed routers: greyed out, and every link they have is drawn as down. */
     failedNodes?: NodeId[]
+    /** Coverage heat map: colour and percentage per router and link. */
+    heat?: HeatMarks
   },
 ) {
   cy.batch(() => {
@@ -270,13 +302,24 @@ export function decorate(
     const downNodes = new Set(extra.failedNodes ?? [])
     cy.nodes().forEach((n) => {
       const down = downNodes.has(n.id())
-      n.data('display', nodeLabel(n.id(), n.data('name') || undefined, n.id() === h.pq, down))
+      const heat = extra.heat?.nodes[n.id()]
+      n.data(
+        'display',
+        nodeLabel(n.id(), n.data('name') || undefined, n.id() === h.pq, down, heat?.text),
+      )
       if (down) n.addClass('down')
+      if (heat) n.addClass(`heat-${heat.level}`)
     })
     cy.edges().forEach((e) => {
       const f =
         failed.has(e.id()) || downNodes.has(e.data('source')) || downNodes.has(e.data('target'))
-      e.data(edgeLabels(e.data('metricAB'), e.data('metricBA'), f))
+      const labels = edgeLabels(e.data('metricAB'), e.data('metricBA'), f)
+      const heat = extra.heat?.links[e.id()]
+      if (heat) {
+        labels.label = [labels.label.trim(), heat.text].filter((x) => x).join(' · ')
+        e.addClass(`heat-${heat.level}`)
+      }
+      e.data(labels)
       if (f) e.addClass('failed')
     })
     const add = (ids: NodeId[] | undefined, cls: string) => {

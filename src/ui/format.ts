@@ -1,5 +1,7 @@
 // Small text helpers for the results table and detail panel. No routing maths:
 // they only read what the engine returned.
+import { percent, type CoverageCounts } from '../engine/coverage'
+import { protectedIn, type HeatMap } from '../engine/heat-map'
 import { adjLabel } from '../engine/labels'
 import type { PacketWalk } from '../engine/packet-walk'
 import type { ProtectionPaths } from '../engine/paths'
@@ -8,6 +10,7 @@ import type {
   FailureSimulation,
   FailureSummary,
   Flow,
+  RepairMode,
   SourceFailure,
   Through,
 } from '../engine/simulate'
@@ -349,4 +352,75 @@ export function howText(r: ResultRow, b?: Bundles): string {
     default:
       return `Nothing: ${r.dest} is cut off from ${r.source} when the link fails`
   }
+}
+
+// Coverage heat map (TODO backlog, docs/02-algorithms.md §12).
+
+/**
+ * How well a router or link is protected: every repair (`full`), 75% or more
+ * (`most`), 50% or more (`part`), less (`low`), or nothing to repair (`idle`).
+ */
+export type HeatLevel = 'full' | 'most' | 'part' | 'low' | 'idle'
+
+export const HEAT_LEVELS: { level: HeatLevel; text: string }[] = [
+  { level: 'full', text: '✓ 100%: every repair has a backup' },
+  { level: 'most', text: '75–99%' },
+  { level: 'part', text: '50–74%' },
+  { level: 'low', text: 'under 50%' },
+  { level: 'idle', text: '–: nothing to repair (only a backup link)' },
+]
+
+/** What the heat map protects with: the simulation's repair modes. */
+export const HEAT_MODE_NAME: Record<RepairMode, string> = {
+  lfa: 'LFA',
+  rlfa: 'LFA + Remote LFA',
+  tilfa: 'TI-LFA',
+}
+
+export interface HeatMark {
+  level: HeatLevel
+  /** Written on the diagram: "✓ 100%", "50%", or "–". */
+  text: string
+}
+
+/** Level and label for one router's or link's counts in `mode`. */
+export function heatMark(counts: CoverageCounts, mode: RepairMode): HeatMark {
+  const part = protectedIn(counts, mode)
+  const pct = percent(part, counts.pairs)
+  if (pct === undefined) return { level: 'idle', text: '–' }
+  // Exact counts decide the level, so 99.96% never rounds up to a ✓.
+  if (part === counts.pairs) return { level: 'full', text: '✓ 100%' }
+  const f = part / counts.pairs
+  const level: HeatLevel = f >= 0.75 ? 'most' : f >= 0.5 ? 'part' : 'low'
+  return { level, text: `${Math.min(pct, 99.9)}%` }
+}
+
+export interface HeatMarks {
+  nodes: Record<NodeId, HeatMark>
+  links: Record<string, HeatMark>
+}
+
+export function heatMarks(map: HeatMap, mode: RepairMode): HeatMarks {
+  const each = (r: Record<string, CoverageCounts>) =>
+    Object.fromEntries(Object.entries(r).map(([id, c]) => [id, heatMark(c, mode)]))
+  return { nodes: each(map.routers), links: each(map.links) }
+}
+
+/** Tooltip lines: every mode's numbers, so the colour can be checked. */
+export function heatLines(counts: CoverageCounts, kind: 'node' | 'link'): string[] {
+  if (counts.pairs === 0)
+    return [
+      kind === 'node'
+        ? 'Heat map: repairs nothing (reaches no other router)'
+        : 'Heat map: carries no traffic, so nothing to repair (only a backup)',
+    ]
+  const n = counts.pairs
+  const share = (mode: RepairMode) =>
+    `${HEAT_MODE_NAME[mode]} ${protectedIn(counts, mode)}/${n} (${percent(protectedIn(counts, mode), n)}%)`
+  return [
+    kind === 'node'
+      ? `Heat map: repairs ${n} destination${n === 1 ? '' : 's'} as the router before a failed link`
+      : `Heat map: ${n} repair${n === 1 ? '' : 's'} if this link fails (both ends)`,
+    `${share('lfa')} · ${share('rlfa')} · ${share('tilfa')}`,
+  ]
 }

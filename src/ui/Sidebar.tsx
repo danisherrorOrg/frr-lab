@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import type { RepairMode } from '../engine/simulate'
 import { freePosition } from '../state/edit'
 import { useStore, type Tool } from '../state/store'
-import { bundles, linkName as nameOf } from './format'
+import { bundles, HEAT_MODE_NAME, linkName as nameOf } from './format'
 import { PropertiesPanel } from './PropertiesPanel'
 
 /** The source-picker value for the "All routers" view: a NUL character keeps it apart from any router id. */
@@ -215,6 +216,8 @@ export function Sidebar({ className = '' }: { className?: string }) {
   const setAllSources = useStore((s) => s.setAllSources)
   const extended = useStore((s) => s.settings.extended)
   const setExtended = useStore((s) => s.setExtended)
+  const heatMap = useStore((s) => s.heatMap)
+  const setHeatMap = useStore((s) => s.setHeatMap)
   const ids = nodes.map((n) => n.id).sort()
 
   return (
@@ -289,6 +292,24 @@ export function Sidebar({ className = '' }: { className?: string }) {
           />
           Extended P-space (RLFA)
         </label>
+        <label htmlFor="heat-map" className="mt-2 mb-1 block text-sm font-semibold">
+          Coverage heat map
+        </label>
+        <select
+          id="heat-map"
+          className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
+          value={heatMap ?? ''}
+          onChange={(e) =>
+            setHeatMap(e.target.value === '' ? null : (e.target.value as RepairMode))
+          }
+        >
+          <option value="">Off</option>
+          {(['lfa', 'rlfa', 'tilfa'] as const).map((m) => (
+            <option key={m} value={m}>
+              Colour by {HEAT_MODE_NAME[m]} coverage
+            </option>
+          ))}
+        </select>
       </div>
 
       <PropertiesPanel />

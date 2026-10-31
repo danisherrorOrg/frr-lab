@@ -1,10 +1,12 @@
 import cytoscape from 'cytoscape'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { HeatMap } from '../engine/heat-map'
+import type { RepairMode } from '../engine/simulate'
 import type { NodeId } from '../engine/types'
 import { useStore } from '../state/store'
 import { decorate, stepFlow, STYLE, sync, type Highlight } from './canvas'
 import { CanvasMenu, type Target } from './CanvasMenu'
-import { tooltipLines } from './format'
+import { heatLines, heatMarks, tooltipLines } from './format'
 import { MetricEditor } from './MetricEditor'
 
 /** Something placed at a spot inside the canvas box. */
@@ -25,16 +27,25 @@ function targetOf(ev: cytoscape.EventObject, cy: cytoscape.Core): Target | null 
   return el.isNode() ? { kind: 'node', id } : { kind: 'link', id }
 }
 
+/** The heat map's numbers for a hovered router or link (any mode, so the colour can be checked). */
+function heatTip(map: HeatMap | undefined, target: Target): string[] {
+  const counts = map && (target.kind === 'node' ? map.routers : map.links)[target.id]
+  return counts ? heatLines(counts, target.kind) : []
+}
+
 /**
  * Cytoscape wrapper: draws the topology and turns clicks into store actions.
  * `onRouterTap`: a router was clicked (to open its row, or make it the DUT).
+ * `heat`: the coverage heat map to colour routers and links by, when it is on.
  */
 export function GraphCanvas({
   highlight,
   onRouterTap,
+  heat,
 }: {
   highlight: Highlight
   onRouterTap?: (id: NodeId) => void
+  heat?: { map: HeatMap; mode: RepairMode } | undefined
 }) {
   const box = useRef<HTMLDivElement>(null)
   const cyRef = useRef<cytoscape.Core | null>(null)
@@ -155,6 +166,7 @@ export function GraphCanvas({
   /** Before every click, in case something else moved the box. */
   const remeasure = () => cyRef.current?.resize()
 
+  const marks = useMemo(() => heat && heatMarks(heat.map, heat.mode), [heat])
   useEffect(() => {
     const cy = cyRef.current
     if (!cy) return
@@ -163,8 +175,9 @@ export function GraphCanvas({
       linkStart,
       failed: failedLinks,
       failedNodes,
+      ...(marks && { heat: marks }),
     })
-  }, [topology, highlight, selection, linkStart, failedLinks, failedNodes])
+  }, [topology, highlight, selection, linkStart, failedLinks, failedNodes, marks])
 
   // The menu's or editor's router or link may have been deleted or renamed since it opened.
   const exists = (t: Target) =>
@@ -263,11 +276,12 @@ export function GraphCanvas({
           className="pointer-events-none absolute z-10 rounded bg-slate-900/90 px-2 py-1 text-xs whitespace-nowrap text-white shadow dark:bg-slate-100/95 dark:text-slate-900"
           style={{ left: tip.x + 12, top: tip.y + 12 }}
         >
-          {tooltipLines(topology, tip.target, { links: failedLinks, nodes: failedNodes }).map(
-            (line) => (
-              <div key={line}>{line}</div>
-            ),
-          )}
+          {[
+            ...tooltipLines(topology, tip.target, { links: failedLinks, nodes: failedNodes }),
+            ...heatTip(heat?.map, tip.target),
+          ].map((line) => (
+            <div key={line}>{line}</div>
+          ))}
         </div>
       )}
       {menu && (

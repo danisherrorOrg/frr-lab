@@ -3,6 +3,7 @@ import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/App'
+import { coverageMap, type HeatMap } from '../../src/engine/heat-map'
 import { shareHash } from '../../src/io/share-url'
 import { EXAMPLES, exampleTopology } from '../../src/state/examples'
 import { initialState, useStore } from '../../src/state/store'
@@ -15,17 +16,21 @@ import type { Highlight } from '../../src/ui/canvas'
 const canvas = vi.hoisted(() => ({
   highlight: null as Highlight | null,
   tap: undefined as ((id: string) => void) | undefined,
+  heat: undefined as { map: HeatMap; mode: string } | undefined,
 }))
 vi.mock('../../src/ui/GraphCanvas', () => ({
   GraphCanvas: ({
     highlight,
     onRouterTap,
+    heat,
   }: {
     highlight: Highlight
     onRouterTap?: (id: string) => void
+    heat?: { map: HeatMap; mode: string }
   }) => {
     canvas.highlight = highlight
     canvas.tap = onRouterTap
+    canvas.heat = heat
     return null
   },
 }))
@@ -1069,6 +1074,61 @@ describe('Compare view under a failure', () => {
     expect(ti.textContent).toContain('Lost until the network reconverges onto S→N→M→D (cost 21)')
     expect(within(ti).getByRole('img').getAttribute('aria-label')).toBe(
       'TI-LFA: traffic goes S→N→S…',
+    )
+  })
+})
+
+// TODO backlog: coverage heat map on the canvas (docs/02-algorithms.md §12).
+describe('coverage heat map', () => {
+  it('off by default; picking a mode colours the canvas and shows the key', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'ring5')
+    expect(canvas.heat).toBeUndefined()
+    expect(screen.queryByRole('group', { name: 'Heat map key' })).toBeNull()
+
+    await user.selectOptions(screen.getByLabelText('Coverage heat map'), 'lfa')
+    const key = await screen.findByRole('group', { name: 'Heat map key' })
+    await within(key).findByText(/under 50%/)
+    expect(key.textContent).toContain('Heat map, LFA')
+    const t = useStore.getState().topology
+    expect(canvas.heat).toEqual({ map: coverageMap(t), mode: 'lfa' })
+
+    // Another mode only recolours: same numbers.
+    await user.selectOptions(screen.getByLabelText('Coverage heat map'), 'rlfa')
+    expect(canvas.heat?.mode).toBe('rlfa')
+    expect(screen.getByRole('group', { name: 'Heat map key' }).textContent).toContain(
+      'LFA + Remote LFA',
+    )
+
+    await user.selectOptions(screen.getByLabelText('Coverage heat map'), '')
+    expect(canvas.heat).toBeUndefined()
+  })
+
+  it('follows edits and the extended P-space setting', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'ring5')
+    await user.selectOptions(screen.getByLabelText('Coverage heat map'), 'lfa')
+    await within(await screen.findByRole('group', { name: 'Heat map key' })).findByText(/under 50%/)
+
+    act(() => void useStore.getState().updateLink('C-B', { metricAB: 10, metricBA: 10 }))
+    const t = useStore.getState().topology
+    await vi.waitFor(() => expect(canvas.heat?.map).toEqual(coverageMap(t)))
+    expect(canvas.heat?.map.links['C-B']?.pairs).toBe(0)
+
+    await user.click(screen.getByLabelText('Extended P-space (RLFA)'))
+    await vi.waitFor(() => expect(canvas.heat?.map).toEqual(coverageMap(t, { extended: false })))
+  })
+
+  it('says it shows the plan while something is down', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'ring5')
+    await user.selectOptions(screen.getByLabelText('Coverage heat map'), 'tilfa')
+    act(() => useStore.getState().toggleFailedLink('S-E'))
+    expect((await screen.findByRole('group', { name: 'Heat map key' })).textContent).toContain(
+      'It shows the plan with nothing down.',
     )
   })
 })

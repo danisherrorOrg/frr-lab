@@ -1,4 +1,5 @@
 import type { ComputeOptions, CoverageReport, SourceRows } from '../engine/index'
+import type { HeatMap } from '../engine/heat-map'
 import type { LinkView } from '../engine/link-view'
 import type { FailureSimulation, RepairMode, SourceFailure } from '../engine/simulate'
 import type { DestinationResult, NodeId, Topology } from '../engine/types'
@@ -46,6 +47,12 @@ export interface EngineClient {
   ): Promise<SourceFailure[]>
   /** What one link carries and how it is protected (docs/02-algorithms.md §11). */
   linkView(topology: Topology, link: string, options?: { extended?: boolean }): Promise<LinkView>
+  /** Coverage per router and per link, for the heat map (docs/02-algorithms.md §12). */
+  coverageMap(
+    topology: Topology,
+    options?: { extended?: boolean },
+    onProgress?: (done: number, total: number, source: NodeId) => void,
+  ): Promise<HeatMap>
   /** Stops the worker; pending calls reject. */
   terminate(): void
 }
@@ -114,6 +121,7 @@ export function createEngineClient(worker: WorkerLike = createDefaultWorker()): 
     else if (data.kind === 'all-sources' || data.kind === 'simulate-all')
       p.resolve(data.sources as never)
     else if (data.kind === 'link') p.resolve(data.view as never)
+    else if (data.kind === 'heat-map') p.resolve(data.map as never)
     else p.resolve(data.report as never)
   })
 
@@ -157,6 +165,8 @@ export function createEngineClient(worker: WorkerLike = createDefaultWorker()): 
       ),
     linkView: (topology, link, options) =>
       send({ kind: 'link', topology, link, ...(options && { options }) }),
+    coverageMap: (topology, options, onProgress) =>
+      send({ kind: 'heat-map', topology, ...(options && { options }) }, onProgress),
     terminate: () => {
       worker.terminate()
       for (const p of pending.values()) p.reject(new Error('The engine worker was stopped.'))

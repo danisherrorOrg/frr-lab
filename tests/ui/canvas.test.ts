@@ -1,6 +1,8 @@
 import cytoscape from 'cytoscape'
 import { describe, expect, it } from 'vitest'
+import { coverageMap } from '../../src/engine/heat-map'
 import { decorate, stepFlow, STYLE, sync } from '../../src/ui/canvas'
+import { heatMarks } from '../../src/ui/format'
 import { loadFixture } from '../helpers'
 
 const none = { selection: null, linkStart: null, failed: [] }
@@ -218,5 +220,37 @@ describe('canvas: parallel links (D29)', () => {
     decorate(cy, t, { source: 'S' }, none)
     expect(cy.getElementById('A-S').data('label')).toBe('1')
     expect(cy.getElementById('A-S').hasClass('walk-stack')).toBe(false)
+  })
+})
+
+describe('canvas heat map', () => {
+  it('colours routers and links by level and writes the share', () => {
+    const { cy, t } = draw('03-ring5-highmetric.yaml')
+    const heat = heatMarks(coverageMap(t), 'lfa')
+    decorate(cy, t, { source: 'S' }, { ...none, heat })
+    expect(cy.getElementById('S-E').classes()).toContain('heat-low')
+    expect(cy.getElementById('S-E').data('label')).toBe('1 · 0%')
+    expect(cy.getElementById('C-B').hasClass('heat-idle')).toBe(true)
+    expect(cy.getElementById('C-B').data('label')).toBe('10 · –')
+    expect(cy.getElementById('B').hasClass('heat-full')).toBe(true)
+    expect(cy.getElementById('B').data('display')).toBe('B\n✓ 100%')
+    expect(cy.getElementById('S').hasClass('heat-low')).toBe(true)
+  })
+
+  it('a failed link keeps its failed style on top; turning it off clears it', () => {
+    const { cy, t } = draw('03-ring5-highmetric.yaml')
+    const heat = heatMarks(coverageMap(t), 'tilfa')
+    decorate(cy, t, { source: 'S' }, { ...none, failed: ['S-E'], heat })
+    const se = cy.getElementById('S-E')
+    expect(se.data('label')).toBe('✕ 1 · ✓ 100%')
+    expect(se.classes()).toEqual(expect.arrayContaining(['heat-full', 'failed']))
+    // Later rules win: failed links and the picked row's paths draw over the heat colours.
+    const at = (sel: string) => STYLE.findIndex((r) => r.selector === sel)
+    expect(at('edge.heat-full')).toBeLessThan(at('edge.failed'))
+    expect(at('edge.heat-low')).toBeLessThan(at('edge.primary'))
+    expect(at('node.heat-low')).toBeLessThan(at('node.p-space'))
+    decorate(cy, t, { source: 'S' }, none)
+    expect(cy.elements().filter((e) => /heat-/.test(e.classes().join(' ')))).toHaveLength(0)
+    expect(cy.getElementById('B').data('display')).toBe('B')
   })
 })

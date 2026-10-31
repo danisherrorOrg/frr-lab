@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { coverageMap } from '../../src/engine/heat-map'
 import { computeAllSources, computeCoverage } from '../../src/engine/index'
 import { simulateAllSources } from '../../src/engine/simulate'
 import type { Link, Topology } from '../../src/engine/types'
@@ -43,6 +44,16 @@ describe('coverage speed', () => {
     const ms = performance.now() - start
     expect(r.sources).toHaveLength(200)
     expect(r.total.tilfa).toBe(r.total.pairs)
+    expect(ms).toBeLessThan(2000)
+  })
+
+  // TODO backlog: the coverage heat map does the same work, grouped per link.
+  it('200 routers, 600 links, heat map: under 2 s', () => {
+    const start = performance.now()
+    const m = coverageMap(bigTopology())
+    const ms = performance.now() - start
+    expect(Object.keys(m.routers)).toHaveLength(200)
+    expect(Object.keys(m.links)).toHaveLength(600)
     expect(ms).toBeLessThan(2000)
   })
 })

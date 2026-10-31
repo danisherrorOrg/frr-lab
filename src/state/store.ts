@@ -86,6 +86,11 @@ export interface AppState {
   yamlGuide: boolean
   /** The per-link view (TODO backlog): null = closed, else the link picked (null = none yet). */
   linkView: { link: string | null } | null
+  /**
+   * Coverage heat map on the canvas (TODO backlog): colour routers and links by the
+   * share of their repairs protected in this repair mode; null = off.
+   */
+  heatMap: RepairMode | null
 
   loadTopology: (t: Topology, source?: NodeId, warnings?: string[]) => void
   loadExample: (key: string) => void
@@ -132,6 +137,7 @@ export interface AppState {
   /** Open the per-link view on this link (null = open with none picked) and select it. */
   openLinkView: (link: string | null) => void
   closeLinkView: () => void
+  setHeatMap: (mode: RepairMode | null) => void
 }
 
 /** Keep the chosen source if it still exists, else 'S', else the first router. */
@@ -222,6 +228,7 @@ export const useStore = create<AppState>()((set, get) => {
     tour: null,
     yamlGuide: false,
     linkView: null,
+    heatMap: null,
 
     loadTopology: (t, source, warnings = []) => {
       const placed = edit.withPositions(t)
@@ -416,6 +423,7 @@ export const useStore = create<AppState>()((set, get) => {
     openLinkView: (link) =>
       set({ linkView: { link }, ...(link !== null && { selection: { kind: 'link', id: link } }) }),
     closeLinkView: () => set({ linkView: null }),
+    setHeatMap: (heatMap) => set({ heatMap }),
   }
 })
 

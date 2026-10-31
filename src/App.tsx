@@ -25,6 +25,7 @@ import { Toolbar } from './ui/Toolbar'
 import { Tour } from './ui/Tour'
 import { YamlGuide } from './ui/YamlGuide'
 import { isFirstVisit, markTourSeen } from './ui/tour-steps'
+import { useHeatMap } from './ui/useHeatMap'
 import { useResults } from './ui/useResults'
 import { useAllModes, useSimulation } from './ui/useSimulation'
 
@@ -131,6 +132,11 @@ export function App() {
   // The compare view under a failure runs every mode side by side (§10.1).
   const allModes = useAllModes(topology, source, failedLinks, failedNodes, extended)
   const setSimMode = useStore((s) => s.setSimMode)
+  const heat = useHeatMap(topology)
+  const heatShown = useMemo(
+    () => (heat.mode !== null && heat.map ? { map: heat.map, mode: heat.mode } : undefined),
+    [heat.mode, heat.map],
+  )
 
   /**
    * A router clicked on the canvas (Phase 9.5): with one DUT, open its row as the
@@ -311,9 +317,9 @@ export function App() {
       <div className="flex flex-1 flex-col md:grid md:grid-cols-[16rem_minmax(0,1fr)] md:grid-rows-[auto_1fr]">
         <div className="order-1 md:col-start-2 md:row-start-1">
           <div className="h-[50vh] min-h-72 border-b border-slate-200 bg-slate-50 md:h-[55vh] dark:border-slate-700 dark:bg-slate-800">
-            <GraphCanvas highlight={highlight} onRouterTap={routerTap} />
+            <GraphCanvas highlight={highlight} onRouterTap={routerTap} heat={heatShown} />
           </div>
-          <Legend />
+          <Legend heat={heat} />
         </div>
         <Sidebar className="order-2 md:col-start-1 md:row-span-2 md:row-start-1" />
         <main className="order-3 flex min-w-0 flex-col gap-4 p-3 md:col-start-2 md:row-start-2">
