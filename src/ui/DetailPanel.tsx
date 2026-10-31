@@ -1,8 +1,10 @@
+import type { PacketWalk as Walk } from '../engine/packet-walk'
 import type { ProtectionPaths } from '../engine/paths'
 import type { DestinationResult, NodeId, Protection } from '../engine/types'
 import { useMemo } from 'react'
 import { useStore, type BackupKind } from '../state/store'
 import { bundles, hopName, isBundled, lfaTags, linkName, METHOD_NAME, segmentText } from './format'
+import { PacketWalk } from './PacketWalk'
 
 interface Props {
   source: NodeId
@@ -14,6 +16,11 @@ interface Props {
   drawn: Exclude<BackupKind, 'auto'> | null
   onBackup: (b: BackupKind) => void
   onClose: () => void
+  /** The TI-LFA repair walked router by router; absent when there is none. */
+  walk?: Walk
+  walkStep?: number | null
+  onWalkStep?: (step: number | null) => void
+  onPhp?: (php: boolean) => void
 }
 
 const h3 = 'mt-3 mb-1 text-sm font-semibold'
@@ -29,6 +36,10 @@ export function DetailPanel({
   drawn,
   onBackup,
   onClose,
+  walk,
+  walkStep = null,
+  onWalkStep = () => {},
+  onPhp = () => {},
 }: Props) {
   const e = p.protectedLink.to
   const kinds = ['lfa', 'rlfa', 'tilfa'] as const
@@ -173,6 +184,21 @@ export function DetailPanel({
         <p className="text-red-700 dark:text-red-400">
           No path: {result.dest} can&apos;t be reached once link {sE} fails.
         </p>
+      )}
+
+      {walk && (
+        <>
+          <h3 className={h3}>Packet walk (TI-LFA)</h3>
+          <PacketWalk
+            walk={walk}
+            e={e}
+            failedLink={p.protectedLink.id}
+            step={walkStep}
+            onStep={onWalkStep}
+            onPhp={onPhp}
+            b={b}
+          />
+        </>
       )}
 
       <h3 className={h3}>Explain</h3>

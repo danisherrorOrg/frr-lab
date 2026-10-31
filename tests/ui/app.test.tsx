@@ -86,6 +86,40 @@ describe('App smoke test', () => {
     )
   })
 
+  it('Example 3 packet walk: steps router by router with the label stack, PHP on and off', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'ring5-high')
+    await user.click(await rowFor('E'))
+    const walk = screen.getByRole('group', { name: 'Packet walk' })
+
+    await user.click(within(walk).getByRole('button', { name: /Start packet walk/ }))
+    expect(walk.textContent).toContain('Router 1 of 5: S')
+    expect(walk.textContent).toContain('Pushes 16004 (Prefix-SID(B)), 24005 (Adj-SID(B→C))')
+    // The canvas draws the TI-LFA path and marks where the packet is.
+    expect(canvas.highlight).toMatchObject({
+      backup: ['S', 'A', 'B', 'C', 'E'],
+      packetAt: 'S',
+      packetLink: 'A-S',
+    })
+
+    await user.click(within(walk).getByRole('button', { name: 'Next router' }))
+    expect(walk.textContent).toContain('Router 2 of 5: A')
+    expect(walk.textContent).toContain('c(A,B) + dist(B,B) = 1 + 0 = 1 = dist(A,B)')
+    expect(walk.textContent).toContain('PHP: B is the end of the segment Prefix-SID(B)')
+
+    await user.click(within(walk).getByRole('button', { name: 'Next router' }))
+    expect(walk.textContent).toContain("24005 is B's own Adj-SID for link B–C")
+    expect(canvas.highlight).toMatchObject({ packetAt: 'B', packetLink: 'C-B' })
+
+    // PHP off: B pops its own Prefix-SID first, then the Adj-SID.
+    await user.click(within(walk).getByLabelText('PHP (penultimate-hop popping)'))
+    expect(walk.textContent).toContain("16004 is B's own Prefix-SID: this segment ends here")
+
+    await user.click(within(walk).getByRole('button', { name: 'Stop' }))
+    expect(canvas.highlight?.packetAt).toBeUndefined()
+  })
+
   it('editing a metric updates the results, and undo puts it back', async () => {
     const user = userEvent.setup()
     render(<App />)

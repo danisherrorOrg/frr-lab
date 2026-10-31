@@ -138,6 +138,28 @@ dist(X,Y) < dist(X,E) + dist(E,Y)
 ```
 If D == E, node protection doesn't apply (fall back to link protection).
 
+### 4.5 Packet walk (TODO backlog, D34)
+`packetWalk()` (`src/engine/packet-walk.ts`) follows one packet along the repair from §4.2, router by router, and records the label stack each router receives and sends (top first). It is a teaching view; it changes no result.
+- **At S (the PLR):** the packet arrives with D's own label (the walk assumes it is already on the SR path to D). S pushes the rest of the segment list on top (RFC 9855 §5) and sends out of the repair interface `outLink` to the path's first hop N. S does not read the top label: after clean-up it can even be N's Adj-SID.
+- **Every other router R** reads the top label and uses its *normal* table:
+  - its own Prefix-SID → the segment ends here: pop it and read the next label;
+  - its own Adj-SID R→X → pop it and send out that link, whatever its table says (RFC 8402 §3.4);
+  - another router Y's Prefix-SID → forward to the next router on the path. The walk checks it is a normal next hop: `c(R,next) + dist(next,Y) = dist(R,Y)`. With ECMP the real router may pick another equal-cost next hop; the walk shows the one on the post-convergence path.
+- **PHP (on by default):** when the top label after R's actions is a Prefix-SID of the very next router, R pops it before sending (penultimate-hop popping, RFC 8660 §2). With PHP the segment's end router never sees its own label, and D gets a plain IP packet. With PHP off, each segment end pops its own label (D too).
+- The walk ends at D with no labels left. The metrics walked add up to the post-convergence cost.
+
+Example 3 (§6), PHP on:
+
+| Router | Arrives with | Does | Leaves with |
+|---|---|---|---|
+| S | 16002 | push 16004, 24005; out to A | 16004 24005 16002 |
+| A | 16004 24005 16002 | forward to B (`1 + 0 = 1 = dist(A,B)`); PHP pop 16004 | 24005 16002 |
+| B | 24005 16002 | pop Adj-SID 24005, send on B→C (metric 10) | 16002 |
+| C | 16002 | forward to E; PHP pop 16002 | no labels |
+| E | no labels | deliver | – |
+
+With PHP off, A sends all three labels, B pops 16004 (its own) then 24005, and E pops 16002. Total cost 1+1+10+1 = 13.
+
 ---
 
 ## 5. Coverage numbers
@@ -214,6 +236,7 @@ With SRGB 16000 and SID indices S=1, E=2, A=3, B=4, C=5, Adj-SID B→C = 24005, 
 - RFC 7490 – Remote LFA Fast Reroute. https://www.rfc-editor.org/rfc/rfc7490
 - RFC 8102 – Remote-LFA Node Protection and Manageability (for v0.2).
 - RFC 8402 – Segment Routing Architecture (Prefix-SID, Adj-SID, SRGB).
+- RFC 8660 – Segment Routing with the MPLS Data Plane (label push, pop and PHP).
 - RFC 8667 – IS-IS Extensions for Segment Routing.
 - RFC 9855 – Topology Independent Fast Reroute Using Segment Routing (TI-LFA), October 2025 (was `draft-ietf-rtgwg-segment-routing-ti-lfa`). https://www.rfc-editor.org/rfc/rfc9855
 - RFC 6571 – LFA applicability (good background on coverage in real topologies).

@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { packetWalk } from './engine/packet-walk'
 import { hopLinks, protectionPaths } from './engine/paths'
 import { readShareHash } from './io/share-url'
 import { isRow, useStore, type Tool } from './state/store'
@@ -133,6 +134,22 @@ export function App() {
     return { result, protection, paths, drawn: pickBackup(paths, backup) }
   }, [results, row, source, topology, backup])
 
+  // Packet walk (TODO backlog): the step belongs to one row, so a new row starts fresh.
+  const [php, setPhp] = useState(true)
+  const [walkAt, setWalkAt] = useState<{ key: string; step: number } | null>(null)
+  const walkKey = row && source !== null ? `${source}|${row.dest}|${row.via}|${row.link ?? ''}` : ''
+  const walkStep = walkAt !== null && walkAt.key === walkKey ? walkAt.step : null
+  const walk = useMemo(() => {
+    if (!selected || source === null || !selected.protection.tilfa.path) return undefined
+    const { to, id } = selected.protection.protectedLink
+    return packetWalk(topology, source, selected.result.dest, to, { link: id, php })
+  }, [selected, source, topology, php])
+  const setWalkStep = (step: number | null) => {
+    setWalkAt(step === null ? null : { key: walkKey, step })
+    // Walking follows the TI-LFA path, so draw that one.
+    if (step !== null && backup !== 'tilfa') setBackup('tilfa')
+  }
+
   const highlight = useMemo<Highlight>(() => {
     // Failed links: draw the simulated traffic instead of the selected row (F5).
     // Links are named per hop so a bundle draws the link really used (D29).
@@ -185,8 +202,16 @@ export function App() {
       pSpace: rlfa.extended ? rlfa.extPSpace : rlfa.pSpace,
       qSpace: rlfa.qSpace,
       ...(rlfa.needed && rlfa.best !== undefined && { pq: rlfa.best }),
+      ...(walk &&
+        walkStep !== null &&
+        walk.hops[walkStep] && {
+          packetAt: walk.hops[walkStep].router,
+          ...(walk.hops[walkStep].link !== undefined && { packetLink: walk.hops[walkStep].link }),
+        }),
     }
   }, [
+    walk,
+    walkStep,
     selected,
     source,
     anyFailed,
@@ -247,6 +272,10 @@ export function App() {
                   drawn={selected.drawn?.kind ?? null}
                   onBackup={setBackup}
                   onClose={() => selectRow(null)}
+                  {...(walk && { walk })}
+                  walkStep={walkStep}
+                  onWalkStep={setWalkStep}
+                  onPhp={setPhp}
                 />
               ) : (
                 <p className="text-sm text-slate-500">

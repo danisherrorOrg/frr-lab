@@ -287,7 +287,7 @@ PE1 in `04-isp-core.yaml`). Users want to see each router's results when *it* is
 Things that fit the "learn and check FRR" goal and stay offline / no backend.
 
 **Teaching**
-- [ ] Packet walk: step through a TI-LFA repair hop by hop, showing the label stack at each router (push, pop at the end of each segment, PHP)
+- [x] Packet walk: step through a TI-LFA repair hop by hop, showing the label stack at each router (push, pop at the end of each segment, PHP) *(D34, `02-algorithms.md` §4.5)*
 - [ ] Compare view: LFA, RLFA and TI-LFA paths for one destination side by side
 - [ ] Guided tour on first visit (load Example 2, fail S–E, read the TI-LFA stack)
 - [ ] Clickable P / Q / PQ sets in the detail panel that highlight those routers on the canvas

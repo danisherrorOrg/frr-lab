@@ -25,6 +25,9 @@ export interface Highlight {
   finalLinks?: (string | undefined)[]
   /** Animate traffic along the backup path (marching dashes). */
   flowing?: boolean
+  /** Packet walk: the router the packet is at, and the link it leaves on. */
+  packetAt?: NodeId
+  packetLink?: string
 }
 
 export const COLORS = { primary: '#2563eb', backup: '#ea580c', final: '#16a34a' }
@@ -135,6 +138,20 @@ export const STYLE: cytoscape.StylesheetJson = [
   { selector: 'edge.final-fwd', style: { 'mid-target-arrow-shape': 'chevron' } },
   { selector: 'edge.final-rev', style: { 'mid-source-arrow-shape': 'chevron' } },
   {
+    // Packet walk: a violet ring on the router, a violet glow on the link being sent over.
+    selector: 'node.packet-at',
+    style: {
+      'overlay-color': '#7c3aed',
+      'overlay-opacity': 0.35,
+      'overlay-padding': 10,
+      'overlay-shape': 'ellipse',
+    },
+  },
+  {
+    selector: 'edge.packet-hop',
+    style: { 'underlay-color': '#7c3aed', 'underlay-opacity': 0.45, 'underlay-padding': 8 },
+  },
+  {
     selector: 'edge.failed',
     style: { 'line-color': '#dc2626', 'line-style': 'dotted', width: 4 },
   },
@@ -185,7 +202,7 @@ export function sync(cy: cytoscape.Core, t: Topology) {
 }
 
 const CLASSES =
-  'p-space q-space pq down source dest sel link-start primary backup final primary-fwd primary-rev backup-fwd backup-rev final-fwd final-rev flowing failed'
+  'p-space q-space pq down source dest sel link-start primary backup final primary-fwd primary-rev backup-fwd backup-rev final-fwd final-rev flowing failed packet-at packet-hop'
 
 export function decorate(
   cy: cytoscape.Core,
@@ -249,6 +266,8 @@ export function decorate(
     drawPath(h.backup, h.backupLinks, 'backup')
     drawPath(h.final, h.finalLinks, 'final')
     if (h.flowing) cy.edges('.backup').addClass('flowing')
+    if (h.packetAt !== undefined) cy.getElementById(h.packetAt).addClass('packet-at')
+    if (h.packetLink !== undefined) cy.getElementById(h.packetLink).addClass('packet-hop')
   })
 }
 

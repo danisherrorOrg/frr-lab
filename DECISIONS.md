@@ -307,3 +307,12 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Still not modelled (unchanged):** the first hop of a plain-P-space Remote LFA tunnel is the lowest-id path to the PQ node (D25); node-protecting backups (Later #1); adjacency-set SIDs, LAG members and hashing over equal links (D29).
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D34 – Packet walk for a TI-LFA repair (2026-10-31)
+- **Why:** TODO backlog "Packet walk". Students see the label stack as one list, but not what each router does with it. Stepping router by router shows push at S, forwarding on the top label, the Adj-SID pop, and PHP.
+- **Engine:** `packetWalk()` in `src/engine/packet-walk.ts` (pure, `docs/02-algorithms.md` §4.5). It reuses `computeTilfa()`; nothing new is computed. Every router except S uses its normal table; the walk throws if a router can't do what its top label says, so the property test (random networks, asymmetric metrics and bundles, PHP on and off) also checks every segment list. It found one case worth a fixed test: when clean-up drops S's first segment, the top label S sends can be the first hop's Adj-SID, which S must not read.
+- **Modelling choices:** the packet reaches S already carrying D's label (the RFC 9855 §7.1 "destination's own label"); PHP is on by default, as in SR-MPLS (the P-flag is off unless set, RFC 8667 §2.1), with a switch to turn it off; with ECMP the walk shows the next hop on the post-convergence path, one of the equal ones.
+- **UI:** a "Packet walk (TI-LFA)" part in the detail panel: Start / Back / Next / Stop (← → keys too), a PHP checkbox, the current router's labels and actions in plain English with the numbers, and a table of every router. Starting the walk draws the TI-LFA path; the canvas marks the current router and the link it sends on in violet (also in the legend). The step resets when another row is picked. Not in the share link.
+- **Other options considered:** keep the stack-before-PHP view only (§4.3) — it hides exactly the step students ask about; animate the packet on the canvas — more code for little gain over a highlighted step.
+- **No new dependencies.**
+- **Status:** Accepted.
