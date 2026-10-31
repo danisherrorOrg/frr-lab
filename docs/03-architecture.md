@@ -51,6 +51,8 @@ LFA LAB/
 │   │   ├── coverage.ts      per-source and all-sources reports
 │   │   ├── explain.ts       turns checks into readable steps with numbers
 │   │   ├── paths.ts         node-by-node paths to draw (primary, LFA, RLFA, TI-LFA)
+│   │   ├── rows.ts          compact results-table rows (every router as the DUT, D31)
+│   │   ├── simulate.ts      failure simulation, per source and for every router
 │   │   └── index.ts         computeForSource(), computeCoverage()
 │   ├── io/
 │   │   ├── yaml.ts          load/save + schema validation
@@ -63,13 +65,19 @@ LFA LAB/
 │   ├── state/
 │   │   ├── store.ts         topology, selection, failed links, undo/redo history
 │   │   ├── edit.ts          pure topology edits (add/move/delete/update + checks)
-│   │   └── examples.ts      built-in examples, bundled from examples/*.yaml
+│   │   ├── examples.ts      built-in examples, bundled from examples/*.yaml
+│   │   └── layout.ts        "Auto layout": deterministic force layout (D30)
 │   ├── ui/
 │   │   ├── GraphCanvas.tsx  Cytoscape wrapper (clicks → store actions)
 │   │   ├── canvas.ts        Cytoscape styles, sync and highlight (tested headless)
 │   │   ├── Sidebar.tsx      tools, source picker, settings
 │   │   ├── Toolbar.tsx      add node/link, fail mode, examples, import/export
-│   │   ├── ResultsTable.tsx
+│   │   ├── CanvasMenu.tsx   right-click menu on a router or link (D30)
+│   │   ├── MetricEditor.tsx double-click a link to edit its metric (D30)
+│   │   ├── ResultsTable.tsx one source's table (RowsTable, shared with AllResults)
+│   │   ├── AllResults.tsx   every router as the DUT, one section each (D31)
+│   │   ├── FailurePanel.tsx failure simulation for the drawn source
+│   │   ├── FailureByDut.tsx the same failure from every router (D31)
 │   │   ├── DetailPanel.tsx  P/Q spaces, segment list, explain steps
 │   │   ├── CoverageReport.tsx
 │   │   └── PropertiesPanel.tsx  edit selected node/link
@@ -166,7 +174,9 @@ links:
 │ ○ Add router  │   blue = primary · orange dashed = backup    │
 │ ○ Add link    │   shaded = P-space / Q-space · ★ = PQ node   │
 │ ○ Fail link   │                                              │
-│ Source: [S ▾] │                                              │
+│ Source: [S ▾] │   [+][−][Fit][Auto layout]   hover = tooltip │
+│  (or "All     │   right-click = menu · dbl-click link = metric│
+│   routers")   │                                              │
 │ Mode: [Link]  │                                              │
 ├───────────────┴──────────────────────────────────────────────┤
 │ Results for S:  Dest | NH | Cost | LFA | RLFA | TI-LFA | ✓/✗  │

@@ -1,29 +1,26 @@
 // Small text helpers for the results table and detail panel. No routing maths:
 // they only read what the engine returned.
+import { adjLabel } from '../engine/labels'
 import type { ProtectionPaths } from '../engine/paths'
-import type { FailureSimulation, Flow, Through } from '../engine/simulate'
-import type { NodeId, Protection, Segment, Topology } from '../engine/types'
-import type { BackupKind } from '../state/store'
+import type { Method } from '../engine/rows'
+import type {
+  FailureSimulation,
+  FailureSummary,
+  Flow,
+  SourceFailure,
+  Through,
+} from '../engine/simulate'
+import type { NodeId, Segment, Topology } from '../engine/types'
+import type { BackupKind, Selection } from '../state/store'
 
-export type Method = 'ecmp' | 'lfa' | 'rlfa' | 'tilfa'
+export type { Method } from '../engine/rows'
+export { protectedBy } from '../engine/rows'
 
 export const METHOD_NAME: Record<Method, string> = {
   ecmp: 'ECMP',
   lfa: 'LFA',
   rlfa: 'Remote LFA',
   tilfa: 'TI-LFA',
-}
-
-/**
- * The simplest method that protects this pair, in the order coverage counts
- * them (docs/02-algorithms.md §5): ECMP, LFA, Remote LFA, TI-LFA.
- */
-export function protectedBy(p: Protection): Method | null {
-  if (p.ecmpProtected) return 'ecmp'
-  if (p.lfa.best !== undefined) return 'lfa'
-  if (p.rlfa.needed && p.rlfa.best !== undefined) return 'rlfa'
-  if (p.tilfa.path !== undefined) return 'tilfa'
-  return null
 }
 
 /** Router pairs joined by more than one link (parallel links, D29), as "a|b" with a < b. */
@@ -163,4 +160,80 @@ export function throughText(t: Through, plr: NodeId, next: NodeId, dest: NodeId)
   return node === next
     ? `${part}. TI-LFA link protection only avoids the link ${plr}–${node}; node protection would plan around the router (RFC 9855 §1).`
     : `${part}. ${second}`
+}
+
+/** "1 router" / "2 routers". */
+export const plural = (k: number, word: string) => `${k} ${word}${k === 1 ? '' : 's'}`
+
+/**
+ * Hover text for a router or link on the canvas (Phase 9.5): what the properties
+ * panel would show, without having to select it.
+ */
+export function tooltipLines(
+  t: Topology,
+  target: Exclude<Selection, null>,
+  down: { links: readonly string[]; nodes: readonly NodeId[] },
+): string[] {
+  if (target.kind === 'node') {
+    const n = t.nodes.find((x) => x.id === target.id)
+    if (!n) return []
+    return [
+      `Router ${n.id}${n.name ? ` · ${n.name}` : ''}`,
+      `Prefix-SID index ${n.sidIndex} · label ${t.srgbBase + n.sidIndex}`,
+      ...(down.nodes.includes(n.id) ? ['✕ down: all its links are down'] : []),
+    ]
+  }
+  const l = t.links.find((x) => x.id === target.id)
+  if (!l) return []
+  const { a, b } = l
+  // Labels set in the file are shown as they are; the others are auto-assigned (D18).
+  const adj = (from: NodeId, to: NodeId, set: number | undefined) =>
+    `${from}→${to} ${set ?? `${adjLabel(t, from, to, l.id)} (auto)`}`
+  const deadEnd = [a, b].find((x) => down.nodes.includes(x))
+  return [
+    `Link ${linkName(bundles(t), a, b, l.id)}`,
+    l.metricAB === l.metricBA
+      ? `Metric ${l.metricAB} both ways`
+      : `Metric ${a}→${b} ${l.metricAB} · ${b}→${a} ${l.metricBA}`,
+    `Adj-SID ${adj(a, b, l.adjSidAB)} · ${adj(b, a, l.adjSidBA)}`,
+    ...(deadEnd !== undefined
+      ? [`✕ down (router ${deadEnd} is down)`]
+      : down.links.includes(l.id)
+        ? ['✕ down']
+        : []),
+  ]
+}
+
+/** "3 repaired, 1 dropped until convergence": the non-zero outcomes, in a fixed order. */
+export function outcomeText(s: FailureSummary): string {
+  const parts: [number, string][] = [
+    [s.repaired, `repaired${s.relayed > 0 ? ` (${s.relayed} by more than one router)` : ''}`],
+    [s.dropped, 'dropped until convergence'],
+    [s.looped, 'looping until convergence'],
+    [s.unreachable, 'unreachable'],
+  ]
+  return parts
+    .filter(([k], i) => k > 0 || i === 0)
+    .map(([k, text]) => `${k} ${text}`)
+    .join(', ')
+}
+
+/** "2 survive, 1 breaks" ("2 repairs survive" with a noun), "no backup" only when there are some (D27). */
+export function surviveText(s: FailureSummary, noun?: string): string {
+  return (
+    `${noun ? plural(s.survive, noun) : s.survive} survive${s.survive === 1 ? 's' : ''}, ${s.breaks} break${s.breaks === 1 ? 's' : ''}` +
+    `${s.noBackup > 0 ? `, ${s.noBackup} with no backup` : ''}`
+  )
+}
+
+/**
+ * One line for one DUT in the per-router failure view (Phase 9.6), e.g.
+ * "3 affected, 3 repaired; 2 survive, 1 breaks". `routersDown`: add the survive /
+ * break part, which only means something when a router has failed.
+ */
+export function dutSummary(x: SourceFailure, routersDown: boolean): string {
+  if ('down' in x) return 'down: sends no traffic'
+  const s = x.summary
+  if (s.affected === 0) return 'nothing affected'
+  return `${s.affected} affected, ${outcomeText(s)}${routersDown ? `; ${surviveText(s)}` : ''}`
 }

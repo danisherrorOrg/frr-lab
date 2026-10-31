@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/App'
@@ -11,13 +11,27 @@ import type { Highlight } from '../../src/ui/canvas'
 // jsdom has no <canvas>, so Cytoscape can't draw here; tests/ui/canvas.test.ts
 // checks the drawing logic with headless Cytoscape instead.
 // The mock keeps the last highlight it was given, so tests can check what would be drawn.
-const canvas = vi.hoisted(() => ({ highlight: null as Highlight | null }))
+// It also keeps onRouterTap, so tests can "click" a router on the diagram.
+const canvas = vi.hoisted(() => ({
+  highlight: null as Highlight | null,
+  tap: undefined as ((id: string) => void) | undefined,
+}))
 vi.mock('../../src/ui/GraphCanvas', () => ({
-  GraphCanvas: ({ highlight }: { highlight: Highlight }) => {
+  GraphCanvas: ({
+    highlight,
+    onRouterTap,
+  }: {
+    highlight: Highlight
+    onRouterTap?: (id: string) => void
+  }) => {
     canvas.highlight = highlight
+    canvas.tap = onRouterTap
     return null
   },
 }))
+
+/** Click router `id` on the diagram (the canvas mock passes it to the app). */
+const tapRouter = (id: string) => act(() => canvas.tap!(id))
 
 beforeEach(() => useStore.setState(initialState, true))
 afterEach(() => {
@@ -512,5 +526,108 @@ describe('App: parallel links', () => {
     expect(await within(panel).findByText(/E–D \(E-D\) failed/)).toBeTruthy()
     // The first affected flow (to A) is drawn: E→D on the other link, then D→A.
     expect(canvas.highlight).toMatchObject({ dest: 'A', backupLinks: ['E-D#2', 'A-D'] })
+  })
+})
+
+describe('Phase 9.5: canvas usability', () => {
+  it('clicking a router opens its row as the destination, and draws it', async () => {
+    render(<App />)
+    await rowFor('C')
+    tapRouter('C')
+    const details = await screen.findByRole('region', { name: 'Details' })
+    expect(details.textContent).toContain('S → C')
+    expect(useStore.getState().row).toMatchObject({ dest: 'C' })
+    expect(canvas.highlight).toMatchObject({ dest: 'C' })
+    // The source itself has no row: nothing opens or changes.
+    tapRouter('S')
+    expect(useStore.getState().row).toMatchObject({ dest: 'C' })
+  })
+
+  it('with a link failed, clicking a router also draws its simulated traffic', async () => {
+    render(<App />)
+    await rowFor('C')
+    useStore.getState().toggleFailedLink('S-E')
+    await screen.findByRole('region', { name: 'Failure simulation' })
+    tapRouter('C')
+    expect(useStore.getState().simDest).toBe('C')
+  })
+})
+
+describe('Phase 9.6: every router as the DUT', () => {
+  it('Example 4, "All routers": a section for every router; a row click makes it the DUT', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'isp-core')
+    await user.selectOptions(
+      screen.getByLabelText('Source router (S)'),
+      'All routers (6), each as the DUT',
+    )
+    const view = await screen.findByRole('region', { name: 'Results for every router' })
+    for (const id of ['P1', 'P2', 'P3', 'P4', 'PE1', 'PE2'])
+      expect(await within(view).findByRole('table', { name: `Results for ${id}` })).toBeTruthy()
+    expect(within(view).getAllByRole('button', { expanded: true })).toHaveLength(6)
+
+    // docs/05-testing.md §2: PE1 to P1 is Remote LFA PE2 via P2, TI-LFA 24000 16001.
+    const pe1 = within(view).getByRole('table', { name: 'Results for PE1' })
+    const p1 = within(pe1)
+      .getAllByRole('row')
+      .find((r) => r.querySelector('td')?.textContent === 'P1')!
+    expect(p1.textContent).toContain('★ PE2(via P2)')
+    expect(p1.textContent).toContain('24000 16001')
+
+    // A row in P3's section: P3 becomes the DUT, the row opens with its details.
+    const p3 = within(view).getByRole('table', { name: 'Results for P3' })
+    const toPE1 = within(p3)
+      .getAllByRole('row')
+      .find((r) => r.querySelector('td')?.textContent === 'PE1')!
+    await user.click(toPE1)
+    expect(useStore.getState()).toMatchObject({ source: 'P3', allSources: true })
+    const details = await screen.findByRole('region', { name: 'Details' })
+    expect(details.textContent).toContain('P3 → PE1')
+    expect(toPE1.getAttribute('aria-selected')).toBe('true')
+
+    // Clicking a router on the diagram switches the DUT.
+    tapRouter('P2')
+    expect(useStore.getState().source).toBe('P2')
+
+    // Sections close and open; filters narrow the list.
+    await user.click(within(view).getByRole('button', { name: /DUT P4/ }))
+    expect(within(view).queryByRole('table', { name: 'Results for P4' })).toBeNull()
+    await user.selectOptions(within(view).getByLabelText('DUT'), 'PE2')
+    expect(within(view).getAllByRole('button', { name: /^DUT / })).toHaveLength(1)
+    await user.selectOptions(within(view).getByLabelText('DUT'), '')
+    await user.selectOptions(within(view).getByLabelText('Show'), 'Unprotected (✗)')
+    // TI-LFA protects every pair here, so nothing is left.
+    expect(within(view).getByText(/No row matches/)).toBeTruthy()
+
+    // Back to one router.
+    await user.selectOptions(screen.getByLabelText('Source router (S)'), 'PE1')
+    expect(screen.queryByRole('region', { name: 'Results for every router' })).toBeNull()
+    expect(await screen.findByRole('table', { name: 'Results for PE1' })).toBeTruthy()
+  })
+
+  it('failure view per DUT: Example 6, router E down, LFA only', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'link-protecting')
+    useStore.getState().setAllSources(true)
+    useStore.getState().setSimMode('lfa')
+    useStore.getState().toggleFailedNode('E')
+    const byDut = await screen.findByRole('region', { name: 'Failure by DUT' })
+    await within(byDut).findByText(/routers have traffic/)
+    const line = (id: string) => within(byDut).getByRole('button', { name: new RegExp(`^${id}:`) })
+    expect(line('S').textContent).toBe(
+      'S: 1 affected, 1 repaired (1 by more than one router); 0 survive, 1 breaks',
+    )
+    expect(line('D').textContent).toBe('D: 2 affected, 2 repaired; 2 survive, 0 break')
+    expect(line('M').textContent).toBe('M: nothing affected')
+    expect((line('E') as HTMLButtonElement).disabled).toBe(true)
+    expect(byDut.textContent).toContain('3 of 4 routers have traffic that crosses something down.')
+
+    // Pick D: the failure panel below now follows D's traffic.
+    await user.click(line('D'))
+    expect(useStore.getState().source).toBe('D')
+    const panel = screen.getByRole('region', { name: 'Failure simulation' })
+    await within(panel).findByText(/From D:/)
   })
 })

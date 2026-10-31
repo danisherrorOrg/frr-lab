@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { computeCoverage, computeForSource } from '../../src/engine/index'
-import { simulateFailure } from '../../src/engine/simulate'
+import { computeAllSources, computeCoverage, computeForSource } from '../../src/engine/index'
+import { simulateAllSources, simulateFailure } from '../../src/engine/simulate'
 import { createEngineClient, createInlineWorker, type WorkerLike } from '../../src/worker/client'
 import { handleRequest, type EngineRequest, type EngineResponse } from '../../src/worker/protocol'
 import { loadFixture } from '../helpers'
@@ -72,6 +72,20 @@ describe('createEngineClient', () => {
     await expect(client.simulateFailure(ring(), 'S', ['X-Y'], 'lfa')).rejects.toThrow(
       'Unknown link "X-Y".',
     )
+  })
+
+  it('resolves every router as the DUT, rows and failure summary, with progress (9.6)', async () => {
+    const client = createEngineClient(fakeWorker())
+    const seen: string[] = []
+    const rows = await client.computeAllSources(ring(), { extended: false }, (d, t, s) =>
+      seen.push(`${d}/${t} ${s}`),
+    )
+    expect(rows).toEqual(computeAllSources(ring(), { extended: false }))
+    expect(seen).toEqual(['1/5 A', '2/5 B', '3/5 C', '4/5 E', '5/5 S'])
+
+    const failed = { links: ['S-E'], nodes: ['C'] }
+    const sims = await client.simulateAllSources(ring(), failed, 'tilfa')
+    expect(sims).toEqual(simulateAllSources(ring(), failed, 'tilfa'))
   })
 
   it('rejects with the engine’s message', async () => {

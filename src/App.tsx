@@ -2,9 +2,12 @@ import { useEffect, useMemo } from 'react'
 import { hopLinks, protectionPaths } from './engine/paths'
 import { readShareHash } from './io/share-url'
 import { isRow, useStore, type Tool } from './state/store'
+import type { NodeId } from './engine/types'
+import { AllResults } from './ui/AllResults'
 import type { Highlight } from './ui/canvas'
 import { CoverageReport } from './ui/CoverageReport'
 import { DetailPanel } from './ui/DetailPanel'
+import { FailureByDut } from './ui/FailureByDut'
 import { FailurePanel } from './ui/FailurePanel'
 import { drawnFlow, pickBackup } from './ui/format'
 import { GraphCanvas } from './ui/GraphCanvas'
@@ -88,6 +91,9 @@ export function App() {
   const topology = useStore((s) => s.topology)
   const source = useStore((s) => s.source)
   const extended = useStore((s) => s.settings.extended)
+  const allSources = useStore((s) => s.allSources)
+  const setSource = useStore((s) => s.setSource)
+  const pickRow = useStore((s) => s.pickRow)
   const row = useStore((s) => s.row)
   const backup = useStore((s) => s.backup)
   const selectRow = useStore((s) => s.selectRow)
@@ -102,6 +108,21 @@ export function App() {
   const setSimDest = useStore((s) => s.setSimDest)
   const { results, loading, error } = useResults(topology, source, extended)
   const sim = useSimulation(topology, source, failedLinks, failedNodes, simMode, extended)
+
+  /**
+   * A router clicked on the canvas (Phase 9.5): with one DUT, open its row as the
+   * destination; in the "All routers" view, make it the DUT (Phase 9.6).
+   */
+  const routerTap = (id: NodeId) => {
+    if (allSources) {
+      setSource(id)
+      return
+    }
+    const p = results?.find((r) => r.dest === id)?.protections[0]
+    if (!p) return
+    selectRow({ dest: id, via: p.protectedLink.to, link: p.protectedLink.id })
+    if (anyFailed) setSimDest(id)
+  }
 
   const selected = useMemo(() => {
     if (!results || !row || source === null) return null
@@ -185,27 +206,36 @@ export function App() {
       <div className="flex flex-1 flex-col md:grid md:grid-cols-[16rem_minmax(0,1fr)] md:grid-rows-[auto_1fr]">
         <div className="order-1 md:col-start-2 md:row-start-1">
           <div className="h-[50vh] min-h-72 border-b border-slate-200 bg-slate-50 md:h-[55vh] dark:border-slate-700 dark:bg-slate-800">
-            <GraphCanvas highlight={highlight} />
+            <GraphCanvas highlight={highlight} onRouterTap={routerTap} />
           </div>
           <Legend />
         </div>
         <Sidebar className="order-2 md:col-start-1 md:row-span-2 md:row-start-1" />
         <main className="order-3 flex min-w-0 flex-col gap-4 p-3 md:col-start-2 md:row-start-2">
+          {anyFailed && allSources && <FailureByDut />}
           {anyFailed && source !== null && (
             <FailurePanel source={source} simulation={sim.simulation} error={sim.error} />
           )}
           <div className="grid gap-4 lg:grid-cols-2">
-            <ResultsTable
-              source={source}
-              results={results}
-              loading={loading}
-              error={error}
-              row={row}
-              onSelect={(r) => {
-                toggleRow(r)
-                if (anyFailed) setSimDest(r.dest)
-              }}
-            />
+            {allSources ? (
+              <AllResults
+                onSelect={(dut, r) => {
+                  pickRow(dut, r)
+                  if (anyFailed) setSimDest(r.dest)
+                }}
+              />
+            ) : (
+              <ResultsTable
+                source={source}
+                results={results}
+                loading={loading}
+                error={error}
+                onSelect={(r) => {
+                  toggleRow(r)
+                  if (anyFailed) setSimDest(r.dest)
+                }}
+              />
+            )}
             <div>
               {selected && source !== null ? (
                 <DetailPanel

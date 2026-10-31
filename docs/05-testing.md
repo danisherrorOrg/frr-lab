@@ -25,6 +25,8 @@ The engine is the product. If its answers are wrong, the tool teaches wrong thin
 
 Parallel links (Phase 9.4), worked out by hand in `02-algorithms.md` §9: `07-parallel` from S to D the node-protecting LFA A beats the parallel link; from E to D the equal bundle is ECMP; failing one link of a bundle leaves the other up. Property tests also run on random networks with bundles (`tests/engine/parallel.property.test.ts`).
 
+Every router as the DUT (Phase 9.6), worked out by hand in `02-algorithms.md` §8.2: `06-link-protecting` fail E, LFA only → S `1 affected, 1 repaired (relayed); 0 survive, 1 breaks`, N and D survive, M not affected. Each router's rows and failure counts must equal that router's own single-source result (`tests/engine/rows.test.ts`, `tests/engine/simulate-all.test.ts`).
+
 Router failure (Phase 9.3), worked out by hand in `02-algorithms.md` §8.1: `01-square` fail E → D's LFA N survives; `03-ring5-highmetric` fail E → C dropped without TI-LFA, TI-LFA survives; `06-link-protecting` fail E → LFA N breaks at N (N then repairs via M), TI-LFA breaks and loops.
 
 \* With SID indices from the YAML files (S=1, E=2, A=3, B=4, C=5).
@@ -63,5 +65,7 @@ These numbers were checked with a throwaway Python script on 2026-10-29 (not par
 - [x] 200-node generated topology: all-sources coverage < 2 s, UI stays responsive
 - [x] Dark mode, phone width, keyboard only
 - [x] Explain text numbers match the table numbers
+
+Phase 9.5 / 9.6 check, 2026-10-31, in Chrome against `npm run dev`: router click opens its row; tooltips on routers and links; right-click menus; double-click metric edit (then undo); auto layout on Example 4 (no crossing links); drag with the fail-link tool; zoom and fit; "All routers" on Example 4 with a router failed and the per-DUT lines. No console errors.
 
 Last run: 2026-10-31 (Phase 7), in Chrome against `npm run dev` and `npm run preview`. 200-router all-sources coverage took 0.77 s in the worker. The browser window couldn't be resized, so phone width was checked in a 390 px frame. The share link was checked by reloading the page from the link, not in a private window. "Offline" was checked as "every request goes to the page's own host"; there is no service worker, so a cold load still needs the files.

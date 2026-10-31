@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { computeCoverage } from '../../src/engine/index'
-import { coverageCsv, csvField, unprotectedCsv } from '../../src/io/csv'
+import { computeAllSources, computeCoverage } from '../../src/engine/index'
+import { coverageCsv, csvField, resultsCsv, unprotectedCsv } from '../../src/io/csv'
 import { loadFixture } from '../helpers'
 
 describe('coverageCsv', () => {
@@ -61,5 +61,22 @@ describe('csvField', () => {
   it('writes numbers as they are, including negatives', () => {
     expect(csvField(-3)).toBe('-3')
     expect(csvField(66.7)).toBe('66.7')
+  })
+})
+
+// Phase 9.6: the "All routers" table as CSV.
+describe('resultsCsv', () => {
+  it('one line per (DUT, destination, link), with every column of the table', () => {
+    const csv = resultsCsv(computeAllSources(loadFixture('04-isp-core.yaml')))
+    const lines = csv.split('\r\n')
+    expect(lines[0]).toBe(
+      'dut,destination,cost,next_hop,link,protected_by,ecmp,lfa,lfa_link,lfa_node_protecting,rlfa_pq,rlfa_via,tilfa_segments,tilfa_labels,tilfa_out_link',
+    )
+    // docs/05-testing.md §2, Example 4 from PE1 to P1.
+    expect(lines).toContain(
+      'PE1,P1,10,P1,PE1-P1,rlfa,no,,,,PE2,P2,Adj P2→P1 (P1-P2) · Prefix P1,24000 16001,PE1-P2',
+    )
+    expect(lines.filter((l) => l.startsWith('PE1,'))).toHaveLength(6)
+    expect(lines.at(-1)).toBe('')
   })
 })

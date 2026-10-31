@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { computeCoverage } from '../../src/engine/index'
+import { computeAllSources, computeCoverage } from '../../src/engine/index'
+import { simulateAllSources } from '../../src/engine/simulate'
 import type { Link, Topology } from '../../src/engine/types'
 
 /**
@@ -42,6 +43,29 @@ describe('coverage speed', () => {
     const ms = performance.now() - start
     expect(r.sources).toHaveLength(200)
     expect(r.total.tilfa).toBe(r.total.pairs)
+    expect(ms).toBeLessThan(2000)
+  })
+})
+
+// Phase 9.6: the "All routers" view stays under 2 s on the same topology.
+describe('all routers as the DUT: speed', () => {
+  const topo = bigTopology()
+
+  it('results rows for every router: under 2 s', () => {
+    const start = performance.now()
+    const all = computeAllSources(topo)
+    const ms = performance.now() - start
+    expect(all).toHaveLength(200)
+    expect(all.every((x) => x.rows.length >= 199)).toBe(true)
+    expect(ms).toBeLessThan(2000)
+  })
+
+  it('failure summary for every router (a router and a link down, TI-LFA): under 2 s', () => {
+    const start = performance.now()
+    const all = simulateAllSources(topo, { links: [topo.links[0]!.id], nodes: ['R005'] }, 'tilfa')
+    const ms = performance.now() - start
+    expect(all).toHaveLength(200)
+    expect(all.filter((x) => 'down' in x).map((x) => x.source)).toEqual(['R005'])
     expect(ms).toBeLessThan(2000)
   })
 })

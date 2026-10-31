@@ -1,4 +1,5 @@
-import { percent, type CoverageCounts, type CoverageReport } from '../engine/index'
+import { percent, type CoverageCounts, type CoverageReport, type SourceRows } from '../engine/index'
+import type { Segment } from '../engine/types'
 
 // CSV for the coverage report. Pure functions returning strings; the UI does the download.
 // RFC 4180: CRLF line ends, fields with commas, quotes or line breaks are quoted.
@@ -62,5 +63,51 @@ export function unprotectedCsv(report: CoverageReport): string {
       u.reason,
       u.text,
     ]),
+  ])
+}
+
+const segmentCsv = (s: Segment) =>
+  s.kind === 'prefix' ? `Prefix ${s.node}` : `Adj ${s.from}→${s.to} (${s.link})`
+
+/** The "All routers" results table (Phase 9.6): every DUT's rows, same columns as on screen. */
+export function resultsCsv(sources: SourceRows[]): string {
+  const yesNo = (x: boolean | undefined) => (x === undefined ? undefined : x ? 'yes' : 'no')
+  return toCsv([
+    [
+      'dut',
+      'destination',
+      'cost',
+      'next_hop',
+      'link',
+      'protected_by',
+      'ecmp',
+      'lfa',
+      'lfa_link',
+      'lfa_node_protecting',
+      'rlfa_pq',
+      'rlfa_via',
+      'tilfa_segments',
+      'tilfa_labels',
+      'tilfa_out_link',
+    ],
+    ...sources.flatMap(({ rows }) =>
+      rows.map((r) => [
+        r.source,
+        r.dest,
+        r.cost,
+        r.via,
+        r.link,
+        r.protectedBy ?? 'none',
+        yesNo(r.ecmp),
+        r.lfa?.neighbor,
+        r.lfa?.link,
+        yesNo(r.lfa?.nodeProtecting),
+        r.rlfa.needed ? r.rlfa.pq : undefined,
+        r.rlfa.needed ? r.rlfa.via : undefined,
+        r.tilfa?.segments.map(segmentCsv).join(' · '),
+        r.tilfa?.labelStack.join(' '),
+        r.tilfa?.outLink,
+      ]),
+    ),
   ])
 }

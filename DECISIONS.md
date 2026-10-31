@@ -264,3 +264,28 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Other options considered:** one link per neighbor with the cheapest metric (hides the bundle, the point of the feature); identifying a next hop by neighbor and adding the link only to the Adj-SID (the simulation and drawings would pick the wrong link); explicit link ids in YAML (not needed: numbering from the ends is stable).
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D30 – Canvas usability: drag with any tool, tooltips, menus, in-place metric, auto layout (2026-10-31)
+- **Why:** Phase 9.5. Users didn't find out that routers can be dragged, and common actions needed a tool change first.
+- **Dragging:** routers can be dragged with every tool. Cytoscape only fires a tap when the pointer doesn't move, so a drag never fails a link or adds a router. The old "drag only with Select" rule is gone; the sidebar says "Drag a router to move it, with any tool".
+- **Click a router (Select tool):** it is selected for editing *and* its results row opens as the destination (the first next-hop link when there are several). With a failure shown, its simulated traffic is drawn too. The source itself has no row. The page does not scroll to the row: scrolling away from the diagram right after a click on it was confusing (checked in Chrome).
+- **Tooltips:** hovering over a router shows its id, name, Prefix-SID index and label; over a link, its metric each way, both Adj-SIDs (set in the file, or "auto", D18) and whether it is down. The link is named by id when it is in a bundle (D29).
+- **Right-click menu** (long press on touch): router: set as source (DUT), fail / restore, delete; link: fail / restore, edit metric, delete. A link of a failed router can't be failed on its own (it is down already). ↑ / ↓ move through the items; Escape closes.
+- **Double-click a link:** edit its metric where it is: one box when both directions are equal (sets both), one per direction otherwise. Enter saves as one undo step; a bad value shows the reason and keeps the old one. Not with the fail-link tool, where the two clicks already failed and restored the link.
+- **Auto layout:** our own deterministic Fruchterman–Reingold layout (`src/state/layout.ts`), not a Cytoscape layout, so it is pure, testable without a browser and gives the same picture every time (no `Math.random`; shuffles use a fixed seed). Up to 60 routers it tries several starting orders and keeps the one with the fewest crossing links, then turns the picture so its longest side is horizontal. Examples 1, 2, 4, 6 and 7 come out with no crossing links; Example 5 (two spines, four leaves) keeps two. One undo step.
+- **Zoom +/−, Fit:** buttons on the canvas for touch and trackpad users.
+- **Other options considered:** Cytoscape's `cose` layout (random start, so a different picture every time, and hard to test); a "switch to Select to move routers" hint (still needs a tool change).
+- **No new dependencies.**
+- **Status:** Accepted.
+
+### D31 – Results for every router as the DUT (2026-10-31)
+- **Why:** Phase 9.6. Users want each router's results when *it* is the device under test (DUT), without picking routers one by one.
+- **Engine:** `computeAllSources()` reuses `computeForSource()` for each router (no explain steps) and returns compact rows (`ResultRow`, `src/engine/rows.ts`): only what the table shows. A 200-router network has about 40,000 rows; keeping LFA candidates and P/Q spaces for all of them would use far more memory. `protectedBy` moved from the UI into the engine so the table, CSV and coverage order agree (§5). `simulateAllSources()` runs `simulateFailure()` for each router and keeps only the counts (`FailureSummary`, `docs/02-algorithms.md` §8.2). Both run in the worker with progress.
+- **Speed (Node, 200 routers / 600 links):** rows for every router about 0.9 s; failure summary for every router about 1.4 s with TI-LFA (both tested under 2 s).
+- **UI:** the source picker has "All routers (n), each as the DUT". The view has one section per DUT that can be opened or closed (all open up to 8 routers; above that only the drawn DUT), the same columns as the single table, a DUT filter, a "Show" filter (all rows / not protected by ECMP or LFA / unprotected), 20 sections per page and 100 rows per section until "Show all" (the "large tables are paged" rule), and a CSV of every row (`resultsCsv`, same CSV helpers as the Phase 5 report).
+- **The drawn DUT:** `source` is still one router: the one drawn, detailed and simulated in the failure panel. A row click sets the DUT and the row in one step; clicking a router on the diagram (or right-click "Set as source (DUT)") switches the DUT. With one source, a click on a router opens its row instead (D30).
+- **Failure view:** with links or routers down, "Effect on every router as the DUT" lists one line per router, e.g. "S: 1 affected, 1 repaired (1 by more than one router); 0 survive, 1 breaks". Clicking a line makes it the DUT; the single-source failure panel below follows it. The single panel's own summary lines now use the same counts (`summarizeFlows`).
+- **Not in the share link:** the view choice, like the failed links (D23).
+- **No new dependencies.**
+- **Status:** Accepted.
+

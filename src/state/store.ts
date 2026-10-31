@@ -6,6 +6,7 @@ import type { RepairMode } from '../engine/simulate'
 import type { NodeId, Topology } from '../engine/types'
 import * as edit from './edit'
 import { EXAMPLES, exampleTopology } from './examples'
+import { autoLayout } from './layout'
 
 export type Tool = 'select' | 'add-router' | 'add-link' | 'fail-link' | 'fail-router'
 
@@ -45,9 +46,12 @@ export interface AppState {
   topology: Topology
   past: Topology[]
   future: Topology[]
-  /** Bumped when a whole new topology is loaded, so the canvas re-fits. */
+  /** Bumped when a whole new topology is loaded or laid out again, so the canvas re-fits. */
   loadCount: number
+  /** The DUT (device under test): the router whose results, details and failure view are shown. */
   source: NodeId | null
+  /** Results for every router as the DUT at once (Phase 9.6); `source` is still the one drawn. */
+  allSources: boolean
   selection: Selection
   row: RowKey | null
   backup: BackupKind
@@ -84,9 +88,16 @@ export interface AppState {
   updateLink: (id: string, patch: edit.LinkPatch) => string | null
   updateTopology: (patch: edit.TopologyPatch) => string | null
   deleteSelection: () => void
+  /** Delete this router or link (right-click menu); the selection is kept unless it was it. */
+  remove: (s: Exclude<Selection, null>) => void
+  /** Lay the routers out again (Phase 9.5), as one undo step. */
+  autoLayout: () => void
   undo: () => void
   redo: () => void
   setSource: (id: NodeId) => void
+  setAllSources: (on: boolean) => void
+  /** Make `source` the DUT and open its row, in one step ("All routers" view). */
+  pickRow: (source: NodeId, row: RowKey) => void
   select: (s: Selection) => void
   selectRow: (row: RowKey | null) => void
   /** Pick a row; picking the open row again closes it. */
@@ -178,6 +189,7 @@ export const useStore = create<AppState>()((set, get) => {
     future: [],
     loadCount: 0,
     source: first.source,
+    allSources: false,
     selection: null,
     row: null,
     backup: 'auto',
@@ -270,15 +282,22 @@ export const useStore = create<AppState>()((set, get) => {
     updateTopology: (patch) => result(edit.updateTopology(get().topology, patch)),
 
     deleteSelection: () => {
+      const { selection } = get()
+      if (selection !== null) get().remove(selection)
+    },
+
+    remove: (sel) => {
       const { selection, topology } = get()
-      if (selection === null) return
+      const was = selection?.kind === sel.kind && selection.id === sel.id
       commit(
-        selection.kind === 'node'
-          ? edit.deleteRouter(topology, selection.id)
-          : edit.deleteLink(topology, selection.id),
-        { selection: null },
+        sel.kind === 'node'
+          ? edit.deleteRouter(topology, sel.id)
+          : edit.deleteLink(topology, sel.id),
+        was ? { selection: null } : {},
       )
     },
+
+    autoLayout: () => commit(autoLayout(get().topology), { loadCount: get().loadCount + 1 }),
 
     undo: () => {
       const s = get()
@@ -305,6 +324,8 @@ export const useStore = create<AppState>()((set, get) => {
     },
 
     setSource: (id) => set({ source: id, row: null, backup: 'auto' }),
+    setAllSources: (allSources) => set({ allSources, row: null, backup: 'auto' }),
+    pickRow: (source, row) => set({ source, row, backup: 'auto' }),
     select: (selection) => set({ selection }),
     selectRow: (row) => set({ row, backup: 'auto' }),
     toggleRow: (row) => {

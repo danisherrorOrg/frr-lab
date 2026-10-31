@@ -156,4 +156,56 @@ describe('store', () => {
     expect(s().row).toEqual({ dest: 'E', via: 'E' })
     expect(s().topology.nodes.map((n) => n.id)).toContain('R1')
   })
+
+  // Phase 9.5: right-click menu and canvas buttons.
+  it('removes a router or link picked from the menu, as one undo step', () => {
+    s().select({ kind: 'node', id: 'B' })
+    s().remove({ kind: 'link', id: 'S-E' })
+    expect(s().topology.links.map((l) => l.id)).not.toContain('S-E')
+    expect(s().selection).toEqual({ kind: 'node', id: 'B' })
+    s().remove({ kind: 'node', id: 'B' })
+    expect(s().topology.nodes.map((n) => n.id)).not.toContain('B')
+    expect(s().selection).toBeNull()
+    s().undo()
+    s().undo()
+    expect(s().topology).toBe(initialState.topology)
+  })
+
+  it('auto layout moves routers as one undo step and asks the canvas to re-fit', () => {
+    const before = s().topology
+    const fits = s().loadCount
+    s().autoLayout()
+    expect(s().topology.nodes.map((n) => n.id)).toEqual(before.nodes.map((n) => n.id))
+    expect(s().topology.nodes.map((n) => n.pos)).not.toEqual(before.nodes.map((n) => n.pos))
+    expect(s().loadCount).toBe(fits + 1)
+    s().undo()
+    expect(s().topology).toBe(before)
+  })
+
+  // Phase 9.6: every router as the DUT.
+  it('"All routers" keeps the current DUT; picking a row there switches DUT and row together', () => {
+    s().selectRow({ dest: 'E', via: 'E' })
+    s().setAllSources(true)
+    expect(s().allSources).toBe(true)
+    expect(s().source).toBe('S')
+    expect(s().row).toBeNull()
+
+    s().pickRow('B', { dest: 'E', via: 'C' })
+    expect(s().source).toBe('B')
+    expect(s().row).toEqual({ dest: 'E', via: 'C' })
+    expect(s().allSources).toBe(true)
+
+    // "Set as DUT" (right-click) stays in the view; the source list turns it off itself.
+    s().setSource('A')
+    expect(s().allSources).toBe(true)
+    expect(s().source).toBe('A')
+    s().setAllSources(false)
+    expect(s().allSources).toBe(false)
+  })
+
+  it('a new topology keeps the "All routers" view', () => {
+    s().setAllSources(true)
+    s().loadExample('square')
+    expect(s().allSources).toBe(true)
+  })
 })

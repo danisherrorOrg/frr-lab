@@ -1,8 +1,25 @@
 import { createContext, useContext, useMemo } from 'react'
-import type { FailureSimulation, Flow, RepairMethod, RepairMode } from '../engine/simulate'
+import {
+  summarizeFlows,
+  type FailureSimulation,
+  type FailureSummary,
+  type Flow,
+  type RepairMethod,
+  type RepairMode,
+} from '../engine/simulate'
 import type { NodeId } from '../engine/types'
 import { useStore } from '../state/store'
-import { bundles, drawnFlow, linkName, METHOD_NAME, throughText, type Bundles } from './format'
+import {
+  bundles,
+  drawnFlow,
+  linkName,
+  METHOD_NAME,
+  outcomeText,
+  plural,
+  surviveText,
+  throughText,
+  type Bundles,
+} from './format'
 import { rowKeys } from './keys'
 
 const MODES: { mode: RepairMode; label: string }[] = [
@@ -240,33 +257,8 @@ function ThroughCell({ f }: { f: Flow }) {
 }
 
 /** "E down: 3 destinations affected, 2 repairs survive, 1 breaks" (Phase 9.3). */
-function routerSummary(flows: Flow[], routers: NodeId[]): string {
-  const hit = flows.filter((f) => f.before.some((x) => routers.includes(x)))
-  const breaks = hit.filter((f) => f.through).length
-  const survive = hit.filter((f) => f.method && !f.through).length
-  const none = hit.filter((f) => !f.method).length
-  const plural = (k: number, word: string) => `${k} ${word}${k === 1 ? '' : 's'}`
-  return (
-    `${routers.join(', ')} down: ${plural(hit.length, 'destination')} affected, ` +
-    `${plural(survive, 'repair')} survive${survive === 1 ? 's' : ''}, ${breaks} break${breaks === 1 ? 's' : ''}` +
-    `${none > 0 ? `, ${none} with no backup` : ''}.`
-  )
-}
-
-/** "3 repaired, 1 dropped": the non-zero counts, in a fixed order. */
-function counts(flows: Flow[]): string {
-  const n = (st: Flow['status']) => flows.filter((f) => f.status === st).length
-  const relay = flows.filter((f) => f.status === 'repaired' && (f.repairs?.length ?? 0) > 1).length
-  const parts: [number, string][] = [
-    [n('repaired'), `repaired${relay > 0 ? ` (${relay} by more than one router)` : ''}`],
-    [n('dropped'), 'dropped until convergence'],
-    [n('looped'), 'looping until convergence'],
-    [n('unreachable'), 'unreachable'],
-  ]
-  return parts
-    .filter(([k], i) => k > 0 || i === 0)
-    .map(([k, text]) => `${k} ${text}`)
-    .join(', ')
+function routerSummary(s: FailureSummary, routers: NodeId[]): string {
+  return `${routers.join(', ')} down: ${plural(s.viaRouter, 'destination')} affected, ${surviveText(s, 'repair')}.`
 }
 
 interface Props {
@@ -321,6 +313,7 @@ export function FailurePanel({ source, simulation: sim, error }: Props) {
   const affected = sim?.flows.filter((f) => f.affected && !f.destDown) ?? []
   const unaffected = sim?.flows.filter((f) => !f.affected).map((f) => f.dest) ?? []
   const shown = sim && drawnFlow(sim, simDest)
+  const summary = sim && summarizeFlows(sim.flows, routers)
   const restoreLabel = many ? 'Restore all' : routers.length > 0 ? 'Restore router' : 'Restore link'
 
   return (
@@ -426,10 +419,10 @@ export function FailurePanel({ source, simulation: sim, error }: Props) {
             <p className="mt-2">
               From {source}: {affected.length} of {sim.flows.length - deadEnds.length} destination
               {sim.flows.length - deadEnds.length === 1 ? '' : 's'} cross {crossWhat}.
-              {affected.length > 0 && ` ${counts(affected)}.`}
+              {summary && summary.affected > 0 && ` ${outcomeText(summary)}.`}
             </p>
-            {routers.length > 0 && (
-              <p className="mt-1 font-medium">{routerSummary(affected, routers)}</p>
+            {routers.length > 0 && summary && (
+              <p className="mt-1 font-medium">{routerSummary(summary, routers)}</p>
             )}
             {deadEnds.length > 0 && (
               <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">

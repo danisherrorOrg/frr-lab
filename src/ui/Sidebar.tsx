@@ -4,9 +4,17 @@ import { useStore, type Tool } from '../state/store'
 import { bundles, linkName as nameOf } from './format'
 import { PropertiesPanel } from './PropertiesPanel'
 
+/** The source-picker value for the "All routers" view: a NUL character keeps it apart from any router id. */
+const ALL = '\u0000all'
+
 /** Tools, with the one-key shortcut that picks each (App.tsx). */
 const TOOLS: { tool: Tool; label: string; key: string; hint: string }[] = [
-  { tool: 'select', label: 'Select', key: 'V', hint: 'Click to select, drag to move' },
+  {
+    tool: 'select',
+    label: 'Select',
+    key: 'V',
+    hint: 'Click a router or link to edit it; click a router to open its results row',
+  },
   { tool: 'add-router', label: 'Add router', key: 'R', hint: 'Click empty space' },
   { tool: 'add-link', label: 'Add link', key: 'L', hint: 'Click two routers' },
   { tool: 'fail-link', label: 'Fail link', key: 'F', hint: 'Click links to fail or restore them' },
@@ -203,6 +211,8 @@ export function Sidebar({ className = '' }: { className?: string }) {
   const nodes = useStore((s) => s.topology.nodes)
   const source = useStore((s) => s.source)
   const setSource = useStore((s) => s.setSource)
+  const allSources = useStore((s) => s.allSources)
+  const setAllSources = useStore((s) => s.setAllSources)
   const extended = useStore((s) => s.settings.extended)
   const setExtended = useStore((s) => s.setExtended)
   const ids = nodes.map((n) => n.id).sort()
@@ -214,6 +224,9 @@ export function Sidebar({ className = '' }: { className?: string }) {
     >
       <fieldset>
         <legend className="mb-1 text-sm font-semibold">Tools</legend>
+        <p className="mb-1 text-xs text-slate-500">
+          Drag a router to move it, with any tool. Right-click a router or link for more.
+        </p>
         {TOOLS.map((t) => (
           <label key={t.tool} className="flex items-baseline gap-2 py-0.5 text-sm">
             <input
@@ -246,15 +259,28 @@ export function Sidebar({ className = '' }: { className?: string }) {
         <select
           id="source"
           className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
-          value={source ?? ''}
-          onChange={(e) => setSource(e.target.value)}
+          value={allSources ? ALL : (source ?? '')}
+          onChange={(e) => {
+            const v = e.target.value
+            // "All routers" keeps the current router as the one drawn (Phase 9.6).
+            setAllSources(v === ALL)
+            if (v !== ALL) setSource(v)
+          }}
         >
-          {ids.map((id) => (
-            <option key={id} value={id}>
-              {id}
-            </option>
-          ))}
+          <option value={ALL}>All routers ({ids.length}), each as the DUT</option>
+          <optgroup label="One router">
+            {ids.map((id) => (
+              <option key={id} value={id}>
+                {id}
+              </option>
+            ))}
+          </optgroup>
         </select>
+        {allSources && source !== null && (
+          <p className="mt-1 text-xs text-slate-500">
+            Drawn and detailed: {source}. Click a router on the diagram to switch.
+          </p>
+        )}
         <label className="mt-2 flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -286,6 +312,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
           <li>
             <kbd>Delete</kbd>: delete the selected router or link
           </li>
+          <li>Double-click a link: edit its metric where it is</li>
           <li>
             <kbd>Esc</kbd>: clear the selection, back to Select
           </li>

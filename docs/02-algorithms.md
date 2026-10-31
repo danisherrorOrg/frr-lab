@@ -154,6 +154,8 @@ Counting details (D19):
 - "Protected by LFA" means a best LFA exists. ECMP-protected pairs are also counted on their own; they are always LFA-protected too (§2).
 - The unprotected list holds every pair LFA doesn't protect, with the reason from the strongest method that fails: `no-lfa` (RLFA or TI-LFA protects it), `no-rlfa` (only TI-LFA), `partitioned` (nothing: the link is a bridge for D).
 
+**Every router as the DUT (Phase 9.6, D31).** `computeAllSources()` runs the same `computeForSource()` for every router and keeps one compact row per pair (`ResultRow` in `src/engine/rows.ts`): cost, next hop and link, the chosen LFA, PQ node and exit, TI-LFA segments and labels, and `protectedBy`, the simplest method that protects the pair in the order above (ECMP, LFA, Remote LFA, TI-LFA). Nothing is recomputed differently, so each router's rows equal its own single-source table (tested on Example 4).
+
 ---
 
 ## 6. Worked examples (these become fixed tests)
@@ -277,6 +279,15 @@ Worked check (ring S–E–C–B–A–S all 1, plus D on E (1) and C (4), fail 
 With a single failed link at most one router repairs and traffic never loops, and a TI-LFA repair that survives is always the PLR's final path: it is a shortest path without the first link, and it is still there with the others removed (property tests check both).
 
 ---
+
+### 8.2 Every router as the DUT (Phase 9.6, D31)
+`simulateAllSources()` runs `simulateFailure()` once per router with the same failed links and routers and mode, and counts each one's flows (`summarizeFlows()`). A failed router as source is listed as down (it sends nothing). The counts are over the affected flows, leaving out failed routers as destinations (`destDown`, counted on their own):
+- `repaired` / `dropped` / `looped` / `unreachable`: the status of §8 step 5; they add up to `affected`. `relayed`: repaired, but by more than one router.
+- `viaRouter`: affected flows whose normal path passes a failed router; of those, `survive` (the PLR's backup avoids every failed router), `breaks` (it passes one, §8.1) and `noBackup`. They add up to `viaRouter`.
+
+These are the same numbers as the single-source failure panel for that router (a test checks every example, mode and single link or router failure).
+
+Worked check (Example 6, fail router E, LFA only): from S, only D is affected; LFA N is link-protecting, breaks at N, and N repairs again via M (`1 affected, 1 repaired, 1 relayed; 0 survive, 1 breaks`). From N, D is affected and LFA M is node-protecting (dist(M,D)=10 < dist(M,E)+dist(E,D)=11+1), so it survives. From D, S and N are affected and LFA M survives for both (11 < 11+1). From M, nothing is affected: M-D, M-N and M-N-S (11 < 12) avoid E.
 
 ## 9. Parallel links (Phase 9.4, D29)
 Two routers may be joined by several links (a bundle). Each link has its own id (`S-E`, `S-E#2`, …), metrics and Adj-SIDs. Checked against RFC 5286 §3.4–3.6 on 2026-10-31.

@@ -75,7 +75,8 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 - [x] Fail several links; follow traffic hop by hop as each router repairs its own failed link (D23, D24)
 - [x] Fail a router (down or rebooting): show which link-protecting repairs break because they go through it
 - [x] Parallel links between two routers (replaces D4; D29)
-- [ ] Canvas usability: obvious dragging, tooltips, right-click menu, click-to-select destination
+- [x] Canvas usability: obvious dragging, tooltips, right-click menu, click-to-select destination (D30)
+- [x] Results for every router as the DUT, with the failure view per DUT (D31)
 
 ## Later (v0.2+), in priority order
 1. Node protection (RLFA per RFC 8102, TI-LFA with node E removed)

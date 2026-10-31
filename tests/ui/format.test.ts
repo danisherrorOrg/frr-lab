@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { computeForSource } from '../../src/engine/index'
 import { protectionPaths } from '../../src/engine/paths'
-import { lfaTags, pickBackup, protectedBy, segmentsShort, throughText } from '../../src/ui/format'
+import { adjLabel } from '../../src/engine/labels'
+import { simulateAllSources, type FailureSummary } from '../../src/engine/simulate'
+import {
+  dutSummary,
+  lfaTags,
+  outcomeText,
+  pickBackup,
+  protectedBy,
+  segmentsShort,
+  throughText,
+  tooltipLines,
+} from '../../src/ui/format'
 import { loadFixture } from '../helpers'
 
 const first = (file: string, s: string, d: string) =>
@@ -138,5 +149,107 @@ describe('throughText (Phase 9.3)', () => {
     ).toBe(
       "PQ node N is itself down. N is a second failure: E's backup was planned for the link E–D alone, and FRR plans for one failure at a time.",
     )
+  })
+})
+
+describe('tooltipLines (Phase 9.5)', () => {
+  const none = { links: [], nodes: [] }
+
+  it('router: id, name, Prefix-SID index and its label; a down router says so', () => {
+    const isp = loadFixture('04-isp-core.yaml')
+    expect(tooltipLines(isp, { kind: 'node', id: 'PE1' }, none)).toEqual([
+      'Router PE1',
+      'Prefix-SID index 11 · label 16011',
+    ])
+    const named = { ...isp, nodes: isp.nodes.map((n) => ({ ...n, name: 'Edge 1' })) }
+    expect(tooltipLines(named, { kind: 'node', id: 'PE1' }, { links: [], nodes: ['PE1'] })).toEqual(
+      [
+        'Router PE1 · Edge 1',
+        'Prefix-SID index 11 · label 16011',
+        '✕ down: all its links are down',
+      ],
+    )
+  })
+
+  it('link: metric each way, Adj-SIDs (set or auto), and whether it is down', () => {
+    const isp = loadFixture('04-isp-core.yaml')
+    expect(tooltipLines(isp, { kind: 'link', id: 'P1-P4' }, none)).toEqual([
+      'Link P1–P4',
+      'Metric P1→P4 20 · P4→P1 40',
+      `Adj-SID P1→P4 ${adjLabel(isp, 'P1', 'P4')} (auto) · P4→P1 ${adjLabel(isp, 'P4', 'P1')} (auto)`,
+    ])
+    // Example 3: B→C is set in the file (24005), so it isn't marked auto.
+    const high = loadFixture('03-ring5-highmetric.yaml')
+    expect(tooltipLines(high, { kind: 'link', id: 'C-B' }, { links: [], nodes: ['B'] })).toEqual([
+      'Link C–B',
+      'Metric 10 both ways',
+      'Adj-SID C→B 24006 · B→C 24005',
+      '✕ down (router B is down)',
+    ])
+    expect(
+      tooltipLines(high, { kind: 'link', id: 'C-B' }, { links: ['C-B'], nodes: [] }).at(-1),
+    ).toBe('✕ down')
+  })
+
+  it('names the link of a bundle (D29)', () => {
+    const par = loadFixture('07-parallel.yaml')
+    expect(tooltipLines(par, { kind: 'link', id: 'S-E#2' }, none).slice(0, 2)).toEqual([
+      'Link S–E (S-E#2)',
+      'Metric 20 both ways',
+    ])
+  })
+
+  it('is empty for something that is gone', () => {
+    expect(tooltipLines(loadFixture('01-square.yaml'), { kind: 'node', id: 'Z' }, none)).toEqual([])
+  })
+})
+
+describe('per-DUT failure text (Phase 9.6)', () => {
+  const zero: FailureSummary = {
+    affected: 0,
+    repaired: 0,
+    relayed: 0,
+    dropped: 0,
+    looped: 0,
+    unreachable: 0,
+    destDown: 0,
+    viaRouter: 0,
+    survive: 0,
+    breaks: 0,
+    noBackup: 0,
+  }
+
+  it('outcomeText lists the non-zero outcomes in a fixed order', () => {
+    expect(
+      outcomeText({ ...zero, affected: 4, repaired: 2, relayed: 1, dropped: 1, looped: 1 }),
+    ).toBe(
+      '2 repaired (1 by more than one router), 1 dropped until convergence, 1 looping until convergence',
+    )
+    expect(outcomeText({ ...zero, affected: 1, unreachable: 1 })).toBe('0 repaired, 1 unreachable')
+  })
+
+  it('Example 6, router E down, LFA only: one line per DUT', () => {
+    const all = simulateAllSources(loadFixture('06-link-protecting.yaml'), { nodes: ['E'] }, 'lfa')
+    const line = (s: string) =>
+      dutSummary(
+        all.find((x) => x.source === s)!,
+        true,
+      )
+    expect(line('E')).toBe('down: sends no traffic')
+    expect(line('M')).toBe('nothing affected')
+    expect(line('S')).toBe(
+      '1 affected, 1 repaired (1 by more than one router); 0 survive, 1 breaks',
+    )
+    expect(line('D')).toBe('2 affected, 2 repaired; 2 survive, 0 break')
+  })
+
+  it('without a router down, no survive / break part', () => {
+    const all = simulateAllSources(loadFixture('02-ring5.yaml'), { links: ['S-E'] }, 'tilfa')
+    expect(
+      dutSummary(
+        all.find((x) => x.source === 'S')!,
+        false,
+      ),
+    ).toBe('2 affected, 2 repaired')
   })
 })

@@ -9,6 +9,7 @@ import {
 import { explainLfa, explainRlfa, explainTilfa } from './explain'
 import { computeLfa, ecmpProtectorLinks } from './lfa'
 import { computeRlfa, rlfaForProtection, type RlfaResult } from './rlfa'
+import { toRows, type SourceRows } from './rows'
 import { allPairs, firstLinks } from './spf'
 import { computeTilfa, tilfaForProtection } from './tilfa'
 import type { DestinationResult, NodeId, Protection, Topology } from './types'
@@ -124,6 +125,25 @@ export function computeCoverage(topology: Topology, options: CoverageOptions = {
   return report
 }
 
+/**
+ * Every router's results-table rows, each router in turn as the source (the DUT,
+ * Phase 9.6). The same computeForSource as one source, without explain steps.
+ */
+export function computeAllSources(
+  topology: Topology,
+  options: Omit<CoverageOptions, 'sources'> = {},
+): SourceRows[] {
+  const sources = allPairs(topology).graph.nodes
+  return sources.map((source, i) => {
+    const results = computeForSource(topology, source, {
+      explain: false,
+      ...(options.extended !== undefined && { extended: options.extended }),
+    })
+    options.onProgress?.(i + 1, sources.length, source)
+    return { source, rows: toRows(source, results) }
+  })
+}
+
 export type {
   CoverageCounts,
   CoverageReport,
@@ -132,6 +152,7 @@ export type {
   UnprotectedReason,
 } from './coverage'
 export { percent } from './coverage'
+export { protectedBy, toRows, type Method, type ResultRow, type SourceRows } from './rows'
 export {
   hopLinks,
   protectionPaths,

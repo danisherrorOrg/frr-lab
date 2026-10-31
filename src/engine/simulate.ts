@@ -363,6 +363,80 @@ export function simulateFailure(
   return { links, nodes, mode, flows }
 }
 
+/** One source's failure result in numbers, for the per-DUT view (Phase 9.6). */
+export interface FailureSummary {
+  /** Destinations whose path crosses something down; a failed router as destination is left out. */
+  affected: number
+  repaired: number
+  /** Repaired, but by more than one router (D24). */
+  relayed: number
+  dropped: number
+  looped: number
+  unreachable: number
+  /** Destinations that are failed routers themselves: unreachable, as expected (D27). */
+  destDown: number
+  /** Affected destinations whose normal path passes a failed router. */
+  viaRouter: number
+  /** Of those: the PLR's backup avoids every failed router, passes one (D27), or doesn't exist. */
+  survive: number
+  breaks: number
+  noBackup: number
+}
+
+/** Count one source's flows. `nodes` are the failed routers. */
+export function summarizeFlows(flows: readonly Flow[], nodes: readonly NodeId[]): FailureSummary {
+  const hit = flows.filter((f) => f.affected && !f.destDown)
+  const n = (st: FlowStatus) => hit.filter((f) => f.status === st).length
+  const viaRouter = hit.filter((f) => f.before.some((x) => nodes.includes(x)))
+  return {
+    affected: hit.length,
+    repaired: n('repaired'),
+    relayed: hit.filter((f) => f.status === 'repaired' && (f.repairs?.length ?? 0) > 1).length,
+    dropped: n('dropped'),
+    looped: n('looped'),
+    unreachable: n('unreachable'),
+    destDown: flows.filter((f) => f.destDown).length,
+    viaRouter: viaRouter.length,
+    survive: viaRouter.filter((f) => f.method && !f.through).length,
+    breaks: viaRouter.filter((f) => f.through).length,
+    noBackup: viaRouter.filter((f) => !f.method).length,
+  }
+}
+
+/** One router as the DUT: down (it sends nothing), or its summary. */
+export type SourceFailure =
+  { source: NodeId; down: true } | { source: NodeId; summary: FailureSummary }
+
+/**
+ * The same failure from every router in turn (Phase 9.6), sorted by router id.
+ * Each one is exactly simulateFailure from that source.
+ */
+export function simulateAllSources(
+  topology: Topology,
+  failed: Failures,
+  mode: RepairMode,
+  options: SimulateOptions & {
+    onProgress?: (done: number, total: number, source: NodeId) => void
+  } = {},
+): SourceFailure[] {
+  const { onProgress, ...simOptions } = options
+  const sources = allPairs(topology).graph.nodes
+  const down = new Set(failed.nodes ?? [])
+  return sources.map((source, i): SourceFailure => {
+    const r: SourceFailure = down.has(source)
+      ? { source, down: true }
+      : {
+          source,
+          summary: summarizeFlows(
+            simulateFailure(topology, source, failed, mode, simOptions).flows,
+            [...down],
+          ),
+        }
+    onProgress?.(i + 1, sources.length, source)
+    return r
+  })
+}
+
 interface Walk {
   path: NodeId[]
   /** The link and its metric for each hop of `path`. */

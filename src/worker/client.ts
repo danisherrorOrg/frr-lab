@@ -1,5 +1,5 @@
-import type { ComputeOptions, CoverageReport } from '../engine/index'
-import type { FailureSimulation, RepairMode } from '../engine/simulate'
+import type { ComputeOptions, CoverageReport, SourceRows } from '../engine/index'
+import type { FailureSimulation, RepairMode, SourceFailure } from '../engine/simulate'
 import type { DestinationResult, NodeId, Topology } from '../engine/types'
 import { handleRequest, type EngineRequest, type EngineResponse } from './protocol'
 
@@ -29,6 +29,20 @@ export interface EngineClient {
     mode: RepairMode,
     options?: { extended?: boolean },
   ): Promise<FailureSimulation>
+  /** Every router's results rows, each as the DUT (Phase 9.6). */
+  computeAllSources(
+    topology: Topology,
+    options?: { extended?: boolean },
+    onProgress?: (done: number, total: number, source: NodeId) => void,
+  ): Promise<SourceRows[]>
+  /** The same failure from every router in turn (Phase 9.6). */
+  simulateAllSources(
+    topology: Topology,
+    failed: { links: string[]; nodes: string[] },
+    mode: RepairMode,
+    options?: { extended?: boolean },
+    onProgress?: (done: number, total: number, source: NodeId) => void,
+  ): Promise<SourceFailure[]>
   /** Stops the worker; pending calls reject. */
   terminate(): void
 }
@@ -94,6 +108,8 @@ export function createEngineClient(worker: WorkerLike = createDefaultWorker()): 
     if (data.kind === 'error') p.reject(new Error(data.message))
     else if (data.kind === 'source') p.resolve(data.results as never)
     else if (data.kind === 'simulate') p.resolve(data.simulation as never)
+    else if (data.kind === 'all-sources' || data.kind === 'simulate-all')
+      p.resolve(data.sources as never)
     else p.resolve(data.report as never)
   })
 
@@ -121,6 +137,20 @@ export function createEngineClient(worker: WorkerLike = createDefaultWorker()): 
         ...(options && { options }),
       })
     },
+    computeAllSources: (topology, options, onProgress) =>
+      send({ kind: 'all-sources', topology, ...(options && { options }) }, onProgress),
+    simulateAllSources: (topology, { links, nodes }, mode, options, onProgress) =>
+      send(
+        {
+          kind: 'simulate-all',
+          topology,
+          links,
+          ...(nodes.length > 0 && { nodes }),
+          mode,
+          ...(options && { options }),
+        },
+        onProgress,
+      ),
     terminate: () => {
       worker.terminate()
       for (const p of pending.values()) p.reject(new Error('The engine worker was stopped.'))

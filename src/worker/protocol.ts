@@ -1,10 +1,18 @@
 import {
+  computeAllSources,
   computeCoverage,
   computeForSource,
   type ComputeOptions,
   type CoverageReport,
+  type SourceRows,
 } from '../engine/index'
-import { simulateFailure, type FailureSimulation, type RepairMode } from '../engine/simulate'
+import {
+  simulateAllSources,
+  simulateFailure,
+  type FailureSimulation,
+  type RepairMode,
+  type SourceFailure,
+} from '../engine/simulate'
 import type { DestinationResult, NodeId, Topology } from '../engine/types'
 
 // Messages between the page and engine.worker.ts. Plain data only, so they
@@ -35,12 +43,25 @@ export type EngineRequest =
       mode: RepairMode
       options?: { extended?: boolean }
     }
+  /** Every router as the DUT (Phase 9.6), with progress. */
+  | { id: number; kind: 'all-sources'; topology: Topology; options?: { extended?: boolean } }
+  | {
+      id: number
+      kind: 'simulate-all'
+      topology: Topology
+      links: string[]
+      nodes?: string[]
+      mode: RepairMode
+      options?: { extended?: boolean }
+    }
 
 export type EngineResponse =
   | { id: number; kind: 'progress'; done: number; total: number; source: NodeId }
   | { id: number; kind: 'source'; results: DestinationResult[] }
   | { id: number; kind: 'coverage'; report: CoverageReport }
   | { id: number; kind: 'simulate'; simulation: FailureSimulation }
+  | { id: number; kind: 'all-sources'; sources: SourceRows[] }
+  | { id: number; kind: 'simulate-all'; sources: SourceFailure[] }
   | { id: number; kind: 'error'; message: string }
 
 /**
@@ -48,6 +69,8 @@ export type EngineResponse =
  * Kept apart from the worker file so tests can call it directly in Node.
  */
 export function handleRequest(req: EngineRequest, post: (res: EngineResponse) => void): void {
+  const onProgress = (done: number, total: number, source: NodeId) =>
+    post({ id: req.id, kind: 'progress', done, total, source })
   try {
     if (req.kind === 'source') {
       post({
@@ -67,12 +90,25 @@ export function handleRequest(req: EngineRequest, post: (res: EngineResponse) =>
           req.options,
         ),
       })
-    } else {
-      const report = computeCoverage(req.topology, {
-        ...req.options,
-        onProgress: (done, total, source) =>
-          post({ id: req.id, kind: 'progress', done, total, source }),
+    } else if (req.kind === 'all-sources') {
+      post({
+        id: req.id,
+        kind: 'all-sources',
+        sources: computeAllSources(req.topology, { ...req.options, onProgress }),
       })
+    } else if (req.kind === 'simulate-all') {
+      post({
+        id: req.id,
+        kind: 'simulate-all',
+        sources: simulateAllSources(
+          req.topology,
+          { links: req.links, nodes: req.nodes ?? [] },
+          req.mode,
+          { ...req.options, onProgress },
+        ),
+      })
+    } else {
+      const report = computeCoverage(req.topology, { ...req.options, onProgress })
       post({ id: req.id, kind: 'coverage', report })
     }
   } catch (err) {

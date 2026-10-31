@@ -36,6 +36,7 @@
 - Each link: metric (same both ways by default, with the option of a different metric per direction), optional Adj-SID label per direction.
 - (v0.2, Phase 9.4) Two routers may have several links (parallel links); each link is protected, drawn and failed on its own.
 - Undo / redo.
+- (v0.2, Phase 9.5) Drag routers with any tool; hover tooltips; right-click menu on routers and links; double-click a link to edit its metric; auto layout, fit and zoom buttons.
 
 **F2 – Import / export**
 - Load and save topology as YAML (format in `03-architecture.md`).
@@ -49,10 +50,11 @@
   - **RLFA:** P-space, extended P-space, Q-space, PQ nodes, chosen PQ node.
   - **TI-LFA (link protection):** post-convergence path, segment list, label stack.
 - ECMP: if a destination has 2+ primary next hops, each one protects the other (shown as "ECMP-protected").
+- (v0.2, Phase 9.6) **All routers:** the same results for every router as the DUT (device under test) in one view, with filters and CSV export, and the failure simulation's effect on each router.
 
 **F4 – Visual results**
 - Results table: destination · primary next hop(s) · cost · LFA · RLFA · TI-LFA · status (✓ / ✗).
-- Click a row: primary path in blue, backup path in orange dashed, P-space / Q-space nodes shaded, PQ node marked.
+- Click a row (or a router on the diagram, as the destination): primary path in blue, backup path in orange dashed, P-space / Q-space nodes shaded, PQ node marked.
 
 **F5 – Failure simulation**
 - "Fail" a link (click it). Traffic for affected destinations moves along the backup path (animated). Then a "Converge" button shows the final path after the network recomputes.
