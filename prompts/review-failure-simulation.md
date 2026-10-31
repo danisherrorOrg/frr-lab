@@ -1,4 +1,4 @@
-# Prompt: Review the failure-simulation logic (links, routers and parallel links)
+# Prompt: Review the failure-simulation logic (links, routers, parallel links and every router as the DUT)
 
 Review the failure-simulation logic in this repo for correctness. The goal is
 **zero logic errors**: every rule must match what a real router does, and the RFCs
@@ -6,25 +6,35 @@ must back it. **Don't add features.**
 
 ## Read first
 - `CLAUDE.md`
-- `docs/02-algorithms.md` §8 (link failures), §8.1 (router failure) and §9
-  (parallel links)
-- `DECISIONS.md` entries D22 to D29. D23's "Broken" rule was replaced by D24;
-  D25, D26 and D28 are earlier reviews; D29 made every next hop a specific link.
+- `docs/02-algorithms.md` §8 (link failures), §8.1 (router failure), §8.2 (every
+  router as the DUT) and §9 (parallel links)
+- `DECISIONS.md` entries D22 to D31. D23's "Broken" rule was replaced by D24;
+  D25, D26 and D28 are earlier reviews; D29 made every next hop a specific link;
+  D30 is canvas usability (a router click opens its row, which can show a
+  failure flow); D31 added the per-DUT view and `summarizeFlows`.
   Re-check what they say they checked. Don't assume it is still right.
 
 ## Code to review
 - `src/engine/simulate.ts`: the simulation: hop-by-hop walk (link by link),
-  repairs, drops, loops, the router-failure "survives / breaks" check, and the
-  converged path
+  repairs, drops, loops, the router-failure "survives / breaks" check, the
+  converged path, and the per-DUT counts (`summarizeFlows`, `simulateAllSources`)
 - What the walk relies on: `firstLinks` (`spf.ts`), `cheapestEdge` (`graph.ts`),
   `hopLinks` (`paths.ts`), per-link protections in `index.ts`, `lfa.ts`, `rlfa.ts`
   and `tilfa.ts` (`bestLink`, `outLink`, Adj-SID `link`)
 - `src/ui/FailurePanel.tsx`: every sentence shown to users, including how a link of
-  a bundle is named (`S–E (S-E#2)`)
+  a bundle is named (`S–E (S-E#2)`); its summary lines now come from
+  `summarizeFlows` via `outcomeText` / `surviveText` in `src/ui/format.ts`
+- `src/ui/FailureByDut.tsx` and `dutSummary` (`src/ui/format.ts`): one line per
+  router as the DUT, e.g. "S: 1 affected, 1 repaired (1 by more than one router);
+  0 survive, 1 breaks"
+- `src/ui/CanvasMenu.tsx` and `tooltipLines` (`src/ui/format.ts`): what the
+  right-click menu and the hover tooltip say about a failed link or router
 - `src/App.tsx` and `src/ui/canvas.ts`: which link of a bundle is drawn for the
-  normal, repair and converged paths
+  normal, repair and converged paths, and which flow is drawn when a router is
+  clicked on the diagram or a DUT is picked in the per-DUT list
 - Tests: `tests/engine/simulate.test.ts`, `simulate-node.test.ts`,
-  `simulate.property.test.ts`, `parallel.test.ts`, `parallel.property.test.ts`
+  `simulate.property.test.ts`, `parallel.test.ts`, `parallel.property.test.ts`,
+  `simulate-all.test.ts`
 - Example networks: `examples/01-square.yaml` to `examples/07-parallel.yaml`
 
 ## The question for every rule
@@ -106,19 +116,31 @@ If code, docs and RFC disagree, follow the RFC (CLAUDE.md rule 3).
     normal path's link, and the converged path over links that are up. Never a
     failed link of a bundle when the other one carried the traffic.
 
+### Every router as the DUT (§8.2, D31)
+15. **Counts:** for each router, are `affected`, `repaired`, `relayed`, `dropped`,
+    `looped`, `unreachable`, `destDown`, `viaRouter`, `survive`, `breaks` and
+    `noBackup` exactly what that router's own simulation shows? Do the outcomes add
+    up to `affected`, and survive + breaks + no backup to `viaRouter`? Is a failed
+    router as the source listed as down and never simulated?
+16. **Same words in both places:** the single-source panel ("E down: 1 destination
+    affected, 0 repairs survive, 1 breaks") and the per-DUT line must never
+    disagree for the same router, failure and mode. Is "affected" for a flow that
+    crosses only a failed link (no failed router) counted in `affected` but not in
+    `viaRouter`, and is that what the text means?
+
 ### Text and docs
-15. **Every sentence the panel shows:** is it true in every case it can appear?
+17. **Every sentence the panel shows:** is it true in every case it can appear?
     That includes chains of repairs, loops, split networks, the PLR not being S,
     repeated failed links, router plus link failures together, and bundles (is the
     exact link named whenever two routers have several?). Are the numbers shown
     measured from the router the sentence names?
-16. **Docs vs code vs RFC:** do §8, §8.1, §9 and D22–D29 say exactly what the code
-    does, including the worked checks?
+18. **Docs vs code vs RFC:** do §8, §8.1, §8.2, §9 and D22–D31 say exactly what
+    the code does, including the worked checks?
 
 ## How to search
 Don't stop at reading the code. Run it. Write a small throwaway script (in the
-scratchpad, not the repo) that calls `simulateFailure` for every network in
-Examples 1–7, and for each one:
+scratchpad, not the repo) that calls `simulateFailure` (and `simulateAllSources`,
+compared against it) for every network in Examples 1–7, and for each one:
 - every source router
 - every mode
 - every set of one and two failed links (three on the small examples)
@@ -131,8 +153,8 @@ and unequal links between the same routers, and both links of a bundle failed.
 Flag anything a real router would do differently: a drop where a backup exists, a loop that isn't the same router
 with the same labels, a repair by a router whose link is up, a wrong target, a
 "breaks" for traffic that one backup delivers, traffic sent over a failed link of a
-bundle, a cost that doesn't match the links walked, or a sentence that is false for
-that case. Check every finding by hand against the RFC before you call it a bug.
+bundle, a cost that doesn't match the links walked, a per-DUT count that differs
+from that router's own panel, or a sentence that is false for that case. Check every finding by hand against the RFC before you call it a bug.
 
 ## For each problem found
 - Give a concrete network and the failed links or routers that show it (use the
@@ -145,7 +167,7 @@ that case. Check every finding by hand against the RFC before you call it a bug.
 2. Keep the worked examples in `docs/02-algorithms.md` §6 and the worked checks in
    §8 / §8.1 / §9 passing.
 3. Update `docs/02-algorithms.md` and add a new `DECISIONS.md` entry (next number:
-   D30) that lists what changed, what was checked and left unchanged, and what is
+   D32) that lists what changed, what was checked and left unchanged, and what is
    still not modelled.
 4. Run `npm test`, `npm run lint` and `npm run typecheck`. All must pass, including
    the 200-router speed test (under 2 s).
