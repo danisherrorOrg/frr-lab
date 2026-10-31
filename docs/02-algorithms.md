@@ -414,3 +414,31 @@ Worked checks:
 | Example 4, PE1→P3, links PE1–P1 and P2–P4 | dropped at PE1 | delivered, 70, longer than 50 | delivered, 100 (PE1, P2, then PE1 again repair), longer than 50 |
 
 Example 6 is the lesson: with a router down, link-protecting TI-LFA can do worse than plain LFA, because each router repairs only its own link (RFC 9855 §1; node protection is Later #1).
+
+---
+
+## 11. Per-link view (TODO backlog, D41)
+`linkView()` (`src/engine/link-view.ts`) answers "if this link fails, whose traffic needs a repair, and how?". It decides nothing new: it regroups the results table (§5) by link.
+
+For each direction X→Y of the link:
+1. **Repairs:** Y is X's primary next hop over this link for D exactly when the link is one of `firstLinks(X, D)` (§1.4, D29). FRR is local repair (RFC 5286 §1, RFC 9855 §2): whoever sent the packet, X repairs it with its own backup for (D, X–Y). So each destination listed is one row of X's results table, and "how" is that row's simplest protecting method in the §5 order (ECMP, LFA, Remote LFA, TI-LFA, or none).
+2. **Traffic from:** a router W ≠ D sends traffic to D over X→Y when some shortest path uses it, with the §1.5 test read as "uses it" on a tie:
+   ```
+   dist(W,X) + c(X→Y) + dist(Y,D) = dist(W,D)
+   ```
+   `c` is the metric of this one link of a bundle (D29). Such a W always gives a row in step 1 (shortest sub-paths are shortest, so X's own shortest path to D starts on this link), and X itself is always listed. A flow is one (W, D) pair.
+3. **Counts:** destinations per method, and flows in total.
+
+A link on no shortest path (the costlier link of a bundle, or Example 4's P1–P2) carries nothing either way: it can only be a backup.
+
+Worked checks:
+
+| Example, link | Direction | Destination: protected by, traffic from |
+|---|---|---|
+| 2, S–E | S→E | C: LFA A, from S · E: Remote LFA PQ B, from A, S (A-S-E = 2 < A-B-C-E = 3) |
+| | E→S | A: LFA C, from E · S: Remote LFA, from C, E |
+| 4, PE1–P1 | PE1→P1 | P1: Remote LFA PE2 via P2, from P2, P4, PE1 (P4-P2-PE1-P1 = 30 < P4→P1 = 40) · P3: Remote LFA, from P2, PE1 · PE2: ECMP, from PE1 |
+| | P1→PE1 | P2: LFA P2, from P1, P3 · PE1: LFA P2, from P1, P3, PE2 (PE2's two paths tie at 30) |
+| 7, S-E#2 | both | nothing: 20 > 10, only a backup |
+
+A property test (random networks, with and without bundles) checks that the rows equal the repairing router's own rows for the link, and that (W, D) is listed exactly when the §1.5 test says some shortest path W→D uses the link.

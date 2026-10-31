@@ -13,6 +13,7 @@ import {
   type RepairMode,
   type SourceFailure,
 } from '../engine/simulate'
+import { linkView, type LinkView } from '../engine/link-view'
 import type { DestinationResult, NodeId, Topology } from '../engine/types'
 
 // Messages between the page and engine.worker.ts. Plain data only, so they
@@ -54,6 +55,8 @@ export type EngineRequest =
       mode: RepairMode
       options?: { extended?: boolean }
     }
+  /** Per-link view (TODO backlog, docs/02-algorithms.md §11). */
+  | { id: number; kind: 'link'; topology: Topology; link: string; options?: { extended?: boolean } }
 
 export type EngineResponse =
   | { id: number; kind: 'progress'; done: number; total: number; source: NodeId }
@@ -62,6 +65,7 @@ export type EngineResponse =
   | { id: number; kind: 'simulate'; simulation: FailureSimulation }
   | { id: number; kind: 'all-sources'; sources: SourceRows[] }
   | { id: number; kind: 'simulate-all'; sources: SourceFailure[] }
+  | { id: number; kind: 'link'; view: LinkView }
   | { id: number; kind: 'error'; message: string }
 
 /**
@@ -107,6 +111,8 @@ export function handleRequest(req: EngineRequest, post: (res: EngineResponse) =>
           { ...req.options, onProgress },
         ),
       })
+    } else if (req.kind === 'link') {
+      post({ id: req.id, kind: 'link', view: linkView(req.topology, req.link, req.options) })
     } else {
       const report = computeCoverage(req.topology, { ...req.options, onProgress })
       post({ id: req.id, kind: 'coverage', report })

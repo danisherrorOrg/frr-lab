@@ -16,6 +16,7 @@ import { FailurePanel } from './ui/FailurePanel'
 import { bundles, drawnFlow, pickBackup, spaceMarks, walkMarks, type SpaceKind } from './ui/format'
 import { GraphCanvas } from './ui/GraphCanvas'
 import { Legend } from './ui/Legend'
+import { LinkView } from './ui/LinkView'
 import { NoticeBox } from './ui/NoticeBox'
 import type { WalkPath } from './ui/PacketWalk'
 import { ResultsTable } from './ui/ResultsTable'
@@ -402,6 +403,12 @@ export function App() {
                   onBackup={setBackup}
                 />
               )}
+          <LinkView
+            onSelect={(dut, r) => {
+              pickRow(dut, r)
+              if (anyFailed) setSimDest(r.dest)
+            }}
+          />
           <CoverageReport source={source} />
         </main>
       </div>

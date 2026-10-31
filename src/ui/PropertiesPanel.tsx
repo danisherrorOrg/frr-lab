@@ -85,6 +85,7 @@ function RouterForm({ node, topology: t }: { node: RouterNode; topology: Topolog
 
 function LinkForm({ link, topology: t }: { link: Link; topology: Topology }) {
   const update = useStore((s) => s.updateLink)
+  const openLinkView = useStore((s) => s.openLinkView)
   const remove = useStore((s) => s.deleteSelection)
   const { a, b } = link
   const adj = (key: 'adjSidAB' | 'adjSidBA', from: string, to: string) => {
@@ -125,6 +126,13 @@ function LinkForm({ link, topology: t }: { link: Link; topology: Topology }) {
       />
       {adj('adjSidAB', a, b)}
       {adj('adjSidBA', b, a)}
+      <button
+        type="button"
+        className="mt-1 mr-2 rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
+        onClick={() => openLinkView(link.id)}
+      >
+        What uses this link?
+      </button>
       <button type="button" className={danger} onClick={remove}>
         Delete link
       </button>

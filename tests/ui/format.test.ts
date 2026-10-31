@@ -8,7 +8,9 @@ import { simulateAllSources, simulateFailure, type FailureSummary } from '../../
 import {
   bundles,
   dutSummary,
+  howText,
   walkMarks,
+  type Bundles,
   isBundled,
   lfaTags,
   outcomeText,
@@ -19,6 +21,8 @@ import {
   throughText,
   tooltipLines,
 } from '../../src/ui/format'
+import { toRows } from '../../src/engine/rows'
+import { parseTopology } from '../../src/io/yaml'
 import { connectedTopology } from '../arbitraries'
 import { loadFixture } from '../helpers'
 
@@ -433,5 +437,36 @@ describe('spaceMarks: P / Q / PQ sets picked in the detail panel', () => {
 
   it('a picked set that is now empty falls back to the normal shading', () => {
     expect(spaceMarks({ ...rlfa, pq: [] }, 'pq')).toEqual(spaceMarks(rlfa, null))
+  })
+})
+
+describe('howText (per-link view)', () => {
+  const rowsOf = (file: string, s: string) => toRows(s, computeForSource(loadFixture(file), s))
+  const how = (file: string, s: string, d: string, b?: Bundles) =>
+    howText(
+      rowsOf(file, s).find((r) => r.dest === d)!,
+      b,
+    )
+
+  it('names the backup each method uses, with labels for TI-LFA', () => {
+    expect(how('02-ring5.yaml', 'S', 'C')).toBe('LFA A (node-protecting)')
+    expect(how('02-ring5.yaml', 'S', 'E')).toBe('Remote LFA: tunnel to PQ node B')
+    expect(how('03-ring5-highmetric.yaml', 'S', 'E')).toBe(
+      'TI-LFA: B · B→C · E (16004 24005 16002)',
+    )
+    expect(how('04-isp-core.yaml', 'PE1', 'P1')).toBe('Remote LFA: tunnel to PQ node PE2 via P2')
+    expect(how('04-isp-core.yaml', 'PE1', 'PE2')).toBe('ECMP: the other next hop P2 takes it')
+  })
+
+  it('names the link of a bundle, and says when nothing protects', () => {
+    const par = loadFixture('07-parallel.yaml')
+    expect(how('07-parallel.yaml', 'S', 'E', bundles(par))).toBe('LFA E (S-E#2) (link-protecting)')
+    const r = parseTopology(
+      'nodes: [{ id: A, sid: 1 }, { id: B, sid: 2 }]\nlinks: [{ a: A, b: B, metric: 5 }]',
+    )
+    if (!r.ok) throw new Error(r.errors.join())
+    expect(howText(toRows('A', computeForSource(r.topology, 'A'))[0]!)).toBe(
+      'Nothing: B is cut off from A when the link fails',
+    )
   })
 })

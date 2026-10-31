@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeAllSources, computeCoverage, computeForSource } from '../../src/engine/index'
+import { linkView } from '../../src/engine/link-view'
 import { simulateAllSources, simulateFailure } from '../../src/engine/simulate'
 import { createEngineClient, createInlineWorker, type WorkerLike } from '../../src/worker/client'
 import { handleRequest, type EngineRequest, type EngineResponse } from '../../src/worker/protocol'
@@ -49,6 +50,16 @@ describe('handleRequest', () => {
     const out: EngineResponse[] = []
     handleRequest({ id: 2, kind: 'source', topology: ring(), source: 'Z' }, (r) => out.push(r))
     expect(out).toEqual([{ id: 2, kind: 'error', message: 'Unknown source router "Z".' }])
+  })
+})
+
+describe('per-link view requests', () => {
+  it('the client resolves the same view as the engine, and rejects an unknown link', async () => {
+    const client = createEngineClient(fakeWorker())
+    expect(await client.linkView(ring(), 'S-E', { extended: false })).toEqual(
+      linkView(ring(), 'S-E', { extended: false }),
+    )
+    await expect(client.linkView(ring(), 'nope')).rejects.toThrow('Unknown link "nope".')
   })
 })
 

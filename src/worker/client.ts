@@ -1,4 +1,5 @@
 import type { ComputeOptions, CoverageReport, SourceRows } from '../engine/index'
+import type { LinkView } from '../engine/link-view'
 import type { FailureSimulation, RepairMode, SourceFailure } from '../engine/simulate'
 import type { DestinationResult, NodeId, Topology } from '../engine/types'
 import { handleRequest, type EngineRequest, type EngineResponse } from './protocol'
@@ -43,6 +44,8 @@ export interface EngineClient {
     options?: { extended?: boolean },
     onProgress?: (done: number, total: number, source: NodeId) => void,
   ): Promise<SourceFailure[]>
+  /** What one link carries and how it is protected (docs/02-algorithms.md §11). */
+  linkView(topology: Topology, link: string, options?: { extended?: boolean }): Promise<LinkView>
   /** Stops the worker; pending calls reject. */
   terminate(): void
 }
@@ -110,6 +113,7 @@ export function createEngineClient(worker: WorkerLike = createDefaultWorker()): 
     else if (data.kind === 'simulate') p.resolve(data.simulation as never)
     else if (data.kind === 'all-sources' || data.kind === 'simulate-all')
       p.resolve(data.sources as never)
+    else if (data.kind === 'link') p.resolve(data.view as never)
     else p.resolve(data.report as never)
   })
 
@@ -151,6 +155,8 @@ export function createEngineClient(worker: WorkerLike = createDefaultWorker()): 
         },
         onProgress,
       ),
+    linkView: (topology, link, options) =>
+      send({ kind: 'link', topology, link, ...(options && { options }) }),
     terminate: () => {
       worker.terminate()
       for (const p of pending.values()) p.reject(new Error('The engine worker was stopped.'))

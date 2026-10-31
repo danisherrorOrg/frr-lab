@@ -53,6 +53,7 @@ LFA LAB/
 │   │   ├── paths.ts         node-by-node paths to draw (primary, LFA, RLFA, TI-LFA)
 │   │   ├── compare.ts       LFA / RLFA / TI-LFA side by side for one row (§10 of 02)
 │   │   ├── rows.ts          compact results-table rows (every router as the DUT, D31)
+│   │   ├── link-view.ts     per-link view: what one link carries and how it is protected (§11 of 02)
 │   │   ├── simulate.ts      failure simulation, per source and for every router
 │   │   └── index.ts         computeForSource(), computeCoverage()
 │   ├── io/
@@ -83,6 +84,7 @@ LFA LAB/
 │   │   ├── CompareView.tsx  the three backups side by side, each with a small diagram
 │   │   ├── CompareFailure.tsx  the three repair modes side by side while something is down
 │   │   ├── MiniMap.tsx      small SVG copy of the diagram with one path
+│   │   ├── LinkView.tsx     per-link view: pick a link, its traffic and repairs both ways
 │   │   ├── CoverageReport.tsx
 │   │   └── PropertiesPanel.tsx  edit selected node/link
 │   ├── App.tsx  main.tsx

@@ -3,7 +3,7 @@
 import { adjLabel } from '../engine/labels'
 import type { PacketWalk } from '../engine/packet-walk'
 import type { ProtectionPaths } from '../engine/paths'
-import type { Method } from '../engine/rows'
+import type { Method, ResultRow } from '../engine/rows'
 import type {
   FailureSimulation,
   FailureSummary,
@@ -324,4 +324,29 @@ export function dutSummary(x: SourceFailure, routersDown: boolean): string {
       ? ''
       : `${s.viaRouter} meet${s.viaRouter === 1 ? 's' : ''} a down router: `
   return `${s.affected} affected, ${outcomeText(s)}${routersDown ? `; ${which}${surviveText(s)}` : ''}`
+}
+
+/**
+ * How one results row is protected, in a line (per-link view, docs/02-algorithms.md §11):
+ * "LFA A (node-protecting)", "Remote LFA: tunnel to PQ node B", "TI-LFA: B · E (16004 16002)".
+ */
+export function howText(r: ResultRow, b?: Bundles): string {
+  switch (r.protectedBy) {
+    case 'ecmp':
+      return r.lfa
+        ? `ECMP: the other next hop ${hopName(b, r.source, r.lfa.neighbor, r.lfa.link)} takes it`
+        : 'ECMP: another equal-cost next hop takes it'
+    case 'lfa':
+      return r.lfa
+        ? `LFA ${hopName(b, r.source, r.lfa.neighbor, r.lfa.link)} (${r.lfa.nodeProtecting ? 'node' : 'link'}-protecting)`
+        : 'LFA'
+    case 'rlfa':
+      return `Remote LFA: tunnel to PQ node ${r.rlfa.pq ?? '?'}${r.rlfa.via ? ` via ${r.rlfa.via}` : ''}`
+    case 'tilfa':
+      return r.tilfa
+        ? `TI-LFA: ${segmentsShort(r.tilfa.segments, b)} (${r.tilfa.labelStack.join(' ')})`
+        : 'TI-LFA'
+    default:
+      return `Nothing: ${r.dest} is cut off from ${r.source} when the link fails`
+  }
 }

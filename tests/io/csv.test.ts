@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { computeAllSources, computeCoverage } from '../../src/engine/index'
-import { coverageCsv, csvField, resultsCsv, unprotectedCsv } from '../../src/io/csv'
+import { linkView } from '../../src/engine/link-view'
+import { coverageCsv, csvField, linkCsv, resultsCsv, unprotectedCsv } from '../../src/io/csv'
 import { loadFixture } from '../helpers'
 
 describe('coverageCsv', () => {
@@ -78,5 +79,18 @@ describe('resultsCsv', () => {
     )
     expect(lines.filter((l) => l.startsWith('PE1,'))).toHaveLength(6)
     expect(lines.at(-1)).toBe('')
+  })
+})
+
+describe('linkCsv', () => {
+  it('one line per destination each way, with the traffic that crosses the link', () => {
+    const csv = linkCsv(linkView(loadFixture('02-ring5.yaml'), 'S-E'))
+    const lines = csv.split('\r\n')
+    expect(lines[0]).toBe(
+      'repairing_router,traffic_from,destination,cost,next_hop,link,protected_by,ecmp,lfa,lfa_link,lfa_node_protecting,rlfa_pq,rlfa_via,tilfa_segments,tilfa_labels,tilfa_out_link',
+    )
+    // docs/02-algorithms.md §11: S repairs A's and its own traffic to E with Remote LFA B.
+    expect(lines).toContain('S,A S,E,1,E,S-E,rlfa,no,,,,B,,Prefix B · Prefix E,16004 16002,A-S')
+    expect(lines.filter((l) => l !== '')).toHaveLength(5)
   })
 })

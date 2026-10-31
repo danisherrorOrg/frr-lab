@@ -298,7 +298,7 @@ Things that fit the "learn and check FRR" goal and stay offline / no backend.
 - [x] Clickable P / Q / PQ sets in the detail panel that highlight those routers on the canvas *(D39)*
 
 **Design checks (for engineers)**
-- [ ] Per-link view: pick a link, list every (source, destination) it protects and how
+- [x] Per-link view: pick a link, list every (source, destination) it protects and how *(D41, `02-algorithms.md` §11)*
 - [ ] Coverage heat-map on the canvas: colour links / routers by how well they are protected
 - [ ] What-if diff: change a metric and see coverage before vs after ("LFA 60% → 80%")
 - [ ] Max SID depth (MSD) setting: flag TI-LFA repairs whose label stack is too deep for the hardware

@@ -84,6 +84,8 @@ export interface AppState {
   tour: number | null
   /** The "YAML format" guide is open. */
   yamlGuide: boolean
+  /** The per-link view (TODO backlog): null = closed, else the link picked (null = none yet). */
+  linkView: { link: string | null } | null
 
   loadTopology: (t: Topology, source?: NodeId, warnings?: string[]) => void
   loadExample: (key: string) => void
@@ -127,6 +129,9 @@ export interface AppState {
   setNotice: (n: Notice | null) => void
   setTour: (step: number | null) => void
   setYamlGuide: (open: boolean) => void
+  /** Open the per-link view on this link (null = open with none picked) and select it. */
+  openLinkView: (link: string | null) => void
+  closeLinkView: () => void
 }
 
 /** Keep the chosen source if it still exists, else 'S', else the first router. */
@@ -153,6 +158,7 @@ function tidy(s: AppState, t: Topology): Partial<AppState> {
     failedNodes: s.failedNodes.filter((id) => nodes.has(id)),
     simDest: s.simDest !== null && nodes.has(s.simDest) ? s.simDest : null,
     linkStart: s.linkStart !== null && nodes.has(s.linkStart) ? s.linkStart : null,
+    linkView: s.linkView?.link != null && !links.has(s.linkView.link) ? { link: null } : s.linkView,
   }
 }
 
@@ -215,6 +221,7 @@ export const useStore = create<AppState>()((set, get) => {
     notice: null,
     tour: null,
     yamlGuide: false,
+    linkView: null,
 
     loadTopology: (t, source, warnings = []) => {
       const placed = edit.withPositions(t)
@@ -339,7 +346,15 @@ export const useStore = create<AppState>()((set, get) => {
     setSource: (id) => set({ source: id, row: null, backup: 'auto' }),
     setAllSources: (allSources) => set({ allSources, row: null, backup: 'auto' }),
     pickRow: (source, row) => set({ source, row, backup: 'auto' }),
-    select: (selection) => set({ selection }),
+    // A link clicked on the canvas while the per-link view is open becomes its link.
+    select: (selection) =>
+      set({
+        selection,
+        ...(selection?.kind === 'link' &&
+          get().linkView !== null && {
+            linkView: { link: selection.id },
+          }),
+      }),
     selectRow: (row) => set({ row, backup: 'auto' }),
     toggleRow: (row) => {
       const open = get().row
@@ -398,6 +413,9 @@ export const useStore = create<AppState>()((set, get) => {
     setNotice: (notice) => set({ notice }),
     setTour: (tour) => set({ tour }),
     setYamlGuide: (yamlGuide) => set({ yamlGuide }),
+    openLinkView: (link) =>
+      set({ linkView: { link }, ...(link !== null && { selection: { kind: 'link', id: link } }) }),
+    closeLinkView: () => set({ linkView: null }),
   }
 })
 

@@ -373,3 +373,12 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Other options considered:** unknown keys as warnings (the file would load with the typo still ignored, which is the problem being fixed); a separate Markdown page (needs leaving the app and could drift from the loader).
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D41 – Per-link view (2026-10-31)
+- **Why:** TODO backlog "Design checks". Engineers asked "if this link fails, whose traffic is hit and is it covered?". The results table answers per router, so you had to open both ends of the link and work out the transit traffic yourself.
+- **Engine:** `linkView()` in `src/engine/link-view.ts` (pure, `docs/02-algorithms.md` §11). For each direction X→Y it keeps X's own results rows whose protected link is this one (FRR is local repair: X repairs everyone's traffic with its own backup) and lists every router whose traffic to that destination crosses X→Y on some shortest path (§1.5, ties count, the safe choice of D6). Nothing is recomputed differently, so the rows equal X's table. Fixed tests on Examples 2, 3, 4, 7 and a two-router bridge; a property test on random networks (with bundles).
+- **Traffic from = shortest paths, not one flow:** with ECMP upstream, a router may send only part of its traffic over the link; it is listed because some of it is hit. The simulation (§8) still follows one flow per destination.
+- **UI:** a "Per-link view" section under the results (button next to the coverage report), also opened from the link's right-click menu and its properties ("What uses this link?"). A link picker; while it is open, clicking a link on the diagram switches to it, and deleting the link clears it. One table per direction: destination, cost, traffic from (first 8, then "+ n more", full list in the tooltip), protected by, and how (the LFA, PQ node or TI-LFA segments and labels, `howText()` in `src/ui/format.ts`). A row opens in the results with its router as the DUT. CSV export (`linkCsv()`, same row columns as the "All routers" CSV). While anything is down, a note says it shows the plan for this link failing alone. Runs in the engine worker. Checked in Chrome on Example 4, no console errors.
+- **Other options considered:** draw the flows on the canvas (busy with 10+ flows, and the canvas already shows the open row); list only the two end routers' rows (misses the transit traffic the TODO asks for).
+- **No new dependencies.**
+- **Status:** Accepted.

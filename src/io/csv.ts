@@ -1,4 +1,6 @@
 import { percent, type CoverageCounts, type CoverageReport, type SourceRows } from '../engine/index'
+import type { LinkView } from '../engine/link-view'
+import type { ResultRow } from '../engine/rows'
 import type { Segment } from '../engine/types'
 
 // CSV for the coverage report. Pure functions returning strings; the UI does the download.
@@ -69,45 +71,60 @@ export function unprotectedCsv(report: CoverageReport): string {
 const segmentCsv = (s: Segment) =>
   s.kind === 'prefix' ? `Prefix ${s.node}` : `Adj ${s.from}→${s.to} (${s.link})`
 
+const yesNoOpt = (x: boolean | undefined) => (x === undefined ? undefined : x ? 'yes' : 'no')
+
+/** Columns after `dut`, the same for every table of results rows. */
+const ROW_HEADER = [
+  'destination',
+  'cost',
+  'next_hop',
+  'link',
+  'protected_by',
+  'ecmp',
+  'lfa',
+  'lfa_link',
+  'lfa_node_protecting',
+  'rlfa_pq',
+  'rlfa_via',
+  'tilfa_segments',
+  'tilfa_labels',
+  'tilfa_out_link',
+]
+
+const rowCells = (r: ResultRow) => [
+  r.dest,
+  r.cost,
+  r.via,
+  r.link,
+  r.protectedBy ?? 'none',
+  yesNoOpt(r.ecmp),
+  r.lfa?.neighbor,
+  r.lfa?.link,
+  yesNoOpt(r.lfa?.nodeProtecting),
+  r.rlfa.needed ? r.rlfa.pq : undefined,
+  r.rlfa.needed ? r.rlfa.via : undefined,
+  r.tilfa?.segments.map(segmentCsv).join(' · '),
+  r.tilfa?.labelStack.join(' '),
+  r.tilfa?.outLink,
+]
+
 /** The "All routers" results table (Phase 9.6): every DUT's rows, same columns as on screen. */
 export function resultsCsv(sources: SourceRows[]): string {
-  const yesNo = (x: boolean | undefined) => (x === undefined ? undefined : x ? 'yes' : 'no')
   return toCsv([
-    [
-      'dut',
-      'destination',
-      'cost',
-      'next_hop',
-      'link',
-      'protected_by',
-      'ecmp',
-      'lfa',
-      'lfa_link',
-      'lfa_node_protecting',
-      'rlfa_pq',
-      'rlfa_via',
-      'tilfa_segments',
-      'tilfa_labels',
-      'tilfa_out_link',
-    ],
-    ...sources.flatMap(({ rows }) =>
-      rows.map((r) => [
-        r.source,
-        r.dest,
-        r.cost,
-        r.via,
-        r.link,
-        r.protectedBy ?? 'none',
-        yesNo(r.ecmp),
-        r.lfa?.neighbor,
-        r.lfa?.link,
-        yesNo(r.lfa?.nodeProtecting),
-        r.rlfa.needed ? r.rlfa.pq : undefined,
-        r.rlfa.needed ? r.rlfa.via : undefined,
-        r.tilfa?.segments.map(segmentCsv).join(' · '),
-        r.tilfa?.labelStack.join(' '),
-        r.tilfa?.outLink,
-      ]),
+    ['dut', ...ROW_HEADER],
+    ...sources.flatMap(({ rows }) => rows.map((r) => [r.source, ...rowCells(r)])),
+  ])
+}
+
+/**
+ * The per-link view (docs/02-algorithms.md §11): one line per destination the link
+ * carries, each way, with the routers whose traffic crosses it ("A B", space-separated).
+ */
+export function linkCsv(view: LinkView): string {
+  return toCsv([
+    ['repairing_router', 'traffic_from', ...ROW_HEADER],
+    ...view.directions.flatMap((d) =>
+      d.pairs.map((p) => [p.row.source, p.sources.join(' '), ...rowCells(p.row)]),
     ),
   ])
 }
