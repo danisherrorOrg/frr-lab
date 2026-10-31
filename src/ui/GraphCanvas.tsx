@@ -1,7 +1,7 @@
 import cytoscape from 'cytoscape'
 import { useEffect, useRef } from 'react'
 import { useStore } from '../state/store'
-import { decorate, STYLE, sync, type Highlight } from './canvas'
+import { decorate, stepFlow, STYLE, sync, type Highlight } from './canvas'
 
 /** Cytoscape wrapper: draws the topology and turns clicks into store actions. */
 export function GraphCanvas({ highlight }: { highlight: Highlight }) {
@@ -11,7 +11,7 @@ export function GraphCanvas({ highlight }: { highlight: Highlight }) {
   const loadCount = useStore((s) => s.loadCount)
   const selection = useStore((s) => s.selection)
   const linkStart = useStore((s) => s.linkStart)
-  const failedLinks = useStore((s) => s.failedLinks)
+  const failedLink = useStore((s) => s.failedLink)
   const tool = useStore((s) => s.tool)
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export function GraphCanvas({ highlight }: { highlight: Highlight }) {
         if (st.tool === 'add-link') st.linkClick(id)
         else st.select({ kind: 'node', id })
       } else if (st.tool === 'fail-link') {
-        st.toggleFailed(id)
+        st.failLink(id)
       } else {
         st.select({ kind: 'link', id })
       }
@@ -79,9 +79,22 @@ export function GraphCanvas({ highlight }: { highlight: Highlight }) {
     decorate(cy, topology, highlight, {
       selection: selection?.id ?? null,
       linkStart,
-      failed: failedLinks,
+      failed: failedLink === null ? [] : [failedLink],
     })
-  }, [topology, highlight, selection, linkStart, failedLinks])
+  }, [topology, highlight, selection, linkStart, failedLink])
+
+  // Traffic on the repair path: marching dashes, unless the user asked for less motion.
+  useEffect(() => {
+    const cy = cyRef.current
+    if (!cy || !highlight.flowing) return
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    let offset = 0
+    const timer = window.setInterval(() => {
+      offset = (offset + 2) % 1600
+      stepFlow(cy, offset)
+    }, 50)
+    return () => window.clearInterval(timer)
+  }, [highlight])
 
   const cursor = tool === 'select' ? 'cursor-default' : 'cursor-crosshair'
   return (

@@ -1,6 +1,6 @@
 import cytoscape from 'cytoscape'
 import { describe, expect, it } from 'vitest'
-import { decorate, STYLE, sync } from '../../src/ui/canvas'
+import { decorate, stepFlow, STYLE, sync } from '../../src/ui/canvas'
 import { loadFixture } from '../helpers'
 
 const none = { selection: null, linkStart: null, failed: [] }
@@ -86,5 +86,41 @@ describe('canvas highlight', () => {
     expect(cy.getElementById('S-E').data('label')).toBe('✕ 1')
     expect(cy.getElementById('B').data('display')).toBe('B')
     expect(cy.getElementById('A').hasClass('sel')).toBe(true)
+  })
+
+  it('failure simulation: animated repair path, then the final path with a halo', () => {
+    const t = loadFixture('02-ring5.yaml')
+    // styleEnabled: headless Cytoscape skips style maths unless asked.
+    const cy = cytoscape({ headless: true, styleEnabled: true, style: STYLE })
+    sync(cy, t)
+    // pstyle() (the computed style) isn't in Cytoscape's TypeScript types.
+    type Parsed = { pfValue: number; strValue: string; value: unknown }
+    const ps = (id: string, prop: string) =>
+      (cy.getElementById(id) as unknown as { pstyle(p: string): Parsed }).pstyle(prop)
+    const repair = ['S', 'A', 'B', 'C', 'E']
+    decorate(
+      cy,
+      t,
+      { source: 'S', dest: 'E', primary: ['S', 'E'], backup: repair, flowing: true },
+      { selection: null, linkStart: null, failed: ['S-E'] },
+    )
+    expect(cy.getElementById('S-E').classes()).toEqual(['failed', 'primary', 'primary-fwd'])
+    expect(cy.getElementById('A-S').classes()).toEqual(['backup', 'backup-rev', 'flowing'])
+    stepFlow(cy, 8)
+    // A-S runs against the travel direction (S→A), so its dashes move the other way.
+    expect(ps('A-S', 'line-dash-offset').pfValue).toBe(8)
+    expect(ps('E-C', 'line-dash-offset').pfValue).toBe(8)
+    expect(cy.edges('.flowing')).toHaveLength(4)
+
+    decorate(
+      cy,
+      t,
+      { source: 'S', dest: 'E', final: repair },
+      { selection: null, linkStart: null, failed: ['S-E'] },
+    )
+    expect(cy.edges('.flowing')).toHaveLength(0)
+    expect(cy.getElementById('A-S').classes()).toEqual(['final', 'final-rev'])
+    expect(ps('A-S', 'underlay-opacity').value).toBe(0.3)
+    expect(ps('A-S', 'mid-source-arrow-shape').strValue).toBe('chevron')
   })
 })

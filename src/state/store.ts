@@ -2,6 +2,7 @@
 // selection, failed links and settings. Results are not stored here; the UI asks
 // the engine worker for them whenever the topology or source changes.
 import { create } from 'zustand'
+import type { RepairMode } from '../engine/simulate'
 import type { NodeId, Topology } from '../engine/types'
 import * as edit from './edit'
 import { EXAMPLES, exampleTopology } from './examples'
@@ -37,8 +38,17 @@ export interface AppState {
   selection: Selection
   row: RowKey | null
   backup: BackupKind
-  /** Link ids failed by the fail-link tool (simulation comes in Phase 7). */
-  failedLinks: string[]
+  /**
+   * The link failed by the fail-link tool. One at a time: FRR protects against a
+   * single failure (D4), so a second click moves the failure (D22).
+   */
+  failedLink: string | null
+  /** Which FRR methods the routers run in the simulation. */
+  simMode: RepairMode
+  /** False = traffic on the repair path; true = after the network reconverges. */
+  converged: boolean
+  /** The simulated destination drawn on the canvas; null = the first affected one. */
+  simDest: NodeId | null
   settings: { extended: boolean }
   tool: Tool
   /** First router clicked with the add-link tool. */
@@ -50,6 +60,8 @@ export interface AppState {
   addRouter: (pos: edit.Pos) => void
   moveRouter: (id: NodeId, pos: edit.Pos) => void
   linkClick: (id: NodeId) => void
+  /** Add a link from a to b (keyboard path of the add-link tool). Returns an error or null. */
+  addLinkBetween: (a: NodeId, b: NodeId) => string | null
   updateRouter: (id: NodeId, patch: edit.RouterPatch) => string | null
   updateLink: (id: string, patch: edit.LinkPatch) => string | null
   updateTopology: (patch: edit.TopologyPatch) => string | null
@@ -61,7 +73,11 @@ export interface AppState {
   selectRow: (row: RowKey | null) => void
   setBackup: (b: BackupKind) => void
   setTool: (t: Tool) => void
-  toggleFailed: (linkId: string) => void
+  /** Fail this link (restoring any other); the failed link again, or null, restores it. */
+  failLink: (linkId: string | null) => void
+  setSimMode: (m: RepairMode) => void
+  setConverged: (on: boolean) => void
+  setSimDest: (d: NodeId | null) => void
   setExtended: (on: boolean) => void
   setNotice: (n: Notice | null) => void
 }
@@ -86,7 +102,8 @@ function tidy(s: AppState, t: Topology): Partial<AppState> {
     source,
     selection: selOk ? sel : null,
     row: rowOk ? s.row : null,
-    failedLinks: s.failedLinks.filter((id) => links.has(id)),
+    failedLink: s.failedLink !== null && links.has(s.failedLink) ? s.failedLink : null,
+    simDest: s.simDest !== null && nodes.has(s.simDest) ? s.simDest : null,
     linkStart: s.linkStart !== null && nodes.has(s.linkStart) ? s.linkStart : null,
   }
 }
@@ -121,7 +138,10 @@ export const useStore = create<AppState>()((set, get) => {
     selection: null,
     row: null,
     backup: 'auto',
-    failedLinks: [],
+    failedLink: null,
+    simMode: 'tilfa',
+    converged: false,
+    simDest: null,
     settings: { extended: true },
     tool: 'select',
     linkStart: null,
@@ -133,7 +153,9 @@ export const useStore = create<AppState>()((set, get) => {
         source: pickSource(placed, source),
         selection: null,
         row: null,
-        failedLinks: [],
+        failedLink: null,
+        converged: false,
+        simDest: null,
         linkStart: null,
         loadCount: get().loadCount + 1,
         notice:
@@ -165,19 +187,21 @@ export const useStore = create<AppState>()((set, get) => {
         set({ linkStart: start === id ? null : id })
         return
       }
-      const r = edit.addLink(get().topology, start, id)
-      if (!r.ok) {
-        set({
-          linkStart: null,
-          notice: { kind: 'error', title: "Can't add link", lines: [r.error] },
-        })
-        return
+      const error = get().addLinkBetween(start, id)
+      if (error !== null) {
+        set({ linkStart: null, notice: { kind: 'error', title: "Can't add link", lines: [error] } })
       }
+    },
+
+    addLinkBetween: (a, b) => {
+      const r = edit.addLink(get().topology, a, b)
+      if (!r.ok) return r.error
       commit(r.topology, {
         linkStart: null,
-        selection: { kind: 'link', id: edit.linkId(start, id) },
+        selection: { kind: 'link', id: edit.linkId(a, b) },
         notice: null,
       })
+      return null
     },
 
     updateRouter: (id, patch) => {
@@ -239,10 +263,15 @@ export const useStore = create<AppState>()((set, get) => {
     selectRow: (row) => set({ row, backup: 'auto' }),
     setBackup: (backup) => set({ backup }),
     setTool: (tool) => set({ tool, linkStart: null }),
-    toggleFailed: (id) => {
-      const f = get().failedLinks
-      set({ failedLinks: f.includes(id) ? f.filter((x) => x !== id) : [...f, id] })
-    },
+    failLink: (id) =>
+      set({
+        failedLink: id === get().failedLink ? null : id,
+        converged: false,
+        simDest: null,
+      }),
+    setSimMode: (simMode) => set({ simMode, converged: false }),
+    setConverged: (converged) => set({ converged }),
+    setSimDest: (simDest) => set({ simDest }),
     setExtended: (extended) => set({ settings: { ...get().settings, extended } }),
     setNotice: (notice) => set({ notice }),
   }

@@ -1,15 +1,45 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
+import { shareHash } from '../io/share-url'
 import { parseTopology, serializeTopology } from '../io/yaml'
 import { EXAMPLES } from '../state/examples'
-import { fileName } from './format'
 import { useStore } from '../state/store'
+import { downloadText } from './download'
+import { fileName } from './format'
+import { applyTheme, currentTheme, type Theme } from './theme'
 
 const button =
   'rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 disabled:opacity-40 dark:border-slate-600 dark:hover:bg-slate-700'
 
-/** Top bar: examples, import, export, undo / redo. */
+/** Put the topology in the page URL and copy the link. Nothing is uploaded (F2). */
+async function share() {
+  const { topology, source, setNotice } = useStore.getState()
+  const hash = shareHash(topology, source)
+  window.history.replaceState(null, '', hash)
+  const url = window.location.href
+  const note = `Anyone who opens it sees this topology. The data is inside the link itself (${url.length} characters); nothing is uploaded.`
+  // Shown first: the clipboard can wait on a permission prompt or fail.
+  setNotice({
+    kind: 'info',
+    title: 'Share link ready: copy it from the address bar',
+    lines: [note],
+  })
+  try {
+    await navigator.clipboard.writeText(url)
+    setNotice({ kind: 'info', title: 'Share link copied', lines: [note] })
+  } catch {
+    // The address bar already holds the link.
+  }
+}
+
+/** Top bar: examples, import, export, share, undo / redo, theme. */
 export function Toolbar() {
   const fileInput = useRef<HTMLInputElement>(null)
+  const [theme, setTheme] = useState<Theme>(currentTheme)
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    applyTheme(next, true)
+    setTheme(next)
+  }
   const loadExample = useStore((s) => s.loadExample)
   const canUndo = useStore((s) => s.past.length > 0)
   const canRedo = useStore((s) => s.future.length > 0)
@@ -28,12 +58,7 @@ export function Toolbar() {
 
   const exportFile = () => {
     const t = useStore.getState().topology
-    const url = URL.createObjectURL(new Blob([serializeTopology(t)], { type: 'text/yaml' }))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = fileName(t.name)
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadText(fileName(t.name), serializeTopology(t), 'text/yaml')
   }
 
   return (
@@ -70,6 +95,9 @@ export function Toolbar() {
       <button type="button" className={button} onClick={exportFile}>
         Export YAML
       </button>
+      <button type="button" className={button} onClick={() => void share()}>
+        🔗 Share
+      </button>
       <span className="mx-2 h-5 w-px bg-slate-300 dark:bg-slate-600" />
       <button type="button" className={button} onClick={undo} disabled={!canUndo} title="Ctrl+Z">
         ↶ Undo
@@ -82,6 +110,15 @@ export function Toolbar() {
         title="Ctrl+Shift+Z"
       >
         ↷ Redo
+      </button>
+      <button
+        type="button"
+        className={`${button} ml-auto`}
+        onClick={toggleTheme}
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+      >
+        {theme === 'dark' ? '☀' : '☾'}
       </button>
     </header>
   )

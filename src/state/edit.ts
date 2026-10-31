@@ -39,6 +39,15 @@ export function addRouter(t: Topology, pos: Pos): { topology: Topology; id: Node
   return { topology: { ...t, nodes: [...t.nodes, node] }, id }
 }
 
+/** A free spot for a router added from the keyboard: right of the others, at their middle height. */
+export function freePosition(t: Topology): Pos {
+  const placed = t.nodes.flatMap((n) => (n.pos ? [n.pos] : []))
+  if (placed.length === 0) return { x: 0, y: 0 }
+  const maxX = Math.max(...placed.map((p) => p.x))
+  const midY = placed.reduce((sum, p) => sum + p.y, 0) / placed.length
+  return { x: maxX + 120, y: Math.round(midY) }
+}
+
 export function moveRouter(t: Topology, id: NodeId, pos: Pos): Topology {
   return { ...t, nodes: t.nodes.map((n) => (n.id === id ? { ...n, pos: roundPos(pos) } : n)) }
 }

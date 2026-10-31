@@ -1,6 +1,7 @@
 // Small text helpers for the results table and detail panel. No routing maths:
 // they only read what the engine returned.
 import type { ProtectionPaths } from '../engine/paths'
+import type { FailureSimulation, Flow } from '../engine/simulate'
 import type { NodeId, Protection, Segment } from '../engine/types'
 import type { BackupKind } from '../state/store'
 
@@ -68,3 +69,8 @@ export const fileName = (name: string) =>
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '') || 'topology'
   }.yaml`
+
+/** The flow drawn on the canvas: the chosen one, else the first affected one. */
+export function drawnFlow(sim: FailureSimulation, dest: NodeId | null): Flow | undefined {
+  return sim.flows.find((f) => f.dest === dest && f.affected) ?? sim.flows.find((f) => f.affected)
+}

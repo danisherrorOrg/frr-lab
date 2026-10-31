@@ -67,13 +67,44 @@ describe('store', () => {
 
   it('deleting the source router picks another source and drops stale state', () => {
     s().selectRow({ dest: 'E', via: 'E' })
-    s().toggleFailed('S-E')
+    s().failLink('S-E')
     s().select({ kind: 'node', id: 'S' })
     s().deleteSelection()
     expect(s().source).toBe('E') // first router in the file
     expect(s().row).toBeNull()
-    expect(s().failedLinks).toEqual([])
+    expect(s().failedLink).toBeNull()
     expect(s().selection).toBeNull()
+  })
+
+  it('fails one link at a time; failing it again restores it', () => {
+    s().failLink('S-E')
+    s().setConverged(true)
+    s().setSimDest('E')
+    expect(s()).toMatchObject({ failedLink: 'S-E', converged: true, simDest: 'E' })
+    // Another link moves the failure and starts again from the repair view.
+    s().failLink('A-S')
+    expect(s()).toMatchObject({ failedLink: 'A-S', converged: false, simDest: null })
+    s().failLink('A-S')
+    expect(s().failedLink).toBeNull()
+  })
+
+  it('changing the repair mode goes back to the repair view', () => {
+    s().failLink('S-E')
+    s().setConverged(true)
+    s().setSimMode('lfa')
+    expect(s()).toMatchObject({ simMode: 'lfa', converged: false })
+  })
+
+  it('loading a topology clears the failure', () => {
+    s().failLink('S-E')
+    s().loadExample('square')
+    expect(s().failedLink).toBeNull()
+  })
+
+  it('adds a link between two routers from the keyboard form', () => {
+    expect(s().addLinkBetween('S', 'B')).toBeNull()
+    expect(s().selection).toEqual({ kind: 'link', id: 'S-B' })
+    expect(s().addLinkBetween('S', 'B')).toBe('S and B are already linked.')
   })
 
   it('renaming the source router keeps it as the source', () => {

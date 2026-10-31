@@ -5,6 +5,7 @@ import {
   addRouter,
   deleteLink,
   deleteRouter,
+  freePosition,
   moveRouter,
   nextRouterId,
   nextSidIndex,
@@ -23,6 +24,12 @@ const ok = (r: ReturnType<typeof addLink>): Topology => {
 }
 
 describe('adding and removing routers', () => {
+  it('freePosition puts a keyboard-added router right of the others', () => {
+    // Square: x 0..250, y 0,0,250,250 → middle height 125.
+    expect(freePosition(square())).toEqual({ x: 370, y: 125 })
+    expect(freePosition({ ...square(), nodes: [] })).toEqual({ x: 0, y: 0 })
+  })
+
   it('picks the first free R<n> id and SID index', () => {
     const t: Topology = {
       ...square(),

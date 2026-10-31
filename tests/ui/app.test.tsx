@@ -3,6 +3,8 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/App'
+import { shareHash } from '../../src/io/share-url'
+import { EXAMPLES, exampleTopology } from '../../src/state/examples'
 import { initialState, useStore } from '../../src/state/store'
 
 // jsdom has no <canvas>, so Cytoscape can't draw here; tests/ui/canvas.test.ts
@@ -10,7 +12,10 @@ import { initialState, useStore } from '../../src/state/store'
 vi.mock('../../src/ui/GraphCanvas', () => ({ GraphCanvas: () => null }))
 
 beforeEach(() => useStore.setState(initialState, true))
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  window.history.replaceState(null, '', '/')
+})
 
 /** The results row for one destination (first next hop). */
 async function rowFor(dest: string) {
@@ -112,5 +117,98 @@ describe('App smoke test', () => {
     await user.upload(input, good)
     expect(await screen.findByRole('table', { name: 'Results for X' })).toBeTruthy()
     expect((await rowFor('Y')).textContent).toContain('✗ none')
+  })
+})
+
+describe('Phase 7: failure simulation, coverage, sharing, keyboard', () => {
+  it('fails S–E on the ring: TI-LFA repair, then the converged path', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    // Keyboard path of the fail-link tool: F, then pick the link.
+    await user.keyboard('f')
+    expect(useStore.getState().tool).toBe('fail-link')
+    await user.selectOptions(screen.getByLabelText('Failed link'), 'S-E')
+
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    expect(panel.textContent).toContain('Link S–E failed')
+    await within(panel).findByText(/2 of 4 destinations cross S–E/)
+    expect(panel.textContent).toContain('S switches at once')
+    expect(panel.textContent).toContain('S→A→B→C→E')
+
+    await user.click(within(panel).getByRole('button', { name: /Converge/ }))
+    expect(panel.textContent).toContain('After the network reconverges')
+    expect(panel.textContent).toContain('nothing moves again')
+
+    // LFA only: E has no LFA, so its traffic is dropped.
+    await user.click(within(panel).getByLabelText('LFA only'))
+    await within(panel).findByText(/1 repaired, 1 dropped/)
+
+    await user.click(within(panel).getByRole('button', { name: 'Restore link' }))
+    expect(screen.queryByRole('region', { name: 'Failure simulation' })).toBeNull()
+  })
+
+  it('C toggles the converged view while a link is failed', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    useStore.getState().failLink('S-E')
+    await screen.findByRole('region', { name: 'Failure simulation' })
+    await user.keyboard('c')
+    expect(useStore.getState().converged).toBe(true)
+    await user.keyboard('c')
+    expect(useStore.getState().converged).toBe(false)
+  })
+
+  it('coverage report: one source, then all sources (ring: LFA 10 of 20)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Coverage report' }))
+    const report = screen.getByRole('region', { name: 'Coverage report' })
+    await within(report).findByRole('img', { name: 'TI-LFA: 100%' })
+    await user.click(within(report).getByLabelText(/All sources/))
+    // D19: 02-ring5 all sources = 20 pairs, LFA 10, RLFA 20, TI-LFA 20.
+    expect(await within(report).findByText('10/20 · 50%')).toBeTruthy()
+    expect(within(report).getAllByText('20/20 · 100%')).toHaveLength(2)
+    expect(within(report).getByRole('button', { name: /Unprotected list/ })).toBeTruthy()
+  })
+
+  it('opens a topology from a share link, with its source and no undo history', async () => {
+    const square = exampleTopology(EXAMPLES.find((e) => e.key === 'square')!)
+    window.history.replaceState(null, '', `/${shareHash(square, 'N')}`)
+    render(<App />)
+    expect(await screen.findByRole('table', { name: 'Results for N' })).toBeTruthy()
+    expect(useStore.getState().topology.name).toBe(square.name)
+    expect(useStore.getState().past).toEqual([])
+  })
+
+  it('a broken share link shows a clear error', async () => {
+    window.history.replaceState(null, '', '/#t=garbage!!')
+    render(<App />)
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'The shared link is damaged or incomplete.',
+    )
+  })
+
+  it('adds a router and a link without the mouse', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.keyboard('r')
+    await user.click(screen.getByRole('button', { name: /Add a router now/ }))
+    expect(useStore.getState().topology.nodes.map((n) => n.id)).toContain('R1')
+    await user.keyboard('{Escape}l')
+    await user.selectOptions(screen.getByLabelText('From'), 'R1')
+    await user.selectOptions(screen.getByLabelText('To'), 'S')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(useStore.getState().topology.links.some((l) => l.id === 'R1-S')).toBe(true)
+  })
+
+  it('arrow keys move between results rows', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    const a = await rowFor('A')
+    a.focus()
+    await user.keyboard('{ArrowDown}')
+    expect(document.activeElement?.querySelector('td')?.textContent).toBe('B')
+    await user.keyboard('{Enter}')
+    expect(useStore.getState().row?.dest).toBe('B')
   })
 })

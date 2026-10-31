@@ -17,6 +17,23 @@ export function Legend() {
       <li className="flex items-center gap-1">{line('', '#2563eb')} primary path</li>
       <li className="flex items-center gap-1">{line('6 4', '#ea580c')} backup path</li>
       <li className="flex items-center gap-1">{line('2 3', '#dc2626')} ✕ failed link</li>
+      <li className="flex items-center gap-1">
+        <svg width="28" height="14" aria-hidden="true" className="inline-block">
+          <line
+            x1="0"
+            y1="7"
+            x2="28"
+            y2="7"
+            stroke="#16a34a"
+            strokeOpacity="0.3"
+            strokeWidth="14"
+          />
+          <line x1="0" y1="7" x2="28" y2="7" stroke="#16a34a" strokeWidth="4" />
+          <polyline points="11,3 16,7 11,11" fill="none" stroke="#fff" strokeWidth="2" />
+        </svg>
+        path after convergence
+      </li>
+      <li>Moving dashes = traffic on the repair path.</li>
       <li className="flex items-center gap-1">{swatch('#bfdbfe')} P-space</li>
       <li className="flex items-center gap-1">{swatch('#bbf7d0')} Q-space</li>
       <li className="flex items-center gap-1">★ chosen PQ node</li>

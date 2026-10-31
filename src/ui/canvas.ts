@@ -13,7 +13,13 @@ export interface Highlight {
   qSpace?: NodeId[]
   /** The chosen PQ node, drawn with ★. */
   pq?: NodeId
+  /** Path after the network reconverges (failure simulation, F5): green line with a halo. */
+  final?: NodeId[]
+  /** Animate traffic along the backup path (marching dashes). */
+  flowing?: boolean
 }
+
+export const COLORS = { primary: '#2563eb', backup: '#ea580c', final: '#16a34a' }
 
 // Colours are mid-tones so they read on light and dark backgrounds. Line style
 // and arrows carry the meaning too, not only colour (docs/01-requirements.md §6).
@@ -89,13 +95,26 @@ export const STYLE: cytoscape.StylesheetJson = [
     },
   },
   {
-    selector: 'edge.primary-fwd, edge.backup-fwd',
+    // Edges can't be drawn double, so the final path gets a halo and chevrons instead.
+    selector: 'edge.final',
+    style: {
+      'line-color': '#16a34a',
+      width: 5,
+      'underlay-color': '#16a34a',
+      'underlay-opacity': 0.3,
+      'underlay-padding': 6,
+    },
+  },
+  {
+    selector: 'edge.primary-fwd, edge.backup-fwd, edge.final-fwd',
     style: { 'mid-target-arrow-shape': 'triangle', 'mid-target-arrow-color': 'data(arrow)' },
   },
   {
-    selector: 'edge.primary-rev, edge.backup-rev',
+    selector: 'edge.primary-rev, edge.backup-rev, edge.final-rev',
     style: { 'mid-source-arrow-shape': 'triangle', 'mid-source-arrow-color': 'data(arrow)' },
   },
+  { selector: 'edge.final-fwd', style: { 'mid-target-arrow-shape': 'chevron' } },
+  { selector: 'edge.final-rev', style: { 'mid-source-arrow-shape': 'chevron' } },
   {
     selector: 'edge.failed',
     style: { 'line-color': '#dc2626', 'line-style': 'dotted', width: 4 },
@@ -147,7 +166,7 @@ export function sync(cy: cytoscape.Core, t: Topology) {
 }
 
 const CLASSES =
-  'p-space q-space pq source dest sel link-start primary backup primary-fwd primary-rev backup-fwd backup-rev failed'
+  'p-space q-space pq source dest sel link-start primary backup final primary-fwd primary-rev backup-fwd backup-rev final-fwd final-rev flowing failed'
 
 export function decorate(
   cy: cytoscape.Core,
@@ -177,7 +196,8 @@ export function decorate(
     if (extra.linkStart) cy.getElementById(extra.linkStart).addClass('link-start')
     if (extra.selection) cy.getElementById(extra.selection).addClass('sel')
 
-    const drawPath = (path: NodeId[] | undefined, kind: 'primary' | 'backup', color: string) => {
+    const drawPath = (path: NodeId[] | undefined, kind: keyof typeof COLORS) => {
+      const color = COLORS[kind]
       if (!path) return
       for (let i = 0; i + 1 < path.length; i++) {
         const [x, y] = [path[i]!, path[i + 1]!]
@@ -188,7 +208,22 @@ export function decorate(
         e.data('arrow', color)
       }
     }
-    drawPath(h.primary, 'primary', '#2563eb')
-    drawPath(h.backup, 'backup', '#ea580c')
+    drawPath(h.primary, 'primary')
+    drawPath(h.backup, 'backup')
+    drawPath(h.final, 'final')
+    if (h.flowing) cy.edges('.backup').addClass('flowing')
+  })
+}
+
+/**
+ * One animation frame of traffic on the backup path: shift the dashes along the
+ * direction of travel. Called on a timer by the canvas component.
+ */
+export function stepFlow(cy: cytoscape.Core, offset: number) {
+  cy.batch(() => {
+    cy.edges('.flowing').forEach((e) => {
+      // Dashes move toward the target as the offset falls.
+      e.style('line-dash-offset', e.hasClass('backup-fwd') ? -offset : offset)
+    })
   })
 }

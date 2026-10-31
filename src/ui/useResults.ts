@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { DestinationResult, NodeId, Topology } from '../engine/types'
-import { createEngineClient, type EngineClient } from '../worker/client'
-
-// One engine worker for the whole page.
-let client: EngineClient | undefined
-const engine = () => (client ??= createEngineClient())
+import { engine } from './engine'
 
 interface Answer {
   topology: Topology
