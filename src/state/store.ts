@@ -71,6 +71,10 @@ export interface AppState {
   setSource: (id: NodeId) => void
   select: (s: Selection) => void
   selectRow: (row: RowKey | null) => void
+  /** Pick a row; picking the open row again closes it. */
+  toggleRow: (row: RowKey) => void
+  /** A click on empty canvas: add a router, or clear the selection and close the open row. */
+  tapBackground: (pos: edit.Pos) => void
   setBackup: (b: BackupKind) => void
   setTool: (t: Tool) => void
   /** Fail this link (restoring any other); the failed link again, or null, restores it. */
@@ -261,6 +265,17 @@ export const useStore = create<AppState>()((set, get) => {
     setSource: (id) => set({ source: id, row: null, backup: 'auto' }),
     select: (selection) => set({ selection }),
     selectRow: (row) => set({ row, backup: 'auto' }),
+    toggleRow: (row) => {
+      const open = get().row
+      get().selectRow(open?.dest === row.dest && open.via === row.via ? null : row)
+    },
+    tapBackground: (pos) => {
+      const s = get()
+      if (s.tool === 'add-router') s.addRouter(pos)
+      else set({ selection: null, row: null, backup: 'auto' })
+      // An unfinished add-link click is dropped too.
+      if (s.linkStart !== null) s.setTool(s.tool)
+    },
     setBackup: (backup) => set({ backup }),
     setTool: (tool) => set({ tool, linkStart: null }),
     failLink: (id) =>

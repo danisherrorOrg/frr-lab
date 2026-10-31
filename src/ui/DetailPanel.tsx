@@ -12,6 +12,7 @@ interface Props {
   /** The kind actually drawn (after 'auto' is resolved). */
   drawn: Exclude<BackupKind, 'auto'> | null
   onBackup: (b: BackupKind) => void
+  onClose: () => void
 }
 
 const h3 = 'mt-3 mb-1 text-sm font-semibold'
@@ -26,15 +27,35 @@ export function DetailPanel({
   backup,
   drawn,
   onBackup,
+  onClose,
 }: Props) {
   const e = p.protectedLink.to
   const kinds = ['lfa', 'rlfa', 'tilfa'] as const
 
   return (
-    <section aria-label="Details" className="text-sm">
-      <h2 className="text-base font-semibold">
-        {source} → {result.dest}, protecting link {source}–{e}
-      </h2>
+    <section
+      aria-label="Details"
+      className="text-sm"
+      // The window shortcut skips key presses in form fields, so the panel's own radios
+      // need this for Escape to close it from inside (keyboard rule, Phase 7).
+      onKeyDown={(ev) => {
+        if (ev.key === 'Escape') onClose()
+      }}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h2 className="text-base font-semibold">
+          {source} → {result.dest}, protecting link {source}–{e}
+        </h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close details"
+          title="Close (Esc)"
+          className="-mt-1 rounded px-2 py-0.5 text-lg leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus:outline-2 focus:outline-indigo-500 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+        >
+          ✕
+        </button>
+      </div>
       <p className="text-slate-600 dark:text-slate-300">
         Primary path <Path ids={paths.primary} /> (cost {result.cost}).
       </p>

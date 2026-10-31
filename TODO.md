@@ -191,10 +191,10 @@ Feedback from a user who knows LFA / RLFA / TI-LFA. Do these first: they fix fri
 the current UI before the bigger features below.
 
 ### 9.1 Close the detail panel (small)
-- [ ] ✕ button on `DetailPanel.tsx` that calls `selectRow(null)` and clears the path highlight
-- [ ] `Escape` closes it too (keyboard rule from Phase 7)
-- [ ] Clicking the same row again toggles it closed; clicking empty canvas also closes it
-- [ ] UI test: open a row, press ✕, panel and highlight are gone
+- [x] ✕ button on `DetailPanel.tsx` that calls `selectRow(null)` and clears the path highlight
+- [x] `Escape` closes it too (keyboard rule from Phase 7)
+- [x] Clicking the same row again toggles it closed; clicking empty canvas also closes it
+- [x] UI test: open a row, press ✕, panel and highlight are gone
 
 **Done when:** you can always get back to the plain diagram in one click or one key.
 

@@ -6,10 +6,18 @@ import { App } from '../../src/App'
 import { shareHash } from '../../src/io/share-url'
 import { EXAMPLES, exampleTopology } from '../../src/state/examples'
 import { initialState, useStore } from '../../src/state/store'
+import type { Highlight } from '../../src/ui/canvas'
 
 // jsdom has no <canvas>, so Cytoscape can't draw here; tests/ui/canvas.test.ts
 // checks the drawing logic with headless Cytoscape instead.
-vi.mock('../../src/ui/GraphCanvas', () => ({ GraphCanvas: () => null }))
+// The mock keeps the last highlight it was given, so tests can check what would be drawn.
+const canvas = vi.hoisted(() => ({ highlight: null as Highlight | null }))
+vi.mock('../../src/ui/GraphCanvas', () => ({
+  GraphCanvas: ({ highlight }: { highlight: Highlight }) => {
+    canvas.highlight = highlight
+    return null
+  },
+}))
 
 beforeEach(() => useStore.setState(initialState, true))
 afterEach(() => {
@@ -210,5 +218,45 @@ describe('Phase 7: failure simulation, coverage, sharing, keyboard', () => {
     expect(document.activeElement?.querySelector('td')?.textContent).toBe('B')
     await user.keyboard('{Enter}')
     expect(useStore.getState().row?.dest).toBe('B')
+  })
+})
+
+describe('Phase 9.1: close the detail panel', () => {
+  const details = () => screen.queryByRole('region', { name: 'Details' })
+
+  it('✕ closes the panel and clears the path highlight', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await rowFor('E'))
+    expect(details()).toBeTruthy()
+    expect(canvas.highlight?.primary).toEqual(['S', 'E'])
+
+    await user.click(screen.getByRole('button', { name: 'Close details' }))
+    expect(details()).toBeNull()
+    expect(useStore.getState().row).toBeNull()
+    expect(canvas.highlight).toEqual({ source: 'S' })
+  })
+
+  it('Escape closes it, even from a control inside the panel', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await rowFor('E'))
+    await user.keyboard('{Escape}')
+    expect(details()).toBeNull()
+
+    await user.click(await rowFor('E'))
+    await user.click(screen.getByLabelText('Auto'))
+    await user.keyboard('{Escape}')
+    expect(details()).toBeNull()
+  })
+
+  it('clicking the same row again closes it', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await rowFor('E'))
+    expect(details()).toBeTruthy()
+    await user.click(await rowFor('E'))
+    expect(details()).toBeNull()
+    expect(canvas.highlight).toEqual({ source: 'S' })
   })
 })

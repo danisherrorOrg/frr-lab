@@ -30,9 +30,7 @@ export function GraphCanvas({ highlight }: { highlight: Highlight }) {
       const st = useStore.getState()
       const target = ev.target as cytoscape.Core | cytoscape.SingularElementReturnValue
       if (target === cy) {
-        if (st.tool === 'add-router') st.addRouter(ev.position)
-        else st.select(null)
-        if (st.linkStart !== null) st.setTool(st.tool)
+        st.tapBackground(ev.position)
         return
       }
       const el = target as cytoscape.SingularElementReturnValue

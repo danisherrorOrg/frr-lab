@@ -47,6 +47,7 @@ function useShortcuts() {
         s.deleteSelection()
       } else if (e.key === 'Escape') {
         s.select(null)
+        s.selectRow(null)
         s.setTool('select')
       } else if (TOOL_KEYS[key]) {
         s.setTool(TOOL_KEYS[key])
@@ -89,6 +90,7 @@ export function App() {
   const row = useStore((s) => s.row)
   const backup = useStore((s) => s.backup)
   const selectRow = useStore((s) => s.selectRow)
+  const toggleRow = useStore((s) => s.toggleRow)
   const setBackup = useStore((s) => s.setBackup)
   const failedLink = useStore((s) => s.failedLink)
   const simMode = useStore((s) => s.simMode)
@@ -158,7 +160,7 @@ export function App() {
               error={error}
               row={row}
               onSelect={(r) => {
-                selectRow(r)
+                toggleRow(r)
                 if (failedLink !== null) setSimDest(r.dest)
               }}
             />
@@ -172,6 +174,7 @@ export function App() {
                   backup={backup}
                   drawn={selected.drawn?.kind ?? null}
                   onBackup={setBackup}
+                  onClose={() => selectRow(null)}
                 />
               ) : (
                 <p className="text-sm text-slate-500">

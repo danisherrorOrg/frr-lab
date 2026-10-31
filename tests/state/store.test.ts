@@ -126,4 +126,28 @@ describe('store', () => {
     for (let i = 0; i < 120; i++) s().moveRouter('S', { x: i + 1, y: 0 })
     expect(s().past).toHaveLength(100)
   })
+
+  // Phase 9.1: the detail panel can always be closed.
+  it('clicking the selected row again closes it', () => {
+    s().toggleRow({ dest: 'E', via: 'E' })
+    expect(s().row).toEqual({ dest: 'E', via: 'E' })
+    s().toggleRow({ dest: 'D', via: 'E' })
+    expect(s().row).toEqual({ dest: 'D', via: 'E' })
+    s().toggleRow({ dest: 'D', via: 'E' })
+    expect(s().row).toBeNull()
+  })
+
+  it('clicking empty canvas closes the row, except with the add-router tool', () => {
+    s().selectRow({ dest: 'E', via: 'E' })
+    s().select({ kind: 'node', id: 'A' })
+    s().tapBackground({ x: 0, y: 0 })
+    expect(s().row).toBeNull()
+    expect(s().selection).toBeNull()
+
+    s().selectRow({ dest: 'E', via: 'E' })
+    s().setTool('add-router')
+    s().tapBackground({ x: 5, y: 5 })
+    expect(s().row).toEqual({ dest: 'E', via: 'E' })
+    expect(s().topology.nodes.map((n) => n.id)).toContain('R1')
+  })
 })
