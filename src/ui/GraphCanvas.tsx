@@ -49,6 +49,7 @@ export function GraphCanvas({
   const linkStart = useStore((s) => s.linkStart)
   const failedLinks = useStore((s) => s.failedLinks)
   const tool = useStore((s) => s.tool)
+  const notice = useStore((s) => s.notice)
 
   useEffect(() => {
     onTap.current = onRouterTap
@@ -143,6 +144,17 @@ export function GraphCanvas({
     cyRef.current?.fit(undefined, 40)
   }, [loadCount])
 
+  // Cytoscape remembers where its box is on the page and only looks again when the box
+  // changes size. A notice opening or closing above the diagram moves the box without
+  // resizing it, so clicks would land on the wrong spot (a restored router couldn't be
+  // failed again until its "back up" notice was closed). resize() makes it look again;
+  // it is cheap when the size is the same.
+  useEffect(() => {
+    cyRef.current?.resize()
+  }, [notice])
+  /** Before every click, in case something else moved the box. */
+  const remeasure = () => cyRef.current?.resize()
+
   useEffect(() => {
     const cy = cyRef.current
     if (!cy) return
@@ -194,7 +206,11 @@ export function GraphCanvas({
 
   const cursor = tool === 'select' ? 'cursor-default' : 'cursor-crosshair'
   return (
-    <div className="relative h-full w-full" onContextMenu={(e) => e.preventDefault()}>
+    <div
+      className="relative h-full w-full"
+      onContextMenu={(e) => e.preventDefault()}
+      onPointerDownCapture={remeasure}
+    >
       <div
         ref={box}
         className={`h-full w-full ${cursor}`}
