@@ -316,3 +316,12 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Other options considered:** keep the stack-before-PHP view only (§4.3) — it hides exactly the step students ask about; animate the packet on the canvas — more code for little gain over a highlighted step.
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D35 – Packet walk of the primary path and of the simulated traffic (2026-10-31)
+- **Why:** TODO backlog follow-ups to D34. Students asked to compare the repair with the normal path, and to see the labels of the real repair when several things are down, including a second router's repair, drops and loops.
+- **Primary path:** `primaryWalk()` walks S→E, then E's shortest path to D (the blue path), forwarding on D's Prefix-SID with PHP before D (`docs/02-algorithms.md` §4.5). The detail panel has a "Primary path / TI-LFA backup" choice; switching while walking starts again at S. A row with no TI-LFA path walks only the primary.
+- **Simulated traffic:** `simulateFailure()` now records the label stack on every hop (`Flow.repairLabels`) and where each repair happened (`RepairStep.atIndex`). Each step the packet carries has its label: Prefix-SID for every "forward to" step, Adj-SID for a TI-LFA Adj-SID; a backup's own out-interface has none. Remote LFA's tunnel label is the PQ node's Prefix-SID: LFA Lab is SR-MPLS, so no targeted LDP. `flowWalk()` turns a flow into the same hop view, adding PHP on the hop actually sent and the repair, drop and loop steps (§8.3). Nothing the simulation decides changed: only labels are recorded, and the walk throws if a router couldn't send them, so the property test checks them.
+- **UI:** a collapsed "Packet walk to D" part in the failure panel, for the drawn flow, in the repair step only (the converged view has no FRR to walk). It shares the PHP and "Show labels on the diagram" switches with the row walk. While anything is down, the detail panel points there instead of offering the row walk, since the diagram shows the simulated traffic. A link walked twice in a loop shows its latest stack up to the current step.
+- **Other options considered:** derive labels in the UI from the flow's path — it can't tell a Remote LFA tunnel or a TI-LFA repair list from normal forwarding; a second label simulator — two models that could disagree.
+- **No new dependencies.**
+- **Status:** Accepted.

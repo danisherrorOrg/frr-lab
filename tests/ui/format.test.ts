@@ -1,12 +1,14 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { computeForSource } from '../../src/engine/index'
+import { flowWalk } from '../../src/engine/packet-walk'
 import { protectionPaths } from '../../src/engine/paths'
 import { adjLabel } from '../../src/engine/labels'
 import { simulateAllSources, simulateFailure, type FailureSummary } from '../../src/engine/simulate'
 import {
   bundles,
   dutSummary,
+  walkMarks,
   isBundled,
   lfaTags,
   outcomeText,
@@ -369,5 +371,26 @@ describe('per-DUT failure text (Phase 9.6)', () => {
         false,
       ),
     ).toBe('2 affected, 2 repaired')
+  })
+})
+
+describe('walkMarks', () => {
+  // Example 3, S–E and C–B down: S→A→B, B repairs its failed Adj-SID and sends back to A.
+  const t = loadFixture('03-ring5-highmetric.yaml')
+  const f = simulateFailure(t, 'S', ['S-E', 'C-B'], 'tilfa').flows.find((x) => x.dest === 'E')!
+  const w = flowWalk(t, f)!
+
+  it('a link walked twice shows the stack of the latest visit up to the step', () => {
+    expect(w.hops.map((h) => h.link)).toEqual(['A-S', 'B-A', 'B-A', undefined])
+    const onBA = (step: number) =>
+      walkMarks(w, step, true).packetStacks!.find((x) => x.link === 'B-A')
+    expect(onBA(1)).toEqual({ link: 'B-A', lines: ['24005 B→C', '16002 E'], current: true })
+    expect(onBA(2)).toEqual({ link: 'B-A', lines: ['16005 C', '16002 E'], current: true })
+    expect(onBA(0)?.current).toBe(false)
+  })
+
+  it('nothing before the walk starts; no stacks when they are hidden', () => {
+    expect(walkMarks(w, null, true)).toEqual({})
+    expect(walkMarks(w, 3, false)).toEqual({ packetAt: 'A' })
   })
 })

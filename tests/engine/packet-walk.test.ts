@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { packetWalk, type PacketWalk } from '../../src/engine/packet-walk'
+import { flowWalk, packetWalk, primaryWalk, type PacketWalk } from '../../src/engine/packet-walk'
+import { simulateFailure, type Failures, type RepairMode } from '../../src/engine/simulate'
 import type { Segment, Topology } from '../../src/engine/types'
 import { loadFixture } from '../helpers'
 
@@ -131,5 +132,131 @@ describe('packetWalk: worked examples', () => {
     const t = loadFixture('01-square.yaml')
     const line = { ...t, links: t.links.filter((l) => l.a !== 'S' || l.b !== 'N') }
     expect(packetWalk(line, 'S', 'E', 'E')).toBeUndefined()
+  })
+})
+
+// docs/02-algorithms.md §4.5: the normal path, for comparison with the repair.
+describe('primaryWalk', () => {
+  const ring = loadFixture('02-ring5.yaml')
+
+  it('Example 2, S→C through E: every router forwards on C’s label; E pops it (PHP)', () => {
+    const w = primaryWalk(ring, 'S', 'C', 'E')
+    expect(w?.kind).toBe('primary')
+    expect(brief(w)).toEqual([
+      { router: 'S', in: [16005], do: ['forward'], out: [16005], to: 'E' },
+      { router: 'E', in: [16005], do: ['forward', 'php'], out: [], to: 'C' },
+      { router: 'C', in: [], do: ['deliver'], out: undefined, to: undefined },
+    ])
+    expect(w?.cost).toBe(2)
+    // S forwards to E because c(S,E) + dist(E,C) = 1 + 1 = 2 = dist(S,C).
+    expect(w?.hops[0]!.actions[0]).toMatchObject({ metric: 1, distNextY: 1, distRY: 2 })
+  })
+
+  it('PHP off: C gets its own label and pops it', () => {
+    const w = primaryWalk(ring, 'S', 'C', 'E', { php: false })
+    expect(brief(w)?.at(-1)).toEqual({
+      router: 'C',
+      in: [16005],
+      do: ['pop-end', 'deliver'],
+      out: undefined,
+      to: undefined,
+    })
+  })
+
+  it('Example 7: follows the row’s link of a bundle', () => {
+    const t = loadFixture('07-parallel.yaml')
+    const w = primaryWalk(t, 'S', 'E', 'E', { link: 'S-E' })
+    expect(w?.hops[0]).toMatchObject({ link: 'S-E', to: 'E' })
+  })
+})
+
+// docs/02-algorithms.md §8.3: the labels of the simulated traffic.
+describe('flowWalk', () => {
+  const ring = loadFixture('02-ring5.yaml')
+  const high = loadFixture('03-ring5-highmetric.yaml')
+  const walkOf = (
+    t: Topology,
+    failed: Failures,
+    mode: RepairMode,
+    d: string,
+    php = true,
+  ): PacketWalk | undefined => {
+    const f = simulateFailure(t, 'S', failed, mode).flows.find((x) => x.dest === d)!
+    return flowWalk(t, f, { php })
+  }
+
+  it('one failed link, TI-LFA: the same labels as the packet walk of the repair', () => {
+    const w = walkOf(high, { links: ['S-E'] }, 'tilfa', 'E')
+    expect(w).toMatchObject({ kind: 'flow', status: 'repaired', cost: 13 })
+    expect(brief(w)).toEqual(
+      brief(packetWalk(high, 'S', 'E', 'E'))!.map((h, i) =>
+        i === 0 ? { ...h, do: ['repair'] } : h,
+      ),
+    )
+    expect(w?.hops[0]!.actions[0]).toMatchObject({
+      kind: 'repair',
+      step: { at: 'S', method: 'tilfa' },
+      before: [{ label: 16002 }],
+      after: [{ label: 16004 }, { label: 24005 }, { label: 16002 }],
+    })
+  })
+
+  it('a second router repairs: E’s TI-LFA sends the packet back through S', () => {
+    const w = walkOf(ring, { links: ['E-C'] }, 'tilfa', 'C')
+    expect(brief(w)).toEqual([
+      { router: 'S', in: [16005], do: ['forward'], out: [16005], to: 'E' },
+      { router: 'E', in: [16005], do: ['repair'], out: [16003, 16005], to: 'S' },
+      { router: 'S', in: [16003, 16005], do: ['forward', 'php'], out: [16005], to: 'A' },
+      { router: 'A', in: [16005], do: ['forward'], out: [16005], to: 'B' },
+      { router: 'B', in: [16005], do: ['forward', 'php'], out: [], to: 'C' },
+      { router: 'C', in: [], do: ['deliver'], out: undefined, to: undefined },
+    ])
+  })
+
+  it('two repairs send the packet round in a loop with the same labels', () => {
+    const w = walkOf(ring, { links: ['S-E', 'E-C'] }, 'tilfa', 'E')
+    expect(w?.status).toBe('unreachable')
+    expect(w?.hops.map((h) => h.router)).toEqual(['S', 'A', 'B', 'C', 'B', 'A', 'S'])
+    expect(w?.hops[3]!.actions).toMatchObject([{ kind: 'repair', step: { at: 'C' } }])
+    expect(w?.hops.at(-1)!.actions).toEqual([{ kind: 'loop', exact: true }])
+  })
+
+  it('a failed Adj-SID is repaired towards its far end; labels pile up in a loop', () => {
+    const w = walkOf(high, { links: ['S-E', 'C-B'] }, 'tilfa', 'E')
+    // B's Adj-SID 24005 (B→C) is down: B swaps it for C's Prefix-SID and sends back to A.
+    expect(brief(w)?.[2]).toEqual({
+      router: 'B',
+      in: [24005, 16002],
+      do: ['repair'],
+      out: [16005, 16002],
+      to: 'A',
+    })
+    expect(w?.hops.at(-1)).toMatchObject({ router: 'A', actions: [{ kind: 'loop', exact: false }] })
+  })
+
+  it('Remote LFA pushes the PQ node’s label; LFA only with no backup drops at S', () => {
+    expect(brief(walkOf(ring, { links: ['S-E'] }, 'rlfa', 'E'))?.[0]).toEqual({
+      router: 'S',
+      in: [16002],
+      do: ['repair'],
+      out: [16004, 16002],
+      to: 'A',
+    })
+    const lfa = walkOf(ring, { links: ['S-E'] }, 'lfa', 'E')
+    expect(lfa?.status).toBe('dropped')
+    expect(brief(lfa)).toEqual([
+      { router: 'S', in: [16002], do: ['drop'], out: undefined, to: undefined },
+    ])
+  })
+
+  it('a failed router: S repairs around it; a flow to the failed router itself has no walk', () => {
+    const w = walkOf(ring, { nodes: ['E'] }, 'tilfa', 'C')
+    expect(w?.hops.map((h) => h.router)).toEqual(['S', 'A', 'B', 'C'])
+    expect(walkOf(ring, { nodes: ['E'] }, 'tilfa', 'E')).toBeUndefined()
+  })
+
+  it('PHP off: D pops its own label', () => {
+    const w = walkOf(ring, { links: ['S-E'] }, 'tilfa', 'C', false)
+    expect(w?.hops.at(-1)!.actions.map((a) => a.kind)).toEqual(['pop-end', 'deliver'])
   })
 })

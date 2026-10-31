@@ -131,6 +131,76 @@ describe('App smoke test', () => {
     expect(canvas.highlight?.packetAt).toBeUndefined()
   })
 
+  it('packet walk of the primary path: C’s label hop by hop, PHP at E', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'ring5')
+    await user.click(await rowFor('C'))
+    const walk = screen.getByRole('group', { name: 'Packet walk' })
+
+    await user.click(within(walk).getByLabelText('Primary path (no failure)'))
+    await user.click(within(walk).getByRole('button', { name: /Start packet walk/ }))
+    expect(walk.textContent).toContain('Router 1 of 3: S')
+    expect(walk.textContent).toContain('c(S,E) + dist(E,C) = 1 + 1 = 2 = dist(S,C)')
+    expect(walk.textContent).toContain('Total 2, the normal cost')
+    expect(canvas.highlight).toMatchObject({ primary: ['S', 'E', 'C'], packetAt: 'S' })
+    expect(canvas.highlight?.packetStacks).toEqual([
+      { link: 'S-E', lines: ['16005 C'], current: true },
+      { link: 'E-C', lines: ['no labels'], current: false },
+    ])
+    await user.click(within(walk).getByRole('button', { name: 'Next router' }))
+    expect(walk.textContent).toContain('PHP: C is the end of the segment Prefix-SID(C)')
+
+    // Back to the backup: the walk starts again at S, now on the TI-LFA path.
+    await user.click(within(walk).getByLabelText('TI-LFA backup'))
+    expect(walk.textContent).toContain('Router 1 of 4: S')
+    expect(canvas.highlight).toMatchObject({ backup: ['S', 'A', 'B', 'C'], packetLink: 'A-S' })
+  })
+
+  it('packet walk of the simulated traffic: two repairs, then a loop (ring, S–E and E–C)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'ring5')
+    await user.click(await rowFor('E'))
+    act(() => {
+      useStore.getState().toggleFailedLink('S-E')
+      useStore.getState().toggleFailedLink('E-C')
+      useStore.getState().setSimDest('E')
+    })
+    // The row's own walk would not match the diagram now.
+    expect(screen.getByRole('region', { name: 'Details' }).textContent).toContain(
+      'Its packet walk is in the failure panel.',
+    )
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    await user.click(await within(panel).findByText('Packet walk to E: the labels on each hop'))
+    const walk = within(panel).getByRole('group', { name: 'Packet walk' })
+    await user.click(within(walk).getByRole('button', { name: /Start packet walk/ }))
+    expect(walk.textContent).toContain(
+      'Link S–E is down, so S switches to its TI-LFA backup for E. It pushes 16004 (Prefix-SID(B)) on top',
+    )
+    expect(canvas.highlight).toMatchObject({ packetAt: 'S', packetLink: 'A-S' })
+
+    for (let i = 0; i < 3; i++)
+      await user.click(within(walk).getByRole('button', { name: 'Next router' }))
+    expect(walk.textContent).toContain('Router 4 of 7: C')
+    expect(walk.textContent).toContain('Link C–E is down, so C switches to its TI-LFA backup')
+    // The diagram shows C's new stack on the link it sends on.
+    expect(canvas.highlight?.packetStacks).toContainEqual({
+      link: 'C-B',
+      lines: ['16003 A', '16002 E'],
+      current: true,
+    })
+
+    for (let i = 0; i < 3; i++)
+      await user.click(within(walk).getByRole('button', { name: 'Next router' }))
+    expect(walk.textContent).toContain('S already had this packet with the same labels')
+    expect(walk.textContent).toContain('Loops back to S')
+
+    // The converged view has no FRR repair to walk.
+    act(() => useStore.getState().setConverged(true))
+    expect(canvas.highlight?.packetAt).toBeUndefined()
+  })
+
   it('editing a metric updates the results, and undo puts it back', async () => {
     const user = userEvent.setup()
     render(<App />)

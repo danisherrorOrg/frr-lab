@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { packetWalk } from './engine/packet-walk'
+import { flowWalk, packetWalk, primaryWalk } from './engine/packet-walk'
 import { hopLinks, protectionPaths } from './engine/paths'
 import { readShareHash } from './io/share-url'
 import { isRow, useStore, type Tool } from './state/store'
@@ -10,10 +10,11 @@ import { CoverageReport } from './ui/CoverageReport'
 import { DetailPanel } from './ui/DetailPanel'
 import { FailureByDut } from './ui/FailureByDut'
 import { FailurePanel } from './ui/FailurePanel'
-import { bundles, drawnFlow, pickBackup, stackLines } from './ui/format'
+import { bundles, drawnFlow, pickBackup, walkMarks } from './ui/format'
 import { GraphCanvas } from './ui/GraphCanvas'
 import { Legend } from './ui/Legend'
 import { NoticeBox } from './ui/NoticeBox'
+import type { WalkPath } from './ui/PacketWalk'
 import { ResultsTable } from './ui/ResultsTable'
 import { Sidebar } from './ui/Sidebar'
 import { Toolbar } from './ui/Toolbar'
@@ -139,18 +140,49 @@ export function App() {
   // Label stacks drawn on the diagram during the walk; the user can hide them.
   const [walkOnCanvas, setWalkOnCanvas] = useState(true)
   const [walkAt, setWalkAt] = useState<{ key: string; step: number } | null>(null)
-  const walkKey = row && source !== null ? `${source}|${row.dest}|${row.via}|${row.link ?? ''}` : ''
-  const walkStep = walkAt !== null && walkAt.key === walkKey ? walkAt.step : null
+  // Walk the primary path or the TI-LFA backup; a row with no TI-LFA path has only the primary.
+  const [walkPath, setWalkPath] = useState<WalkPath>('tilfa')
+  const hasTilfa = selected?.protection.tilfa.path !== undefined
+  const walked: WalkPath = hasTilfa ? walkPath : 'primary'
+  const keyFor = (path: WalkPath) =>
+    row && source !== null ? `${source}|${row.dest}|${row.via}|${row.link ?? ''}|${path}` : ''
+  const walkStep = walkAt !== null && walkAt.key === keyFor(walked) ? walkAt.step : null
   const walk = useMemo(() => {
-    if (!selected || source === null || !selected.protection.tilfa.path) return undefined
+    if (!selected || source === null) return undefined
     const { to, id } = selected.protection.protectedLink
-    return packetWalk(topology, source, selected.result.dest, to, { link: id, php })
-  }, [selected, source, topology, php])
-  const setWalkStep = (step: number | null) => {
-    setWalkAt(step === null ? null : { key: walkKey, step })
-    // Walking follows the TI-LFA path, so draw that one.
-    if (step !== null && backup !== 'tilfa') setBackup('tilfa')
+    const d = selected.result.dest
+    return walked === 'tilfa'
+      ? packetWalk(topology, source, d, to, { link: id, php })
+      : primaryWalk(topology, source, d, to, { link: id, php })
+  }, [selected, source, topology, php, walked])
+  const setWalkStep = (step: number | null, path: WalkPath = walked) => {
+    setWalkAt(step === null ? null : { key: keyFor(path), step })
+    // Walking the TI-LFA repair follows the TI-LFA path, so draw that one.
+    if (step !== null && path === 'tilfa' && backup !== 'tilfa') setBackup('tilfa')
   }
+  /** Switch between the primary and the backup walk; a walk in progress starts again at S. */
+  const pickWalkPath = (path: WalkPath) => {
+    setWalkPath(path)
+    if (walkStep !== null) setWalkStep(0, path)
+  }
+
+  // Packet walk of the simulated traffic drawn in the failure view (§8.3). Its step
+  // belongs to one flow under one failure; anything else starts fresh.
+  const shownFlow = anyFailed && sim.simulation ? drawnFlow(sim.simulation, simDest) : undefined
+  const flowKey = shownFlow
+    ? JSON.stringify([source, shownFlow.dest, failedLinks, failedNodes, simMode, extended])
+    : ''
+  const [flowAt, setFlowAt] = useState<{ key: string; step: number } | null>(null)
+  const flowTrace = useMemo(
+    () => (shownFlow ? flowWalk(topology, shownFlow, { php }) : undefined),
+    [shownFlow, topology, php],
+  )
+  const flowStep =
+    flowTrace && flowAt !== null && flowAt.key === flowKey && !converged
+      ? Math.min(flowAt.step, flowTrace.hops.length - 1)
+      : null
+  const setFlowStep = (step: number | null) =>
+    setFlowAt(step === null ? null : { key: flowKey, step })
 
   const highlight = useMemo<Highlight>(() => {
     // Failed links: draw the simulated traffic instead of the selected row (F5).
@@ -182,6 +214,7 @@ export function App() {
           ...(flow.repairLinks && { backupLinks: flow.repairLinks }),
           flowing: flow.status === 'repaired',
         }),
+        ...walkMarks(flowTrace, flowStep, walkOnCanvas, bundles(topology)),
       }
     }
     if (!selected) return { source }
@@ -204,29 +237,13 @@ export function App() {
       pSpace: rlfa.extended ? rlfa.extPSpace : rlfa.pSpace,
       qSpace: rlfa.qSpace,
       ...(rlfa.needed && rlfa.best !== undefined && { pq: rlfa.best }),
-      ...(walk &&
-        walkStep !== null &&
-        walk.hops[walkStep] && {
-          packetAt: walk.hops[walkStep].router,
-          ...(walk.hops[walkStep].link !== undefined && { packetLink: walk.hops[walkStep].link }),
-          ...(walkOnCanvas && {
-            packetStacks: walk.hops.flatMap((h, i) =>
-              h.link === undefined || h.sent === undefined
-                ? []
-                : [
-                    {
-                      link: h.link,
-                      lines: stackLines(h.sent, bundles(topology)),
-                      current: i === walkStep,
-                    },
-                  ],
-            ),
-          }),
-        }),
+      ...walkMarks(walk, walkStep, walkOnCanvas, bundles(topology)),
     }
   }, [
     walk,
     walkStep,
+    flowTrace,
+    flowStep,
     walkOnCanvas,
     selected,
     source,
@@ -255,7 +272,17 @@ export function App() {
         <main className="order-3 flex min-w-0 flex-col gap-4 p-3 md:col-start-2 md:row-start-2">
           {anyFailed && allSources && <FailureByDut />}
           {anyFailed && source !== null && (
-            <FailurePanel source={source} simulation={sim.simulation} error={sim.error} />
+            <FailurePanel
+              source={source}
+              simulation={sim.simulation}
+              error={sim.error}
+              {...(flowTrace && { walk: flowTrace })}
+              walkStep={flowStep}
+              onWalkStep={setFlowStep}
+              onPhp={setPhp}
+              walkOnCanvas={walkOnCanvas}
+              onWalkOnCanvas={setWalkOnCanvas}
+            />
           )}
           <div className="grid gap-4 lg:grid-cols-2">
             {allSources ? (
@@ -288,9 +315,11 @@ export function App() {
                   drawn={selected.drawn?.kind ?? null}
                   onBackup={setBackup}
                   onClose={() => selectRow(null)}
-                  {...(walk && { walk })}
+                  {...(walk && !anyFailed && { walk })}
+                  walkInFailurePanel={anyFailed}
                   walkStep={walkStep}
-                  onWalkStep={setWalkStep}
+                  onWalkStep={(step) => setWalkStep(step)}
+                  {...(hasTilfa && { walkPath, onWalkPath: pickWalkPath })}
                   onPhp={setPhp}
                   walkOnCanvas={walkOnCanvas}
                   onWalkOnCanvas={setWalkOnCanvas}

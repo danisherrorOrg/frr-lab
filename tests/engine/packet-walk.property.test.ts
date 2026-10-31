@@ -1,7 +1,10 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { packetWalk } from '../../src/engine/packet-walk'
-import { allPairs } from '../../src/engine/spf'
+import { flowWalk, packetWalk, primaryWalk } from '../../src/engine/packet-walk'
+import { protectionPaths } from '../../src/engine/paths'
+import { computeForSource } from '../../src/engine/index'
+import { simulateFailure, type RepairMode } from '../../src/engine/simulate'
+import { allPairs, dist } from '../../src/engine/spf'
 import { computeTilfa } from '../../src/engine/tilfa'
 import { connectedTopology } from '../arbitraries'
 
@@ -55,4 +58,71 @@ describe('packet walk properties', () => {
       )
     },
   )
+
+  it('primary walk: follows the drawn normal path at its cost, PHP before D', () => {
+    fc.assert(
+      fc.property(connectedTopology({ parallel: true }), (topo) => {
+        const t = allPairs(topo)
+        for (const s of t.graph.nodes) {
+          for (const r of computeForSource(topo, s, { explain: false })) {
+            for (const p of r.protections) {
+              const w = primaryWalk(topo, s, r.dest, p.protectedLink.to, {
+                link: p.protectedLink.id,
+              })!
+              expect(w.hops.map((h) => h.router)).toEqual(
+                protectionPaths(topo, s, r.dest, p).primary,
+              )
+              expect(w.hops[0]!.link).toBe(p.protectedLink.id)
+              expect(w.cost).toBe(dist(t, s, r.dest))
+              expect(w.hops.at(-2)!.sent).toEqual([])
+            }
+          }
+        }
+      }),
+      { numRuns: 15 },
+    )
+  })
+
+  it('flow walk: the simulated path, labels handed over hop to hop, and the right ending', () => {
+    const input = connectedTopology({ parallel: true }).chain((t) =>
+      fc.record({
+        t: fc.constant(t),
+        s: fc.constantFrom(...t.nodes.map((n) => n.id)),
+        links: fc.uniqueArray(fc.constantFrom(...t.links.map((l) => l.id)), {
+          minLength: 1,
+          maxLength: 3,
+        }),
+        nodes: fc.uniqueArray(fc.constantFrom(...t.nodes.map((n) => n.id)), { maxLength: 1 }),
+        mode: fc.constantFrom<RepairMode>('lfa', 'rlfa', 'tilfa'),
+        php: fc.boolean(),
+      }),
+    )
+    fc.assert(
+      fc.property(input, ({ t, s, links, nodes, mode, php }) => {
+        if (nodes.includes(s)) return
+        // flowWalk throws if a router couldn't send the labels the simulation says.
+        for (const f of simulateFailure(t, s, { links, nodes }, mode).flows) {
+          const w = flowWalk(t, f, { php })
+          if (f.destDown) {
+            expect(w).toBeUndefined()
+            continue
+          }
+          const routers = w!.hops.map((h) => h.router)
+          if (f.repair) {
+            expect(routers).toEqual(f.repair)
+            expect(w!.hops.slice(0, -1).map((h) => h.link)).toEqual(f.repairLinks)
+            expect(w!.cost).toBe(f.repairCost)
+          } else if (!f.affected) expect(routers).toEqual(f.before)
+          for (let i = 0; i + 1 < w!.hops.length; i++) {
+            expect(w!.hops[i + 1]!.received).toEqual(w!.hops[i]!.sent)
+          }
+          const repairs = w!.hops.flatMap((h) => h.actions.filter((a) => a.kind === 'repair'))
+          expect(repairs.length).toBe(f.repairs?.length ?? 0)
+          const end = w!.hops.at(-1)!.actions.at(-1)!.kind
+          expect(end).toBe(f.drop ? 'drop' : f.loopAt !== undefined ? 'loop' : 'deliver')
+        }
+      }),
+      { numRuns: 150 },
+    )
+  })
 })

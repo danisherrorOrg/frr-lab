@@ -3,6 +3,7 @@
 // then on the path the network uses once it has reconverged.
 import { cheapestEdge, type Edge } from './graph'
 import { computeForSource } from './index'
+import { prefixLabel } from './labels'
 import { shortestPath } from './paths'
 import { allPairs, type AllPairs } from './spf'
 import type { DestinationResult, NodeId, Segment, Topology } from './types'
@@ -43,6 +44,8 @@ export interface RepairStep {
   /** Where traffic was heading at that router: D, or a tunnel end / segment on the way. */
   target: NodeId
   method: RepairMethod
+  /** Where `at` is in the flow's `repair` path (a router can be visited twice). */
+  atIndex: number
 }
 
 /** Where traffic was dropped, and why. */
@@ -123,6 +126,11 @@ export interface Flow {
   repair?: NodeId[]
   /** The link of each hop of `repair`: with parallel links, which one carried it (D29). */
   repairLinks?: string[]
+  /**
+   * The MPLS label stack on each hop of `repair`, top first, as the sending router
+   * builds it, before penultimate-hop popping. For the packet walk (§4.5, §8.3).
+   */
+  repairLabels?: Segment[][]
   repairCost?: number
   /** Every router that switched to a backup, in order. The first one is the PLR. */
   repairs?: RepairStep[]
@@ -167,9 +175,14 @@ export interface SimulateOptions {
  * What a packet carries, top first: `hop` = send straight to this neighbor (an LFA
  * next hop, an Adj-SID, a tunnel's exit neighbor), over `link` when the backup
  * names one (D29), else the cheapest link; `to` = forward on normal tables until
- * this router (D, a PQ node, a Prefix-SID).
+ * this router (D, a PQ node, a Prefix-SID). `seg` is the MPLS label it is on the
+ * wire, if any: a Prefix-SID for every `to`, an Adj-SID for a TI-LFA `hop`. A
+ * backup's own first hop is just the interface the PLR sends on, with no label.
  */
-type Instr = { hop: NodeId; link?: string } | { to: NodeId }
+type Instr = { hop: NodeId; link?: string; seg?: Segment } | { to: NodeId; seg: Segment }
+
+/** Makes the Prefix-SID segment of a router. */
+type PrefixOf = (node: NodeId) => Segment
 
 /** IP TTL limit: a packet that keeps going this long is looping. */
 const MAX_HOPS = 255
@@ -241,6 +254,11 @@ export function simulateFailure(
   const table = allPairs(topology)
   const fromS = table.from.get(source)
   if (fromS === undefined) throw new Error(`Unknown source router "${source}".`)
+  const prefixOf: PrefixOf = (node) => ({
+    kind: 'prefix',
+    node,
+    label: prefixLabel(topology, node),
+  })
 
   // Every link that is down: the failed links plus every link of a failed router.
   const downNodes = new Set(nodes)
@@ -298,12 +316,13 @@ export function simulateFailure(
         continue
       }
 
-      const walk = forward(table, source, d, mode, isUp, normalLink, resultsAt)
+      const walk = forward(table, source, d, mode, isUp, normalLink, resultsAt, prefixOf)
       flow.repairs = walk.repairs
       if (walk.repairs.length > 0) {
         flow.method = walk.repairs[0]!.method
         flow.repair = walk.path
         flow.repairLinks = walk.links
+        flow.repairLabels = walk.labels
         flow.repairCost = sum(walk.costs)
         // Up to the PLR the walk is the normal path, so the PLR sits at index i.
         flow.plrRepairCost = sum(walk.costs.slice(i))
@@ -321,6 +340,7 @@ export function simulateFailure(
           mode,
           downNodes,
           isUp,
+          prefixOf,
         )
         if (through) flow.through = through
       }
@@ -456,6 +476,8 @@ interface Walk {
   /** The link and its metric for each hop of `path`. */
   links: string[]
   costs: number[]
+  /** The label stack sent on each hop of `path`, top first, before PHP. */
+  labels: Segment[][]
   repairs: RepairStep[]
   delivered: boolean
   drop?: Drop
@@ -476,28 +498,30 @@ function forward(
   isUp: (linkId: string) => boolean,
   normalLink: (x: NodeId, y: NodeId) => Edge,
   resultsAt: (x: NodeId) => DestinationResult[],
+  prefixOf: PrefixOf,
 ): Walk {
   const path = [source]
   const links: string[] = []
   const costs: number[] = []
+  const labels: Segment[][] = []
   const repairs: RepairStep[] = []
-  /** Index in `path` of each repair's router. */
-  const repairIdx: number[] = []
   const seen = new Set<string>()
   let at = source
-  let stack: Instr[] = [{ to: d }]
+  // The packet reaches S already carrying D's label (as in the packet walk, §4.5).
+  let stack: Instr[] = [{ to: d, seg: prefixOf(d) }]
   let repairedHere = false
+  const sofar = () => ({ path, links, costs, labels, repairs })
 
   for (;;) {
     while (stack[0] !== undefined && 'to' in stack[0] && stack[0].to === at) stack.shift()
     const top = stack[0]
-    if (top === undefined) return { path, links, costs, repairs, delivered: true }
+    if (top === undefined) return { ...sofar(), delivered: true }
 
     if (!repairedHere) {
       const key = `${at}|${stack.map(instrKey).join(',')}`
       // Back at a router with the same labels: the exact loop, shown up to here.
-      if (seen.has(key)) return { path, links, costs, repairs, delivered: false, loopAt: at }
-      if (path.length > MAX_HOPS) return ttlLoop({ path, links, costs, repairs }, repairIdx)
+      if (seen.has(key)) return { ...sofar(), delivered: false, loopAt: at }
+      if (path.length > MAX_HOPS) return ttlLoop(sofar())
       seen.add(key)
     }
 
@@ -514,19 +538,13 @@ function forward(
       path.push(at)
       links.push(edge.linkId)
       costs.push(edge.metric)
+      labels.push(stack.flatMap((k) => (k.seg ? [k.seg] : [])))
       repairedHere = false
       continue
     }
     const down = edge.linkId
     if (repairedHere) {
-      return {
-        path,
-        links,
-        costs,
-        repairs,
-        delivered: false,
-        drop: { at, link: down, next, reason: 'backup-down' },
-      }
+      return { ...sofar(), delivered: false, drop: { at, link: down, next, reason: 'backup-down' } }
     }
     // A failed Adj-SID hop is repaired towards its far end (RFC 9855 §6.2, §9; Adj-SID
     // B-flag, RFC 8667 §2.2.1).
@@ -538,21 +556,13 @@ function forward(
     const normalHop = table.from.get(at)!.firstHops.get(target)![0]!
     const viaNormal =
       'hop' in top && (normalHop !== target || normalLink(at, target).linkId !== down)
-        ? { method: 'tilfa' as const, instrs: [{ to: target }] }
+        ? { method: 'tilfa' as const, instrs: [{ to: target, seg: prefixOf(target) }] }
         : undefined
-    const r = viaNormal ?? repairAt(table, resultsAt(at), down, target, mode, isUp)
+    const r = viaNormal ?? repairAt(table, resultsAt(at), down, target, mode, isUp, prefixOf)
     if (r === undefined) {
-      return {
-        path,
-        links,
-        costs,
-        repairs,
-        delivered: false,
-        drop: { at, link: down, next, reason: 'no-backup' },
-      }
+      return { ...sofar(), delivered: false, drop: { at, link: down, next, reason: 'no-backup' } }
     }
-    repairs.push({ at, link: down, next, target, method: r.method })
-    repairIdx.push(path.length - 1)
+    repairs.push({ at, link: down, next, target, method: r.method, atIndex: path.length - 1 })
     stack = [...r.instrs, ...stack.slice(1)]
     repairedHere = true
   }
@@ -562,10 +572,7 @@ function forward(
  * Out of hops (labels keep piling up, so no state repeats exactly): cut the path
  * where traffic first comes back to a router, so the drawing stays readable.
  */
-function ttlLoop(
-  w: { path: NodeId[]; links: string[]; costs: number[]; repairs: RepairStep[] },
-  repairIdx: number[],
-): Walk {
+function ttlLoop(w: Omit<Walk, 'delivered'>): Walk {
   const { path } = w
   const k = path.findIndex((x, j) => path.indexOf(x) < j)
   if (k < 0) return { ...w, delivered: false, loopAt: path.at(-1)! }
@@ -573,7 +580,8 @@ function ttlLoop(
     path: path.slice(0, k + 1),
     links: w.links.slice(0, k),
     costs: w.costs.slice(0, k),
-    repairs: w.repairs.filter((_, j) => repairIdx[j]! < k),
+    labels: w.labels.slice(0, k),
+    repairs: w.repairs.filter((r) => r.atIndex < k),
     delivered: false,
     loopAt: path[k]!,
   }
@@ -594,6 +602,7 @@ function repairAt(
   t: NodeId,
   mode: RepairMode,
   isUp: (linkId: string) => boolean,
+  prefixOf: PrefixOf,
 ): Backup | undefined {
   const r = results.find((x) => x.dest === t)
   const p = r?.protections.find((x) => x.protectedLink.id === failed)
@@ -608,7 +617,13 @@ function repairAt(
   const others = r.protections.map((x) => x.protectedLink).filter((x) => x.id !== failed)
   const other = others.find((x) => isUp(x.id)) ?? others[0]
   if (p.ecmpProtected && other !== undefined) {
-    return { method: 'ecmp', instrs: [{ hop: other.to, link: other.id }, { to: t }] }
+    return {
+      method: 'ecmp',
+      instrs: [
+        { hop: other.to, link: other.id },
+        { to: t, seg: prefixOf(t) },
+      ],
+    }
   }
 
   if (mode === 'tilfa') {
@@ -616,7 +631,7 @@ function repairAt(
     if (!path || !outLink || !segments) return undefined
     // Out of the post-convergence first-hop interface, then the segment list (RFC 9855 §5.1).
     const segs = segments.map((s): Instr =>
-      s.kind === 'prefix' ? { to: s.node } : { hop: s.to, link: s.link },
+      s.kind === 'prefix' ? { to: s.node, seg: s } : { hop: s.to, link: s.link, seg: s },
     )
     return { method: 'tilfa', instrs: [{ hop: path[1]!, link: outLink }, ...segs], segments }
   }
@@ -624,14 +639,16 @@ function repairAt(
   if (p.lfa.best !== undefined) {
     const hop: Instr =
       p.lfa.bestLink === undefined ? { hop: p.lfa.best } : { hop: p.lfa.best, link: p.lfa.bestLink }
-    return { method: 'lfa', instrs: [hop, { to: t }] }
+    return { method: 'lfa', instrs: [hop, { to: t, seg: prefixOf(t) }] }
   }
   const pq = p.rlfa.needed ? p.rlfa.best : undefined
   if (mode === 'rlfa' && pq !== undefined && shortestPath(table, pq, t)) {
     // Tunnel to the PQ node, through the exit neighbor for extended P-space (D11).
     const exit = p.rlfa.exitVia[pq]
-    const tunnel: Instr[] = exit === undefined ? [{ to: pq }] : [{ hop: exit }, { to: pq }]
-    return { method: 'rlfa', instrs: [...tunnel, { to: t }] }
+    // The tunnel label is the PQ node's Prefix-SID (SR-MPLS, not targeted LDP).
+    const toPq: Instr = { to: pq, seg: prefixOf(pq) }
+    const tunnel: Instr[] = exit === undefined ? [toPq] : [{ hop: exit }, toPq]
+    return { method: 'rlfa', instrs: [...tunnel, { to: t, seg: prefixOf(t) }] }
   }
   return undefined
 }
@@ -654,8 +671,9 @@ function backupThrough(
   mode: RepairMode,
   downNodes: Set<NodeId>,
   isUp: (linkId: string) => boolean,
+  prefixOf: PrefixOf,
 ): Through | undefined {
-  const plan = repairAt(table, results, failed, d, mode, isUp)
+  const plan = repairAt(table, results, failed, d, mode, isUp, prefixOf)
   if (plan === undefined) return undefined
   let at = plr
   for (const [k, ins] of plan.instrs.entries()) {

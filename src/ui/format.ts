@@ -1,6 +1,7 @@
 // Small text helpers for the results table and detail panel. No routing maths:
 // they only read what the engine returned.
 import { adjLabel } from '../engine/labels'
+import type { PacketWalk } from '../engine/packet-walk'
 import type { ProtectionPaths } from '../engine/paths'
 import type { Method } from '../engine/rows'
 import type {
@@ -12,6 +13,7 @@ import type {
 } from '../engine/simulate'
 import type { NodeId, Segment, Topology } from '../engine/types'
 import type { BackupKind, Selection } from '../state/store'
+import type { Highlight } from './canvas'
 
 export type { Method } from '../engine/rows'
 export { protectedBy } from '../engine/rows'
@@ -62,6 +64,38 @@ export const stackLines = (segs: Segment[], b?: Bundles): string[] =>
         (s) =>
           `${s.label} ${s.kind === 'prefix' ? s.node : `${s.from}→${hopName(b, s.from, s.to, s.link)}`}`,
       )
+
+/**
+ * What a packet walk marks on the diagram at `step`: the router, the link it leaves
+ * on, and (with `stacks`) the label stack on every link walked. A link used twice
+ * (a loop) shows the stack of the latest visit up to `step`, else the first.
+ */
+export function walkMarks(
+  walk: PacketWalk | undefined,
+  step: number | null,
+  stacks: boolean,
+  b?: Bundles,
+): Pick<Highlight, 'packetAt' | 'packetLink' | 'packetStacks'> {
+  const at = step === null ? undefined : walk?.hops[step]
+  if (!walk || !at) return {}
+  const byLink = new Map<string, number>()
+  walk.hops.forEach((h, i) => {
+    if (h.link === undefined) return
+    const had = byLink.get(h.link)
+    if (had === undefined || i <= step!) byLink.set(h.link, i)
+  })
+  return {
+    packetAt: at.router,
+    ...(at.link !== undefined && { packetLink: at.link }),
+    ...(stacks && {
+      packetStacks: [...byLink].map(([link, i]) => ({
+        link,
+        lines: stackLines(walk.hops[i]!.sent ?? [], b),
+        current: i === step,
+      })),
+    }),
+  }
+}
 
 /** "B · B→C · E": short form for the table. */
 export const segmentsShort = (segs: Segment[], b?: Bundles): string =>

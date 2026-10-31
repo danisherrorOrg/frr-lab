@@ -1,4 +1,5 @@
-import { createContext, useContext, useMemo } from 'react'
+import { createContext, useContext, useMemo, useState } from 'react'
+import type { PacketWalk as Walk } from '../engine/packet-walk'
 import {
   meetsDownRouter,
   summarizeFlows,
@@ -22,6 +23,7 @@ import {
   type Bundles,
 } from './format'
 import { rowKeys } from './keys'
+import { PacketWalk } from './PacketWalk'
 
 const MODES: { mode: RepairMode; label: string }[] = [
   { mode: 'lfa', label: 'LFA only' },
@@ -270,10 +272,27 @@ interface Props {
   source: NodeId
   simulation: FailureSimulation | undefined
   error: string | undefined
+  /** The drawn flow's packet walk (§8.3): the labels on each hop of the real repair. */
+  walk?: Walk
+  walkStep?: number | null
+  onWalkStep?: (step: number | null) => void
+  onPhp?: (php: boolean) => void
+  walkOnCanvas?: boolean
+  onWalkOnCanvas?: (on: boolean) => void
 }
 
 /** Failure simulation (F5): repair paths for the failed links, then the converged view. */
-export function FailurePanel({ source, simulation: sim, error }: Props) {
+export function FailurePanel({
+  source,
+  simulation: sim,
+  error,
+  walk,
+  walkStep = null,
+  onWalkStep = () => {},
+  onPhp = () => {},
+  walkOnCanvas = true,
+  onWalkOnCanvas = () => {},
+}: Props) {
   const mode = useStore((s) => s.simMode)
   const setMode = useStore((s) => s.setSimMode)
   const converged = useStore((s) => s.converged)
@@ -287,6 +306,8 @@ export function FailurePanel({ source, simulation: sim, error }: Props) {
   const failedNodes = useStore((s) => s.failedNodes)
   const topology = useStore((s) => s.topology)
   const b = useMemo(() => bundles(topology), [topology])
+  // The walk's table is only built while its section is open.
+  const [walkOpen, setWalkOpen] = useState(false)
 
   const down = failedLinks.map((id) => {
     const l = topology.links.find((x) => x.id === id)
@@ -440,6 +461,30 @@ export function FailurePanel({ source, simulation: sim, error }: Props) {
               <div className="mt-2 rounded bg-slate-50 p-2 dark:bg-slate-800" aria-live="polite">
                 <Story f={shown} converged={converged} source={source} downNodes={routers} />
               </div>
+            )}
+            {shown && walk && !converged && (
+              <details
+                className="mt-2"
+                open={walkOpen}
+                onToggle={(ev) => setWalkOpen(ev.currentTarget.open)}
+              >
+                <summary className="cursor-pointer font-semibold">
+                  Packet walk to {shown.dest}: the labels on each hop
+                </summary>
+                {walkOpen && (
+                  <div className="mt-1">
+                    <PacketWalk
+                      walk={walk}
+                      step={walkStep}
+                      onStep={onWalkStep}
+                      onPhp={onPhp}
+                      onCanvas={walkOnCanvas}
+                      onOnCanvas={onWalkOnCanvas}
+                      b={b}
+                    />
+                  </div>
+                )}
+              </details>
             )}
             {affected.length > 0 && (
               <div className="mt-2 overflow-x-auto">

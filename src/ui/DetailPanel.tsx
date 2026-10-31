@@ -4,7 +4,7 @@ import type { DestinationResult, NodeId, Protection } from '../engine/types'
 import { useMemo } from 'react'
 import { useStore, type BackupKind } from '../state/store'
 import { bundles, hopName, isBundled, lfaTags, linkName, METHOD_NAME, segmentText } from './format'
-import { PacketWalk } from './PacketWalk'
+import { PacketWalk, type WalkPath } from './PacketWalk'
 
 interface Props {
   source: NodeId
@@ -16,8 +16,13 @@ interface Props {
   drawn: Exclude<BackupKind, 'auto'> | null
   onBackup: (b: BackupKind) => void
   onClose: () => void
-  /** The TI-LFA repair walked router by router; absent when there is none. */
+  /** The path walked router by router: the TI-LFA repair or the primary path. */
   walk?: Walk
+  /** Links or routers are down: the walk of the simulated traffic is in the failure panel. */
+  walkInFailurePanel?: boolean
+  /** Rows with a TI-LFA repair: which path to walk. */
+  walkPath?: WalkPath
+  onWalkPath?: (path: WalkPath) => void
   walkStep?: number | null
   onWalkStep?: (step: number | null) => void
   onPhp?: (php: boolean) => void
@@ -40,6 +45,9 @@ export function DetailPanel({
   onBackup,
   onClose,
   walk,
+  walkPath,
+  onWalkPath,
+  walkInFailurePanel = false,
   walkStep = null,
   onWalkStep = () => {},
   onPhp = () => {},
@@ -191,13 +199,23 @@ export function DetailPanel({
         </p>
       )}
 
+      {walkInFailurePanel && (
+        <>
+          <h3 className={h3}>Packet walk</h3>
+          <p className="text-slate-500">
+            Something is down, so the diagram shows the simulated traffic. Its packet walk is in the
+            failure panel.
+          </p>
+        </>
+      )}
       {walk && (
         <>
-          <h3 className={h3}>Packet walk (TI-LFA)</h3>
+          <h3 className={h3}>Packet walk</h3>
           <PacketWalk
             walk={walk}
             e={e}
             failedLink={p.protectedLink.id}
+            {...(walkPath !== undefined && onWalkPath && { path: walkPath, onPath: onWalkPath })}
             step={walkStep}
             onStep={onWalkStep}
             onPhp={onPhp}

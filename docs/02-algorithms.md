@@ -138,7 +138,7 @@ dist(X,Y) < dist(X,E) + dist(E,Y)
 ```
 If D == E, node protection doesn't apply (fall back to link protection).
 
-### 4.5 Packet walk (TODO backlog, D34)
+### 4.5 Packet walk (TODO backlog, D34, D35)
 `packetWalk()` (`src/engine/packet-walk.ts`) follows one packet along the repair from §4.2, router by router, and records the label stack each router receives and sends (top first). It is a teaching view; it changes no result.
 - **At S (the PLR):** the packet arrives with D's own label (the walk assumes it is already on the SR path to D). S pushes the rest of the segment list on top (RFC 9855 §5) and sends out of the repair interface `outLink` to the path's first hop N. S does not read the top label: after clean-up it can even be N's Adj-SID.
 - **Every other router R** reads the top label and uses its *normal* table:
@@ -160,6 +160,8 @@ Example 3 (§6), PHP on:
 | E | no labels | deliver | – |
 
 With PHP off, A sends all three labels, B pops 16004 (its own) then 24005, and E pops 16002. Total cost 1+1+10+1 = 13.
+
+**Primary path (D35):** `primaryWalk()` walks the row's normal path for comparison: S→E, then E's shortest path to D (the path drawn in blue, over the row's link of a bundle). Nothing has failed, so every router, S too, forwards on D's Prefix-SID with the same check `c(R,next) + dist(next,D) = dist(R,D)`, and with PHP the router before D pops it. Example 2, S→C through E: S sends 16005 to E (`1 + 1 = 2 = dist(S,C)`); E pops 16005 (PHP) and sends a plain packet to C. Total 2. The detail panel lets the user pick "Primary path" or "TI-LFA backup"; the diagram marks the one walked.
 
 ---
 
@@ -316,6 +318,21 @@ These are the same numbers as the single-source failure panel for that router (a
 Worked check (Example 1, source E, router S and link E–D down, LFA only): D (E→D) has no LFA (S: `dist(S,D)=20` is not `< 10+10`) and never meets S. N (E→D→N) is repaired by E with LFA S (`15 < 10+20`), but S is down: it breaks. Both are unreachable (E has no link left). Per-DUT line: `2 affected, 0 repaired, 2 unreachable; 1 meets a down router: 0 survive, 1 breaks`, and the panel says "S down: 1 destination affected, 0 repairs survive, 1 breaks".
 
 Worked check (Example 6, fail router E, LFA only): from S, only D is affected; LFA N is link-protecting, breaks at N, and N repairs again via M (`1 affected, 1 repaired, 1 relayed; 0 survive, 1 breaks`). From N, D is affected and LFA M is node-protecting (dist(M,D)=10 < dist(M,E)+dist(E,D)=11+1), so it survives. From D, S and N are affected and LFA M survives for both (11 < 11+1). From M, nothing is affected: M-D, M-N and M-N-S (11 < 12) avoid E.
+
+### 8.3 Packet walk of the simulated traffic (D35)
+`flowWalk()` (`src/engine/packet-walk.ts`) shows the labels on each hop of a simulated flow, the one drawn in the failure view. The labels come from the simulation itself: each thing the packet carries (§8 step 3) has its MPLS label, and `simulateFailure()` records the stack each router sends (`Flow.repairLabels`, top first, before PHP) and where each repair happened (`RepairStep.atIndex`).
+- The packet reaches S with D's Prefix-SID, as in §4.5.
+- A Prefix-SID is a "forward to this router" step: D, a PQ node, a TI-LFA prefix segment, or the far end of a failed Adj-SID. A TI-LFA Adj-SID is an Adj-SID. The interface a backup leaves on (an LFA neighbor, the other ECMP member, a Remote LFA exit neighbor, TI-LFA's repair interface) has no label.
+- So what each repair does to the stack: *ECMP* and *LFA* keep the labels and send to another neighbor; *Remote LFA* pushes the PQ node's Prefix-SID (an SR tunnel, not a targeted-LDP label); *TI-LFA* pushes its segment list in front of the active segment (RFC 9855 §6.1), or replaces a failed Adj-SID with a repair list ending in its far end's Prefix-SID (§6.2).
+- PHP is applied on the hop actually sent: when the top label is the next router's own Prefix-SID, the sender pops it. With PHP off, that router pops its own label.
+- The walk ends at D (delivered), where the packet is dropped (no backup, or the backup's own first link is down too), or where a loop closes. An *exact* loop is a router seeing the same labels again; otherwise (TTL cut, §8 step 3) the labels change each time round.
+- When the PLR has no backup, the walk is S's normal path up to the PLR, then the drop. A failed router as D has no walk.
+- `flowWalk()` throws if a router could not send what the simulation says (a forward that is not a normal next hop, an Adj-SID that isn't the router's own), so the property test also checks the simulation's labels.
+- On the diagram, a link walked twice (a loop) shows the stack of its latest visit up to the current step.
+
+Worked check (Example 2, fail S–E and E–C, TI-LFA, to E): S gets 16002 (E) and pushes 16004 (B) → A pops 16004 (PHP) → B forwards 16002 → C finds C–E down and pushes 16003 (A) → B pops 16003 (PHP) → A forwards 16002 → S: the same packet as at the start, a loop.
+
+Worked check (Example 3, fail S–E and C–B, TI-LFA, to E): S sends 16004 24005 16002; A pops 16004; B's Adj-SID 24005 (B→C) is down, so B replaces it with 16005 (C) and sends back to A. A has seen this packet before with other labels: it goes round until TTL runs out.
 
 ## 9. Parallel links (Phase 9.4, D29)
 Two routers may be joined by several links (a bundle). Each link has its own id (`S-E`, `S-E#2`, …), metrics and Adj-SIDs. Checked against RFC 5286 §3.4–3.6 on 2026-10-31.
