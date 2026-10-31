@@ -23,7 +23,7 @@ Learning these is hard: textbooks show one or two static diagrams, and vendor to
 ## What it will do (MVP)
 1. Draw a topology (routers, links, metrics, SIDs) or load one from a YAML file.
 2. Pick a source router and see every destination's primary path, LFA, RLFA and TI-LFA backups (including the SR label stack).
-3. **Fail a link** and watch traffic move to the backup path.
+3. **Fail a link or a router** and watch traffic move to the backup path, and see which backups break when a whole router goes down.
 4. Get a **coverage report**, e.g. "LFA protects 60% of destinations, TI-LFA protects 100%".
 5. **Explain mode** shows the real numbers behind each decision, e.g. `dist(N,D)=10 < dist(N,S)+dist(S,D)=35 ✓`.
 

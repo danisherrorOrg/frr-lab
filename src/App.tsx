@@ -21,6 +21,7 @@ const TOOL_KEYS: Record<string, Tool> = {
   r: 'add-router',
   l: 'add-link',
   f: 'fail-link',
+  d: 'fail-router',
 }
 
 /** Keyboard shortcuts, except while typing in a field. */
@@ -51,7 +52,7 @@ function useShortcuts() {
         s.setTool('select')
       } else if (TOOL_KEYS[key]) {
         s.setTool(TOOL_KEYS[key])
-      } else if (key === 'c' && s.failedLinks.length > 0) {
+      } else if (key === 'c' && (s.failedLinks.length > 0 || s.failedNodes.length > 0)) {
         s.setConverged(!s.converged)
       }
     }
@@ -93,13 +94,14 @@ export function App() {
   const toggleRow = useStore((s) => s.toggleRow)
   const setBackup = useStore((s) => s.setBackup)
   const failedLinks = useStore((s) => s.failedLinks)
-  const anyFailed = failedLinks.length > 0
+  const failedNodes = useStore((s) => s.failedNodes)
+  const anyFailed = failedLinks.length > 0 || failedNodes.length > 0
   const simMode = useStore((s) => s.simMode)
   const converged = useStore((s) => s.converged)
   const simDest = useStore((s) => s.simDest)
   const setSimDest = useStore((s) => s.setSimDest)
   const { results, loading, error } = useResults(topology, source, extended)
-  const sim = useSimulation(topology, source, failedLinks, simMode, extended)
+  const sim = useSimulation(topology, source, failedLinks, failedNodes, simMode, extended)
 
   const selected = useMemo(() => {
     if (!results || !row || source === null) return null

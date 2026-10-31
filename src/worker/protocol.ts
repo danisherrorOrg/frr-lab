@@ -30,6 +30,8 @@ export type EngineRequest =
       topology: Topology
       source: NodeId
       links: string[]
+      /** Failed routers (Phase 9.3). */
+      nodes?: string[]
       mode: RepairMode
       options?: { extended?: boolean }
     }
@@ -57,7 +59,13 @@ export function handleRequest(req: EngineRequest, post: (res: EngineResponse) =>
       post({
         id: req.id,
         kind: 'simulate',
-        simulation: simulateFailure(req.topology, req.source, req.links, req.mode, req.options),
+        simulation: simulateFailure(
+          req.topology,
+          req.source,
+          { links: req.links, nodes: req.nodes ?? [] },
+          req.mode,
+          req.options,
+        ),
       })
     } else {
       const report = computeCoverage(req.topology, {

@@ -1,7 +1,7 @@
 import type { FailureSimulation, Flow, RepairMethod, RepairMode } from '../engine/simulate'
 import type { NodeId } from '../engine/types'
 import { useStore } from '../state/store'
-import { drawnFlow, METHOD_NAME } from './format'
+import { drawnFlow, METHOD_NAME, throughText } from './format'
 import { rowKeys } from './keys'
 
 const MODES: { mode: RepairMode; label: string }[] = [
@@ -95,9 +95,31 @@ function Chain({ f }: { f: Flow }) {
   )
 }
 
+/** A backup broken by a router failure: where it meets the router, and why (D27). */
+function Through({ f }: { f: Flow }) {
+  if (!f.through) return null
+  return (
+    <>
+      {' '}
+      But that backup goes through <strong>{f.through.node}</strong>, which is down:{' '}
+      {throughText(f.through, f.plr!, f.dest)}
+    </>
+  )
+}
+
 /** What happens to the drawn flow, in a few plain sentences with real numbers. */
-function Story({ f, converged, source }: { f: Flow; converged: boolean; source: NodeId }) {
-  const hit = `${f.plr}–${f.next}`
+function Story({
+  f,
+  converged,
+  source,
+  downNodes,
+}: {
+  f: Flow
+  converged: boolean
+  source: NodeId
+  downNodes: NodeId[]
+}) {
+  const hitDown = `${f.plr}–${f.next} down${downNodes.includes(f.next!) ? ` (router ${f.next} is down)` : ''}`
   // Traffic from S doesn't "reach" S: it starts there.
   const reaches = f.plr === source ? `starts at ${source}` : `reaches ${f.plr}`
   const cutOff =
@@ -112,7 +134,7 @@ function Story({ f, converged, source }: { f: Flow; converged: boolean; source: 
     if (!f.repair)
       return (
         <p>
-          ✗ Traffic to {f.dest} {reaches}, finds {hit} down and has no backup: it is{' '}
+          ✗ Traffic to {f.dest} {reaches}, finds {hitDown} and has no backup: it is{' '}
           <strong>dropped</strong>
           {f.status === 'unreachable' ? '.' : ' until the network reconverges.'}
           {cutOff}
@@ -122,8 +144,9 @@ function Story({ f, converged, source }: { f: Flow; converged: boolean; source: 
     if (f.drop || f.loopAt !== undefined)
       return (
         <p>
-          ✗ Traffic to {f.dest} {reaches}, finds {hit} down, and {f.plr} switches to its{' '}
+          ✗ Traffic to {f.dest} {reaches}, finds {hitDown}, and {f.plr} switches to its{' '}
           {METHOD[f.method!]} backup.
+          <Through f={f} />
           <Chain f={f} /> Path: <span className="font-mono">{pathText(f)}</span>.
           {f.status !== 'unreachable' && ' Traffic is lost until the network reconverges.'}
           {cutOff}
@@ -131,8 +154,9 @@ function Story({ f, converged, source }: { f: Flow; converged: boolean; source: 
       )
     return (
       <p>
-        ↻ Traffic to {f.dest} {reaches}, finds {hit} down, and {f.plr} switches at once (FRR, about
+        ↻ Traffic to {f.dest} {reaches}, finds {hitDown}, and {f.plr} switches at once (FRR, about
         50 ms) to its {METHOD[f.method!]} backup.
+        <Through f={f} />
         {chained && <Chain f={f} />} Traffic reaches {f.dest} on{' '}
         <span className="font-mono">{arrow(f.repair)}</span> (cost {f.repairCost}, was{' '}
         {f.beforeCost}).
@@ -193,6 +217,31 @@ function RepairCell({ f }: { f: Flow }) {
   return <>{who}</>
 }
 
+/** "Avoids down router?" cell: does the PLR's planned backup pass a failed router? */
+function ThroughCell({ f }: { f: Flow }) {
+  if (!f.method) return <span className="text-slate-400">–</span>
+  if (!f.through) return <span className="text-green-700 dark:text-green-400">✓ survives</span>
+  return (
+    <span className="text-red-700 dark:text-red-400">
+      ✗ breaks: via {f.through.node} at {f.through.at}
+    </span>
+  )
+}
+
+/** "E down: 3 destinations affected, 2 repairs survive, 1 breaks" (Phase 9.3). */
+function routerSummary(flows: Flow[], routers: NodeId[]): string {
+  const hit = flows.filter((f) => f.before.some((x) => routers.includes(x)))
+  const breaks = hit.filter((f) => f.through).length
+  const survive = hit.filter((f) => f.method && !f.through).length
+  const none = hit.filter((f) => !f.method).length
+  const plural = (k: number, word: string) => `${k} ${word}${k === 1 ? '' : 's'}`
+  return (
+    `${routers.join(', ')} down: ${plural(hit.length, 'destination')} affected, ` +
+    `${plural(survive, 'repair')} survive${survive === 1 ? 's' : ''}, ${breaks} break${breaks === 1 ? 's' : ''}` +
+    `${none > 0 ? `, ${none} with no backup` : ''}.`
+  )
+}
+
 /** "3 repaired, 1 dropped": the non-zero counts, in a fixed order. */
 function counts(flows: Flow[]): string {
   const n = (st: Flow['status']) => flows.filter((f) => f.status === st).length
@@ -224,20 +273,43 @@ export function FailurePanel({ source, simulation: sim, error }: Props) {
   const simDest = useStore((s) => s.simDest)
   const setSimDest = useStore((s) => s.setSimDest)
   const toggleFailedLink = useStore((s) => s.toggleFailedLink)
-  const restoreLinks = useStore((s) => s.restoreLinks)
+  const toggleFailedNode = useStore((s) => s.toggleFailedNode)
+  const restoreAll = useStore((s) => s.restoreAll)
   const failedLinks = useStore((s) => s.failedLinks)
+  const failedNodes = useStore((s) => s.failedNodes)
   const topology = useStore((s) => s.topology)
 
   const down = failedLinks.map((id) => {
     const l = topology.links.find((x) => x.id === id)
     return { id, name: l ? dash(l.a, l.b) : id }
   })
-  const many = down.length > 1
+  const routers = failedNodes
+  const items = down.length + routers.length
+  const many = items > 1
   const names = down.map((l) => l.name).join(', ')
-  const crossWhat = many ? 'a failed link' : names
-  const affected = sim?.flows.filter((f) => f.affected) ?? []
+  const routerNames = routers.join(', ')
+  const title = [
+    routers.length > 0 && `${routers.length > 1 ? 'Routers' : 'Router'} ${routerNames} down`,
+    down.length > 1 && `${down.length} links failed: ${names}`,
+    down.length === 1 && `${routers.length > 0 ? 'link' : 'Link'} ${names} failed`,
+  ]
+    .filter(Boolean)
+    .join(', ')
+  const crossWhat =
+    routers.length === 0
+      ? many
+        ? 'a failed link'
+        : names
+      : down.length === 0 && routers.length === 1
+        ? `router ${routerNames}`
+        : 'a failed link or router'
+  const sourceDown = routers.includes(source)
+  // A failed router as destination is expected to be unreachable: kept out of the table.
+  const deadEnds = sim?.flows.filter((f) => f.destDown).map((f) => f.dest) ?? []
+  const affected = sim?.flows.filter((f) => f.affected && !f.destDown) ?? []
   const unaffected = sim?.flows.filter((f) => !f.affected).map((f) => f.dest) ?? []
   const shown = sim && drawnFlow(sim, simDest)
+  const restoreLabel = many ? 'Restore all' : routers.length > 0 ? 'Restore router' : 'Restore link'
 
   return (
     <section
@@ -247,8 +319,20 @@ export function FailurePanel({ source, simulation: sim, error }: Props) {
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="mr-auto text-base font-semibold">
           <span aria-hidden="true">✕ </span>
-          {many ? `${down.length} links failed: ${names}` : `Link ${names} failed`}
+          {title}
         </h2>
+        {many &&
+          routers.map((r) => (
+            <button
+              key={r}
+              type="button"
+              className={button}
+              aria-label={`Restore router ${r}`}
+              onClick={() => toggleFailedNode(r)}
+            >
+              ↺ {r}
+            </button>
+          ))}
         {many &&
           down.map((l) => (
             <button
@@ -261,11 +345,18 @@ export function FailurePanel({ source, simulation: sim, error }: Props) {
               ↺ {l.name}
             </button>
           ))}
-        <button type="button" className={button} onClick={restoreLinks}>
-          {many ? 'Restore all' : 'Restore link'}
+        <button type="button" className={button} onClick={restoreAll}>
+          {restoreLabel}
         </button>
       </div>
-      {many && (
+      {routers.length > 0 && (
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+          When a router fails, all its links go down at once. Its neighbors only see their own link
+          fail, so they use their <em>link-protecting</em> backups, and some of those still go
+          through the failed router. That is why node protection exists.
+        </p>
+      )}
+      {down.length > 1 && (
         <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
           FRR backups are built for one failure at a time. With {down.length} links down, a backup
           can run into another failed link. The router there then uses its own backup, so traffic
@@ -309,18 +400,34 @@ export function FailurePanel({ source, simulation: sim, error }: Props) {
         </button>
       </div>
 
+      {sourceDown && (
+        <p className="mt-2">
+          The source router {source} is down, so it sends no traffic. Pick another source router to
+          see how its traffic is repaired.
+        </p>
+      )}
       {error && <p className="mt-2 text-red-600">The engine failed: {error}</p>}
-      {!sim && !error && <p className="mt-2 text-slate-500">Simulating…</p>}
-      {sim && (
+      {!sim && !error && !sourceDown && <p className="mt-2 text-slate-500">Simulating…</p>}
+      {sim && !sourceDown && (
         <>
           <p className="mt-2">
-            From {source}: {affected.length} of {sim.flows.length} destination
-            {sim.flows.length === 1 ? '' : 's'} cross {crossWhat}.
+            From {source}: {affected.length} of {sim.flows.length - deadEnds.length} destination
+            {sim.flows.length - deadEnds.length === 1 ? '' : 's'} cross {crossWhat}.
             {affected.length > 0 && ` ${counts(affected)}.`}
           </p>
+          {routers.length > 0 && (
+            <p className="mt-1 font-medium">{routerSummary(affected, routers)}</p>
+          )}
+          {deadEnds.length > 0 && (
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+              {deadEnds.join(', ')} can&apos;t be reached:{' '}
+              {deadEnds.length > 1 ? 'they are' : 'it is'} the failed router
+              {deadEnds.length > 1 ? 's' : ''} itself. That is expected, not a protection failure.
+            </p>
+          )}
           {shown && (
             <div className="mt-2 rounded bg-slate-50 p-2 dark:bg-slate-800" aria-live="polite">
-              <Story f={shown} converged={converged} source={source} />
+              <Story f={shown} converged={converged} source={source} downNodes={routers} />
             </div>
           )}
           {affected.length > 0 && (
@@ -331,6 +438,7 @@ export function FailurePanel({ source, simulation: sim, error }: Props) {
                   <tr>
                     <th className={cell}>Dest</th>
                     <th className={cell}>Repair (FRR)</th>
+                    {routers.length > 0 && <th className={cell}>Backup vs down router</th>}
                     <th className={cell}>Repair path</th>
                     <th className={cell}>After convergence</th>
                     <th className={cell}>Repair = final?</th>
@@ -355,6 +463,11 @@ export function FailurePanel({ source, simulation: sim, error }: Props) {
                         <td className={cell}>
                           <RepairCell f={f} />
                         </td>
+                        {routers.length > 0 && (
+                          <td className={cell}>
+                            <ThroughCell f={f} />
+                          </td>
+                        )}
                         <td className={`${cell} font-mono text-xs`}>
                           {f.repair ? `${pathText(f)} (${f.repairCost})` : '–'}
                         </td>
@@ -373,8 +486,9 @@ export function FailurePanel({ source, simulation: sim, error }: Props) {
           )}
           {unaffected.length > 0 && (
             <p className="mt-2 text-xs text-slate-500">
-              Not affected (their path avoids {many ? 'every failed link' : names}):{' '}
-              {unaffected.join(', ')}.
+              Not affected (their path avoids{' '}
+              {routers.length > 0 ? 'everything that is down' : many ? 'every failed link' : names}
+              ): {unaffected.join(', ')}.
             </p>
           )}
           <p className="mt-1 text-xs text-slate-500">

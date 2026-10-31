@@ -56,6 +56,7 @@
 **F5 – Failure simulation**
 - "Fail" a link (click it). Traffic for affected destinations moves along the backup path (animated). Then a "Converge" button shows the final path after the network recomputes.
 - Shows whether the repair path equals the post-convergence path (it always does for TI-LFA, and not always for LFA).
+- (v0.2, Phase 9.3) "Fail" a router: all its links go down at once. Shows which link-protecting backups survive and which break because they go through it, with the reason and real numbers.
 
 **F6 – Coverage report**
 - For the chosen source, or for **all sources**: percentage of (destination, protected link) pairs covered by LFA / RLFA / TI-LFA.

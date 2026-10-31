@@ -1,10 +1,10 @@
-// Failure simulation (F5, docs/02-algorithms.md §8): fail one or more links and
+// Failure simulation (F5, docs/02-algorithms.md §8): fail links and routers and
 // follow the traffic from S to every destination, first on the FRR repair path,
 // then on the path the network uses once it has reconverged.
 import { computeForSource } from './index'
 import { shortestPath } from './paths'
 import { allPairs, type AllPairs } from './spf'
-import type { DestinationResult, NodeId, Topology } from './types'
+import type { DestinationResult, NodeId, Segment, Topology } from './types'
 
 /**
  * Which FRR methods the routers run, as on a real router:
@@ -54,6 +54,40 @@ export interface Drop {
   reason: 'no-backup' | 'backup-down'
 }
 
+/**
+ * Why the PLR's backup, as planned for its one failed link, runs through a failed
+ * router (D27). Link-protecting backups only avoid the link, not the router:
+ * - `ecmp` / `lfa`: neighbor `via`'s path to D passes the router. `check` holds the
+ *   node-protecting inequality (RFC 5286 §3.2) when that router is the PLR's own
+ *   next hop E: `dist(N,D) < dist(N,E) + dist(E,D)` failed.
+ * - `rlfa`: the tunnel to the PQ node, or the PQ node's path to D, passes it (RFC 8102 §2.1).
+ * - `tilfa`: this segment's path passes it (or is its Prefix-SID / an Adj-SID on one of
+ *   its links); `null` = the backup's first hop goes there.
+ */
+export type BackupBreak =
+  | {
+      method: 'ecmp' | 'lfa'
+      via: NodeId
+      check?: { distND: number; distNE: number; distED: number }
+    }
+  | { method: 'rlfa'; pq: NodeId; leg: 'to-pq' | 'from-pq' }
+  | { method: 'tilfa'; segment: Segment | null }
+
+/** Where a planned backup meets a failed router. */
+export interface Through {
+  /** The failed router. */
+  node: NodeId
+  /** The router on the backup path just before it. */
+  at: NodeId
+  why: BackupBreak
+}
+
+/** What failed: link ids and router ids. */
+export interface Failures {
+  links?: readonly string[]
+  nodes?: readonly NodeId[]
+}
+
 export interface FailedLink {
   id: string
   a: NodeId
@@ -66,8 +100,10 @@ export interface Flow {
   /** S's normal path (lowest-id ECMP tie-break, like the drawings). */
   before: NodeId[]
   beforeCost: number
-  /** True when `before` crosses a failed link (in either direction). */
+  /** True when `before` crosses a failed link (in either direction) or a failed router. */
   affected: boolean
+  /** D itself is a failed router: unreachable, as expected; no repair is followed. */
+  destDown?: true
   /** The first failed link on `before`: the one the PLR repairs. */
   hitLink?: string
   /** Point of local repair: the router on `before` just before `hitLink`. */
@@ -101,11 +137,19 @@ export interface Flow {
   plrAfterCost?: number
   /** Repair vs the PLR's final path. Only for traffic that reaches D. */
   match?: RepairMatch
+  /**
+   * Set when the PLR's backup, planned for its one failed link, passes a failed
+   * router: the repair is broken by the router failure (D27). What really happens
+   * next (another router repairs, a drop, a loop) is in `repairs` and `status`.
+   */
+  through?: Through
 }
 
 export interface FailureSimulation {
-  /** The failed links, in the order given, without repeats. */
+  /** The failed links, in the order given, without repeats (not the links of failed routers). */
   links: FailedLink[]
+  /** The failed routers, in the order given, without repeats. */
+  nodes: NodeId[]
   mode: RepairMode
   /** One per destination S can reach before the failure, sorted by router id. */
   flows: Flow[]
@@ -157,38 +201,67 @@ function pathCost(topology: Topology, path: NodeId[]): number {
 const samePath = (x: NodeId[], y: NodeId[]) =>
   x.length === y.length && x.every((n, i) => n === y[i])
 
+/** What a backup puts on the packet; TI-LFA keeps its segment list for explain text. */
+interface Backup {
+  method: RepairMethod
+  instrs: Instr[]
+  segments?: Segment[]
+}
+
+const isLinkList = (f: readonly string[] | Failures): f is readonly string[] => Array.isArray(f)
+
 const instrKey = (k: Instr) => ('hop' in k ? `>${k.hop}` : k.to)
 
 /**
- * Fail links `linkIds` and follow traffic from `source` to every destination.
- * Traffic is forwarded hop by hop. Every router uses its normal (pre-failure)
- * table; a router whose own outgoing link is down switches to the backup it
- * pre-computed for that one link, as in FRR. That holds for traffic already on
- * someone else's backup too, so with several links down one repair can lead into
- * another, into a drop, or into a loop (D24).
+ * Fail links and routers and follow traffic from `source` to every destination.
+ * A failed router takes all its links down at once; its neighbors only see "my
+ * link failed" and use their link-protecting backups (D27). Traffic is forwarded
+ * hop by hop. Every router uses its normal (pre-failure) table; a router whose own
+ * outgoing link is down switches to the backup it pre-computed for that one link,
+ * as in FRR. That holds for traffic already on someone else's backup too, so with
+ * several failures one repair can lead into another, into a drop, or into a loop (D24).
+ * `failed` may be a plain list of link ids.
  */
 export function simulateFailure(
   topology: Topology,
   source: NodeId,
-  linkIds: readonly string[],
+  failed: readonly string[] | Failures,
   mode: RepairMode,
   options: SimulateOptions = {},
 ): FailureSimulation {
-  const ids = [...new Set(linkIds)]
-  if (ids.length === 0) throw new Error('No failed link given.')
+  const given: Failures = isLinkList(failed) ? { links: failed } : failed
+  const ids = [...new Set(given.links ?? [])]
+  const nodes = [...new Set(given.nodes ?? [])]
+  if (ids.length === 0 && nodes.length === 0)
+    throw new Error(isLinkList(failed) ? 'No failed link given.' : 'Nothing failed.')
   const links: FailedLink[] = ids.map((id) => {
     const l = topology.links.find((k) => k.id === id)
     if (l === undefined) throw new Error(`Unknown link "${id}".`)
     return { id: l.id, a: l.a, b: l.b }
   })
+  for (const n of nodes) {
+    if (!topology.nodes.some((x) => x.id === n)) throw new Error(`Unknown router "${n}".`)
+  }
+  if (nodes.includes(source))
+    throw new Error(`The source router ${source} is down: it sends no traffic.`)
   const table = allPairs(topology)
   const fromS = table.from.get(source)
   if (fromS === undefined) throw new Error(`Unknown source router "${source}".`)
 
-  const after = allPairs(withoutLinks(topology, new Set(ids)))
-  /** The failed link between x and y, if any. */
+  // Every link that is down: the failed links plus every link of a failed router.
+  const downNodes = new Set(nodes)
+  const down: FailedLink[] = [...links]
+  for (const l of topology.links) {
+    if ((downNodes.has(l.a) || downNodes.has(l.b)) && !ids.includes(l.id))
+      down.push({ id: l.id, a: l.a, b: l.b })
+  }
+  const downIds = new Set(down.map((l) => l.id))
+
+  // A failed router with no links left is unreachable in the reduced SPF.
+  const after = allPairs(withoutLinks(topology, downIds))
+  /** The down link between x and y, if any. */
   const downBetween = (x: NodeId, y: NodeId) =>
-    links.find((l) => (x === l.a && y === l.b) || (x === l.b && y === l.a))
+    down.find((l) => (x === l.a && y === l.b) || (x === l.b && y === l.a))
 
   // Each router's results, computed once: every flow repaired there shares them.
   const atRouter = new Map<NodeId, DestinationResult[]>()
@@ -218,6 +291,15 @@ export function simulateFailure(
       flow.next = before[i + 1]!
       flow.hitLink = downBetween(plr, flow.next)!.id
 
+      if (downNodes.has(d)) {
+        // D itself is down: nothing can reach it, and that is expected, not a
+        // protection failure (D27). No repair is followed.
+        flow.destDown = true
+        flow.status = 'unreachable'
+        flows.push(flow)
+        continue
+      }
+
       const walk = forward(table, source, d, mode, downBetween, resultsAt)
       flow.repairs = walk.repairs
       if (walk.repairs.length > 0) {
@@ -229,6 +311,10 @@ export function simulateFailure(
       }
       if (walk.drop) flow.drop = walk.drop
       if (walk.loopAt !== undefined) flow.loopAt = walk.loopAt
+      if (downNodes.size > 0 && walk.repairs.length > 0) {
+        const through = backupThrough(table, resultsAt(plr), plr, flow.next, d, mode, downNodes)
+        if (through) flow.through = through
+      }
 
       const plrAfter = shortestPath(after, plr, d)
       if (plrAfter) {
@@ -262,7 +348,7 @@ export function simulateFailure(
     flows.push(flow)
   }
 
-  return { links, mode, flows }
+  return { links, nodes, mode, flows }
 }
 
 interface Walk {
@@ -383,7 +469,7 @@ function repairAt(
   t: NodeId,
   mode: RepairMode,
   isUp: (neighbor: NodeId) => boolean,
-): { method: RepairMethod; instrs: Instr[] } | undefined {
+): Backup | undefined {
   const r = results.find((x) => x.dest === t)
   const p = r?.protections.find((x) => x.protectedLink.to === next)
   if (r === undefined || p === undefined) return undefined
@@ -404,7 +490,7 @@ function repairAt(
     if (!path || !segments) return undefined
     // Out of the post-convergence first-hop interface, then the segment list (RFC 9855 §5.1).
     const segs = segments.map((s): Instr => (s.kind === 'prefix' ? { to: s.node } : { hop: s.to }))
-    return { method: 'tilfa', instrs: [{ hop: path[1]! }, ...segs] }
+    return { method: 'tilfa', instrs: [{ hop: path[1]! }, ...segs], segments }
   }
 
   if (p.lfa.best !== undefined) {
@@ -418,4 +504,67 @@ function repairAt(
     return { method: 'rlfa', instrs: [...tunnel, { to: t }] }
   }
   return undefined
+}
+
+/**
+ * Does the PLR's backup for (D, link PLR–E), as planned for that one failure, pass
+ * a failed router? Followed leg by leg on normal tables, the same way `forward`
+ * would with only that link down (D27). Returns the first failed router met, the
+ * router just before it, and which part of the backup leads there.
+ */
+function backupThrough(
+  table: AllPairs,
+  results: DestinationResult[],
+  plr: NodeId,
+  next: NodeId,
+  d: NodeId,
+  mode: RepairMode,
+  downNodes: Set<NodeId>,
+): Through | undefined {
+  const plan = repairAt(table, results, next, d, mode, (n) => n !== next)
+  if (plan === undefined) return undefined
+  let at = plr
+  for (const [k, ins] of plan.instrs.entries()) {
+    const leg = 'hop' in ins ? [at, ins.hop] : shortestPath(table, at, ins.to)
+    if (leg === undefined) return undefined
+    const j = leg.findIndex((x, i) => i > 0 && downNodes.has(x))
+    if (j > 0) {
+      const node = leg[j]!
+      return { node, at: leg[j - 1]!, why: breakReason(table, plan, k, next, d, node) }
+    }
+    at = leg.at(-1)!
+  }
+  return undefined
+}
+
+/** Which part of the backup (instruction `k`) leads into failed router `node`. */
+function breakReason(
+  table: AllPairs,
+  plan: Backup,
+  k: number,
+  e: NodeId,
+  d: NodeId,
+  node: NodeId,
+): BackupBreak {
+  const first = plan.instrs[0]!
+  if (plan.method === 'ecmp' || plan.method === 'lfa') {
+    const via = 'hop' in first ? first.hop : first.to
+    const dist = (x: NodeId, y: NodeId) => table.from.get(x)!.dist.get(y)!
+    // RFC 5286 §3.2 Inequality 3, only meaningful for the protected neighbor E itself.
+    return node === e && via !== e
+      ? {
+          method: plan.method,
+          via,
+          check: { distND: dist(via, d), distNE: dist(via, e), distED: dist(e, d) },
+        }
+      : { method: plan.method, via }
+  }
+  if (plan.method === 'rlfa') {
+    // [exit hop?, to PQ, to D]: everything before the last instruction is the tunnel.
+    const tunnelEnd = plan.instrs.at(-2)!
+    const pq = 'to' in tunnelEnd ? tunnelEnd.to : tunnelEnd.hop
+    return { method: 'rlfa', pq, leg: k < plan.instrs.length - 1 ? 'to-pq' : 'from-pq' }
+  }
+  // [first hop, ...one instruction per segment] (RFC 9855 §5.1).
+  return { method: 'tilfa', segment: k === 0 ? null : (plan.segments?.[k - 1] ?? null) }
 }

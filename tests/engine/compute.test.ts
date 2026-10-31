@@ -11,6 +11,7 @@ const FIXTURES = [
   '03-ring5-highmetric.yaml',
   '04-isp-core.yaml',
   '05-leaf-spine.yaml',
+  '06-link-protecting.yaml',
 ]
 
 /** JSON null means "none": drop it here, and list where it was so the test can check it's absent. */

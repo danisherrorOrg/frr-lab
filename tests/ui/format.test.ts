@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { computeForSource } from '../../src/engine/index'
 import { protectionPaths } from '../../src/engine/paths'
-import { lfaTags, pickBackup, protectedBy, segmentsShort } from '../../src/ui/format'
+import { lfaTags, pickBackup, protectedBy, segmentsShort, throughText } from '../../src/ui/format'
 import { loadFixture } from '../helpers'
 
 const first = (file: string, s: string, d: string) =>
@@ -43,5 +43,43 @@ describe('pickBackup', () => {
     expect(pickBackup(paths, 'auto')).toEqual({ kind: 'rlfa', path: ['S', 'A', 'B', 'C', 'E'] })
     expect(pickBackup(paths, 'lfa')).toBeNull()
     expect(pickBackup(paths, 'tilfa')?.kind).toBe('tilfa')
+  })
+})
+
+describe('throughText (Phase 9.3)', () => {
+  it('LFA: the failed node-protecting inequality with real numbers', () => {
+    const text = throughText(
+      {
+        node: 'E',
+        at: 'N',
+        why: { method: 'lfa', via: 'N', check: { distND: 2, distNE: 1, distED: 1 } },
+      },
+      'S',
+      'D',
+    )
+    expect(text).toBe(
+      'LFA N reaches D through E: dist(N,D) = 2 is not < dist(N,E) + dist(E,D) = 1+1 = 2, so N only protects the link S–E, not the router (RFC 5286 §3.2).',
+    )
+  })
+
+  it('Remote LFA and TI-LFA name the part that goes through the router', () => {
+    expect(
+      throughText(
+        { node: 'E', at: 'C', why: { method: 'rlfa', pq: 'B', leg: 'from-pq' } },
+        'S',
+        'D',
+      ),
+    ).toMatch(/^PQ node B reaches D through E \(C→E\)\. .*RFC 8102 §2\.1/)
+    expect(
+      throughText(
+        {
+          node: 'E',
+          at: 'X',
+          why: { method: 'tilfa', segment: { kind: 'prefix', node: 'E', label: 16002 } },
+        },
+        'S',
+        'D',
+      ),
+    ).toMatch(/^the segment list holds Prefix-SID\(E\) \(label 16002\)/)
   })
 })

@@ -88,7 +88,7 @@ describe('store', () => {
     s().toggleFailedLink('S-E')
     expect(s().failedLinks).toEqual(['C-B'])
     s().toggleFailedLink('S-E')
-    s().restoreLinks()
+    s().restoreAll()
     expect(s().failedLinks).toEqual([])
   })
 

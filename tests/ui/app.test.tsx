@@ -260,7 +260,7 @@ describe('Phase 7: failure simulation, coverage, sharing, keyboard', () => {
 
     // P2 repairs P4 and the repair from P2 costs 70; P2's final path costs 50.
     // The row shows 80 and 60, so the cell must say whose costs it compares.
-    useStore.getState().restoreLinks()
+    useStore.getState().restoreAll()
     for (const id of ['PE1-P1', 'P2-P4']) useStore.getState().toggleFailedLink(id)
     panel = await screen.findByRole('region', { name: 'Failure simulation' })
     await user.click(within(panel).getByLabelText('TI-LFA'))
@@ -404,5 +404,71 @@ describe('Phase 9.1: close the detail panel', () => {
     await user.click(await rowFor('E'))
     expect(details()).toBeNull()
     expect(canvas.highlight).toEqual({ source: 'S' })
+  })
+})
+
+describe('Phase 9.3: router failure', () => {
+  it('square, fail E: the node-protecting LFA survives; E itself is expected to be unreachable', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'square')
+    // Keyboard path of the fail-router tool: D, then pick the router.
+    ;(document.activeElement as HTMLElement).blur()
+    await user.keyboard('d')
+    expect(useStore.getState().tool).toBe('fail-router')
+    await user.selectOptions(screen.getByLabelText('Fail or restore a router'), 'E')
+
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    expect(panel.textContent).toContain('Router E down')
+    await within(panel).findByText(/1 of 2 destinations cross router E/)
+    expect(panel.textContent).toContain(
+      'E down: 1 destination affected, 1 repair survives, 0 break.',
+    )
+    expect(panel.textContent).toContain("E can't be reached: it is the failed router itself.")
+    const row = within(panel)
+      .getAllByRole('row')
+      .find((r) => r.querySelector('td')?.textContent === 'D')!
+    expect(row.textContent).toContain('✓ survives')
+    expect(panel.textContent).toContain('finds S–E down (router E is down)')
+    expect(canvas.highlight).toMatchObject({ dest: 'D', backup: ['S', 'N', 'D'], flowing: true })
+
+    // Bring it back: the panel goes and a notice says the old paths return.
+    await user.click(within(panel).getByRole('button', { name: 'Restore router' }))
+    expect(screen.queryByRole('region', { name: 'Failure simulation' })).toBeNull()
+    expect(useStore.getState().notice).toMatchObject({ title: 'Router E is back up' })
+  })
+
+  it('Example 6, fail E: link-protecting LFA N breaks, with the numbers; TI-LFA loops', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'link-protecting')
+    useStore.getState().toggleFailedNode('E')
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    await user.click(within(panel).getByLabelText('LFA only'))
+    await within(panel).findByText(/E down: 1 destination affected, 0 repairs survive, 1 breaks\./)
+    const rowOf = (d: string) =>
+      within(panel)
+        .getAllByRole('row')
+        .find((r) => r.querySelector('td')?.textContent === d)!
+    expect(rowOf('D').textContent).toContain('✗ breaks: via E at N')
+    expect(rowOf('D').textContent).toContain('S · LFA, then N · LFA')
+    await user.click(rowOf('D'))
+    expect(panel.textContent).toContain(
+      'But that backup goes through E, which is down: LFA N reaches D through E: dist(N,D) = 2 is not < dist(N,E) + dist(E,D) = 1+1 = 2, so N only protects the link S–E, not the router (RFC 5286 §3.2).',
+    )
+    expect(panel.textContent).toContain('At N it finds N–E down too')
+
+    await user.click(within(panel).getByLabelText('TI-LFA'))
+    await within(panel).findByText(/1 looping until convergence/)
+    expect(panel.textContent).toContain(
+      'segment Prefix-SID(D) follows normal paths through E (N→E)',
+    )
+  })
+
+  it('the failed router as source sends nothing', async () => {
+    render(<App />)
+    useStore.getState().toggleFailedNode('S')
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    expect(panel.textContent).toContain('The source router S is down, so it sends no traffic.')
   })
 })

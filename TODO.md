@@ -221,8 +221,8 @@ When router E goes down, every link to it goes down at once and its Prefix-SID s
 working. The neighbors only see "my link to E failed", so they use their **link-protecting**
 backups, and some of those still go through E. This is the main reason node protection
 exists.
-- [ ] "Fail router" tool + right-click "Fail router"; failed router greyed out, all its links shown as down
-- [ ] Engine (`simulate.ts`, tests first): fail a node = remove E and all its links. For each source S and destination D:
+- [x] "Fail router" tool + right-click "Fail router"; failed router greyed out, all its links shown as down
+- [x] Engine (`simulate.ts`, tests first): fail a node = remove E and all its links. For each source S and destination D:
       - D = E: unreachable, which is expected (say so plainly, not as a protection failure)
       - repair survives: the backup path never goes through E
       - **repair broken by the node failure**: the backup goes through E (show where), e.g.
@@ -230,13 +230,13 @@ exists.
         - RLFA whose PQ node is reached through E, or whose path from PQ to D goes through E
         - TI-LFA link-protection stack that contains `PrefixSID(E)` or an Adj-SID on a link of E
       - not affected: traffic to D never went through E
-- [ ] Per-source summary: "E down: 6 destinations affected, 4 repairs survive, 2 break"
-- [ ] "Converge" view: SPF with E removed; compare it with the repair path
-- [ ] Explain text with real numbers for each broken repair
-- [ ] Router comes back (restore): show that the old paths return. (opt) Show the overload bit on startup (ISO 10589 / RFC 3787): the rebooted router stays out of transit paths until it is ready
-- [ ] Tests on Examples 1–3: fail E and check each repair's survive/break result by hand first
-- [ ] `DECISIONS.md` entry: what "broken" means for each backup type
-- [ ] Out of scope (non-goal): reboot timing, BFD / hold timers, graceful restart. We show the *state* before and after, not the timing.
+- [x] Per-source summary: "E down: 6 destinations affected, 4 repairs survive, 2 break"
+- [x] "Converge" view: SPF with E removed; compare it with the repair path
+- [x] Explain text with real numbers for each broken repair
+- [x] Router comes back (restore): show that the old paths return. (opt) Show the overload bit on startup (ISO 10589 / RFC 3787): the rebooted router stays out of transit paths until it is ready. *Done as a note in the "back up" notice; not modelled (D27).*
+- [x] Tests on Examples 1–3: fail E and check each repair's survive/break result by hand first. Examples 1–5 have no backup that breaks, so a new `06-link-protecting.yaml` shows the breaking case (D27)
+- [x] `DECISIONS.md` entry: what "broken" means for each backup type
+- [x] Out of scope (non-goal): reboot timing, BFD / hold timers, graceful restart. We show the *state* before and after, not the timing.
 
 **Done when:** failing a router on Example 1 shows the node-protecting LFA survives, and an example with only link-protecting backups shows them breaking, with the reason. This leads into Later #1 (node protection).
 
@@ -250,7 +250,7 @@ Needs a rule change: the MVP bans parallel links (D4).
       - TI-LFA: each parallel link gets its own Adj-SID; `AdjSID(S→N)` must name the link, not just the neighbor
 - [ ] Canvas: draw parallel links as curved bundles (Cytoscape `curve-style: bezier`) with separate metric labels
 - [ ] Add-link tool lets you add a second link between the same pair
-- [ ] New example `06-parallel.yaml` + expected results
+- [ ] New example `07-parallel.yaml` + expected results
 
 **Done when:** a 2-link bundle shows ECMP / link-protecting LFA correctly and each link can be failed on its own.
 

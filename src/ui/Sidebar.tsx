@@ -9,6 +9,12 @@ const TOOLS: { tool: Tool; label: string; key: string; hint: string }[] = [
   { tool: 'add-router', label: 'Add router', key: 'R', hint: 'Click empty space' },
   { tool: 'add-link', label: 'Add link', key: 'L', hint: 'Click two routers' },
   { tool: 'fail-link', label: 'Fail link', key: 'F', hint: 'Click links to fail or restore them' },
+  {
+    tool: 'fail-router',
+    label: 'Fail router',
+    key: 'D',
+    hint: 'Click routers to take them down or bring them back (or right-click a router)',
+  },
 ]
 
 const control =
@@ -28,7 +34,10 @@ function KeyboardTool({ tool }: { tool: Tool }) {
   const addLinkBetween = useStore((s) => s.addLinkBetween)
   const failedLinks = useStore((s) => s.failedLinks)
   const toggleFailedLink = useStore((s) => s.toggleFailedLink)
-  const restoreLinks = useStore((s) => s.restoreLinks)
+  const failedNodes = useStore((s) => s.failedNodes)
+  const toggleFailedNode = useStore((s) => s.toggleFailedNode)
+  const restoreAll = useStore((s) => s.restoreAll)
+  const anyDown = failedLinks.length + failedNodes.length > 0
   const ids = topology.nodes.map((n) => n.id).sort()
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -119,7 +128,37 @@ function KeyboardTool({ tool }: { tool: Tool }) {
       </form>
     )
 
-  // Picking a link toggles it, so the list stays on the prompt and can be used again.
+  // Picking an item toggles it, so the list stays on the prompt and can be used again.
+  if (tool === 'fail-router')
+    return (
+      <div className="mt-2 text-xs">
+        <label className="block">
+          Fail or restore a router
+          <select
+            className={control}
+            value=""
+            onChange={(e) => e.target.value !== '' && toggleFailedNode(e.target.value)}
+          >
+            <option value="">
+              {failedNodes.length === 0
+                ? 'Pick a router to take down'
+                : `${failedNodes.length} down; pick one to change`}
+            </option>
+            {ids.map((id) => (
+              <option key={id} value={id}>
+                {failedNodes.includes(id) ? `✕ ${id} (down, restore)` : `${id} (up)`}
+              </option>
+            ))}
+          </select>
+        </label>
+        {anyDown && (
+          <button type="button" className={`${smallButton} mt-1`} onClick={restoreAll}>
+            Restore all
+          </button>
+        )}
+      </div>
+    )
+
   return (
     <div className="mt-2 text-xs">
       <label className="block">
@@ -144,8 +183,8 @@ function KeyboardTool({ tool }: { tool: Tool }) {
           })}
         </select>
       </label>
-      {failedLinks.length > 0 && (
-        <button type="button" className={`${smallButton} mt-1`} onClick={restoreLinks}>
+      {anyDown && (
+        <button type="button" className={`${smallButton} mt-1`} onClick={restoreAll}>
           Restore all
         </button>
       )}
@@ -229,10 +268,10 @@ export function Sidebar({ className = '' }: { className?: string }) {
         <summary className="cursor-pointer font-semibold">Keyboard shortcuts</summary>
         <ul className="mt-1 space-y-0.5">
           <li>
-            <kbd>V</kbd> <kbd>R</kbd> <kbd>L</kbd> <kbd>F</kbd>: pick a tool
+            <kbd>V</kbd> <kbd>R</kbd> <kbd>L</kbd> <kbd>F</kbd> <kbd>D</kbd>: pick a tool
           </li>
           <li>
-            <kbd>C</kbd>: converge / back to repair (when a link is failed)
+            <kbd>C</kbd>: converge / back to repair (when a link or router is down)
           </li>
           <li>
             <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd>: move through and pick table rows

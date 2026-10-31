@@ -1,7 +1,7 @@
 // Small text helpers for the results table and detail panel. No routing maths:
 // they only read what the engine returned.
 import type { ProtectionPaths } from '../engine/paths'
-import type { FailureSimulation, Flow } from '../engine/simulate'
+import type { FailureSimulation, Flow, Through } from '../engine/simulate'
 import type { NodeId, Protection, Segment } from '../engine/types'
 import type { BackupKind } from '../state/store'
 
@@ -70,7 +70,51 @@ export const fileName = (name: string) =>
       .replace(/^-|-$/g, '') || 'topology'
   }.yaml`
 
-/** The flow drawn on the canvas: the chosen one, else the first affected one. */
+/**
+ * The flow drawn on the canvas: the chosen one, else the first affected one. A failed
+ * router as destination has nothing to draw (it is simply unreachable).
+ */
 export function drawnFlow(sim: FailureSimulation, dest: NodeId | null): Flow | undefined {
-  return sim.flows.find((f) => f.dest === dest && f.affected) ?? sim.flows.find((f) => f.affected)
+  const drawable = (f: Flow) => f.affected && !f.destDown
+  return sim.flows.find((f) => f.dest === dest && drawable(f)) ?? sim.flows.find(drawable)
+}
+
+/**
+ * Why a backup is broken by a router failure, with real numbers (D27):
+ * "N's path to D goes through E: dist(N,D) = 2 is not < dist(N,E) + dist(E,D) = 1+1 = 2 …"
+ */
+export function throughText(t: Through, plr: NodeId, dest: NodeId): string {
+  const { node, at, why } = t
+  const hop = `${at}→${node}`
+  if (why.method === 'ecmp' || why.method === 'lfa') {
+    const who = why.method === 'ecmp' ? `the other ECMP next hop ${why.via}` : `LFA ${why.via}`
+    if (why.check) {
+      const { distND, distNE, distED } = why.check
+      return (
+        `${who} reaches ${dest} through ${node}: dist(${why.via},${dest}) = ${distND} is not < ` +
+        `dist(${why.via},${node}) + dist(${node},${dest}) = ${distNE}+${distED} = ${distNE + distED}, ` +
+        `so ${why.via} only protects the link ${plr}–${node}, not the router (RFC 5286 §3.2).`
+      )
+    }
+    return `${who} reaches ${dest} through ${node} (${hop}).`
+  }
+  if (why.method === 'rlfa') {
+    const leg =
+      why.leg === 'to-pq'
+        ? `the tunnel to PQ node ${why.pq} goes through ${node} (${hop})`
+        : `PQ node ${why.pq} reaches ${dest} through ${node} (${hop})`
+    return `${leg}. Remote LFA (RFC 7490) only protects the link ${plr}–${node}, not the router (RFC 8102 §2.1).`
+  }
+  // TypeScript can't narrow the 'ecmp' | 'lfa' member away by the checks above.
+  if (why.method !== 'tilfa') return ''
+  const seg = why.segment
+  const part =
+    seg === null
+      ? `its first hop is ${node}`
+      : seg.kind === 'prefix' && seg.node === node
+        ? `the segment list holds Prefix-SID(${node}) (label ${seg.label}), the label of the router that is down`
+        : seg.kind === 'adj'
+          ? `the segment list holds Adj-SID(${seg.from}→${seg.to}) (label ${seg.label}), a link of ${node}`
+          : `segment Prefix-SID(${seg.node}) follows normal paths through ${node} (${hop})`
+  return `${part}. TI-LFA link protection only avoids the link ${plr}–${node}; node protection would plan around the router (RFC 9855 §1).`
 }

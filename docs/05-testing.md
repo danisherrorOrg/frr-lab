@@ -20,6 +20,9 @@ The engine is the product. If its answers are wrong, the tool teaches wrong thin
 | `03-ring5-highmetric` | S / E / S–E | none | none | `[Prefix B, Adj B→C, Prefix E]` | `16004, 24005, 16002` |
 | `04-isp-core` | PE1 / P1 / PE1–P1 | none | {PE2} (extended, exit via P2), chosen PE2 | `[Adj P2→P1, Prefix P1]` | `24000, 16001` |
 | `05-leaf-spine` | L1 / SP1 / L1–SP1 | none | {L2, L3, L4} (extended, exit via SP2), chosen L2 | `[Prefix L2, Prefix SP1]` | `16012, 16001` |
+| `06-link-protecting` | S / D / S–E | N (link-protecting only, not downstream) | – (not needed) | `[Prefix D]` (path S-N-E-D) | `16005` |
+
+Router failure (Phase 9.3), worked out by hand in `02-algorithms.md` §8.1: `01-square` fail E → D's LFA N survives; `03-ring5-highmetric` fail E → C dropped without TI-LFA, TI-LFA survives; `06-link-protecting` fail E → LFA N breaks at N (N then repairs via M), TI-LFA breaks and loops.
 
 \* With SID indices from the YAML files (S=1, E=2, A=3, B=4, C=5).
 

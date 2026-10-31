@@ -245,4 +245,30 @@ Worked check, ECMP with two members down (Example 5, source SP1, fail L1–SP1 a
 
 Worked check, a third path (S–E 10, E–D 10, S–A 10, A–D 15, A–B 10, B–D 10; fail S–E and A–D, TI-LFA): S's backup S→A→D runs into A–D at A; A's own backup A→B→D avoids both failures, so traffic reaches D on S→A→B→D (cost 30), which is also the final path.
 
+### 8.1 Router failure (Phase 9.3, D27)
+A failed router E takes all its links down at once and its Prefix-SID stops working. The simulation treats it as "every link of E is down", so the hop-by-hop walk above is unchanged. E's neighbors only see their own link fail, so they use the **link-protecting** backup they built for that link; nobody plans for E itself (node protection is Later #1, §4.4).
+
+For every destination D:
+- **D = E:** unreachable. That is expected, so it is shown on its own line, not as a protection failure. No repair is followed.
+- **Not affected:** S's normal path never goes through E (or any other failed link).
+- **Survives:** the PLR's backup, followed on normal tables as if only the link PLR–E had failed, never goes through E. With E the only failure, the traffic then gets through on that one backup.
+- **Broken by the router failure:** that planned backup goes through E. The panel names the router just before E and why:
+  - *LFA / ECMP:* neighbor N's path to D goes through E. When E is the PLR's own next hop the failed node-protecting check is shown, `dist(N,D) < dist(N,E) + dist(E,D)` ✗ (RFC 5286 §3.2).
+  - *Remote LFA:* the tunnel to the PQ node, or the PQ node's path to D, goes through E (RFC 8102 §2.1).
+  - *TI-LFA:* the segment whose path goes through E: `PrefixSID(E)` itself, an Adj-SID on a link of E, or a Prefix-SID whose normal path crosses E (RFC 9855 §1: link protection only avoids the link).
+  What then happens to the traffic comes from the walk: the router before E finds its own link to E down and uses its own backup (D24), so traffic may still get through, be dropped, or loop.
+- **No backup:** dropped at the PLR, as for a link.
+- **Converge:** SPF with all of E's links removed.
+- **Summary:** "E down: 3 destinations affected, 2 repairs survive, 1 breaks".
+- The source router itself can't be failed in the simulation: it sends no traffic.
+- Ties: "goes through E" means the path drawn and walked (lowest-id tie-break, §4.1). The LFA inequality counts a tie as "may use E", so an LFA can fail Inequality 3 and still survive on the one flow shown.
+
+Worked check (Example 1, fail E): D's LFA N is node-protecting (`10 < 20 + 10`), so the repair S→N→D survives in every mode (cost 25, also the final path). E is unreachable, as expected; N is not affected.
+
+Worked check (Example 3, fail E, from S): C has no LFA (`dist(A,C)=3`, not `< 1+2`) and no PQ node, so with "LFA only" or "LFA + Remote LFA" C is dropped. TI-LFA's path S→A→B→C (cost 12) avoids E and survives.
+
+Worked check (Example 6, `06-link-protecting.yaml`, fail E): S's only alternate N reaches D through E: `dist(N,D)=2` is not `< dist(N,E)+dist(E,D) = 1+1`. LFA only: broken at N; N finds N–E down and uses its own node-protecting LFA M, so traffic reaches D on S→N→M→D (cost 21, also the final path). TI-LFA: S's link-protection path S→N→E→D (`[PrefixSID(D)]` out via N) breaks at N; N's own TI-LFA path N→S→E→D sends it back to S with the same label, so it **loops**.
+
+Worked check (ring S–E–C–B–A–S all 1, plus D on E (1) and C (4), fail E): Remote LFA tunnels to PQ node B, whose path to D is B→C→E→D: broken at C. C uses its LFA D, so traffic gets through on S→A→B→C→D (cost 7).
+
 With a single failed link at most one router repairs and traffic never loops, and a TI-LFA repair that survives is always the PLR's final path: it is a shortest path without the first link, and it is still there with the others removed (property tests check both).

@@ -70,6 +70,17 @@ export const STYLE: cytoscape.StylesheetJson = [
       'background-gradient-direction': 'to-right',
     },
   },
+  {
+    // A failed router: greyed out with a dashed border, so it reads without colour too.
+    selector: 'node.down',
+    style: {
+      'background-color': '#cbd5e1',
+      'background-opacity': 0.5,
+      'border-style': 'dashed',
+      'border-color': '#dc2626',
+      color: '#64748b',
+    },
+  },
   { selector: 'node.pq', style: { 'border-color': '#a16207', 'border-width': 4 } },
   { selector: 'node.source', style: { 'border-color': '#1d4ed8', 'border-width': 5 } },
   {
@@ -121,8 +132,8 @@ export const STYLE: cytoscape.StylesheetJson = [
   },
 ]
 
-function nodeLabel(id: NodeId, name: string | undefined, star: boolean) {
-  const top = star ? `★ ${id}` : id
+function nodeLabel(id: NodeId, name: string | undefined, star: boolean, down: boolean) {
+  const top = down ? `✕ ${id}` : star ? `★ ${id}` : id
   return name ? `${top}\n${name}` : top
 }
 
@@ -166,22 +177,32 @@ export function sync(cy: cytoscape.Core, t: Topology) {
 }
 
 const CLASSES =
-  'p-space q-space pq source dest sel link-start primary backup final primary-fwd primary-rev backup-fwd backup-rev final-fwd final-rev flowing failed'
+  'p-space q-space pq down source dest sel link-start primary backup final primary-fwd primary-rev backup-fwd backup-rev final-fwd final-rev flowing failed'
 
 export function decorate(
   cy: cytoscape.Core,
   t: Topology,
   h: Highlight,
-  extra: { selection: string | null; linkStart: NodeId | null; failed: string[] },
+  extra: {
+    selection: string | null
+    linkStart: NodeId | null
+    failed: string[]
+    /** Failed routers: greyed out, and every link they have is drawn as down. */
+    failedNodes?: NodeId[]
+  },
 ) {
   cy.batch(() => {
     cy.elements().removeClass(CLASSES)
     const failed = new Set(extra.failed)
+    const downNodes = new Set(extra.failedNodes ?? [])
     cy.nodes().forEach((n) => {
-      n.data('display', nodeLabel(n.id(), n.data('name') || undefined, n.id() === h.pq))
+      const down = downNodes.has(n.id())
+      n.data('display', nodeLabel(n.id(), n.data('name') || undefined, n.id() === h.pq, down))
+      if (down) n.addClass('down')
     })
     cy.edges().forEach((e) => {
-      const f = failed.has(e.id())
+      const f =
+        failed.has(e.id()) || downNodes.has(e.data('source')) || downNodes.has(e.data('target'))
       e.data(edgeLabels(e.data('metricAB'), e.data('metricBA'), f))
       if (f) e.addClass('failed')
     })

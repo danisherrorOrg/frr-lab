@@ -124,3 +124,20 @@ describe('canvas highlight', () => {
     expect(ps('A-S', 'mid-source-arrow-shape').strValue).toBe('chevron')
   })
 })
+
+describe('canvas: failed router (Phase 9.3)', () => {
+  it('greys out the router, marks it ✕ and draws every one of its links as down', () => {
+    const { cy, t } = draw('02-ring5.yaml')
+    decorate(cy, t, { source: 'S' }, { ...none, failedNodes: ['E'] })
+    expect(cy.getElementById('E').hasClass('down')).toBe(true)
+    expect(cy.getElementById('E').data('display')).toBe('✕ E')
+    expect(cy.getElementById('S-E').hasClass('failed')).toBe(true)
+    expect(cy.getElementById('E-C').hasClass('failed')).toBe(true)
+    expect(cy.getElementById('E-C').data('label')).toBe('✕ 1')
+    expect(cy.getElementById('C-B').hasClass('failed')).toBe(false)
+    // Restored: back to normal.
+    decorate(cy, t, { source: 'S' }, none)
+    expect(cy.getElementById('E').hasClass('down')).toBe(false)
+    expect(cy.getElementById('S-E').hasClass('failed')).toBe(false)
+  })
+})

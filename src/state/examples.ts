@@ -5,6 +5,7 @@ import ring from '../../examples/02-ring5.yaml?raw'
 import ringHigh from '../../examples/03-ring5-highmetric.yaml?raw'
 import isp from '../../examples/04-isp-core.yaml?raw'
 import leafSpine from '../../examples/05-leaf-spine.yaml?raw'
+import linkProtecting from '../../examples/06-link-protecting.yaml?raw'
 import type { NodeId, Topology } from '../engine/types'
 import { parseTopology } from '../io/yaml'
 
@@ -27,6 +28,12 @@ export const EXAMPLES: Example[] = [
   },
   { key: 'isp-core', title: 'Small ISP core', source: 'PE1', yaml: isp },
   { key: 'leaf-spine', title: 'Leaf-spine fabric', source: 'L1', yaml: leafSpine },
+  {
+    key: 'link-protecting',
+    title: 'Link-protecting LFA: breaks when E fails',
+    source: 'S',
+    yaml: linkProtecting,
+  },
 ]
 
 /** The example's topology. The files are checked by tests, so a failure here is a bug. */

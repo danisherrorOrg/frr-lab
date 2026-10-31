@@ -208,3 +208,24 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
   - The footer said "Repair = final?" compares "the repairing router's backup"; with several repairs it is the whole path from the first router that repairs. §8 step 6 says the same now.
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D27 – Router failure: what "broken" means for each backup type (2026-10-31)
+- **Why:** Phase 9.3. When router E goes down, its neighbors only see "my link to E failed" and use their link-protecting backups; some of those still go through E. Showing that is the reason node protection exists (RFC 8102 §2.1, RFC 9855 §1).
+- **Model:** a failed router = all its links down (its Prefix-SID can't be reached either). The hop-by-hop walk of D24 is reused unchanged: every router uses its normal table and its link backups. Nobody has a node-protecting backup yet (Later #1).
+- **"Broken":** the PLR's backup, followed leg by leg on normal tables as if only the link PLR–E had failed (the plan the PLR made), passes a failed router. We name the router just before it and the reason:
+  - LFA / ECMP: the neighbor's path to D goes through E; when E is the PLR's own next hop we show RFC 5286 §3.2 Inequality 3 with its numbers.
+  - Remote LFA: the tunnel to the PQ node or the PQ node's path to D goes through E (RFC 8102 §2.1).
+  - TI-LFA: the first segment whose path reaches E: `PrefixSID(E)`, an Adj-SID on a link of E, or a Prefix-SID whose normal path crosses E. RFC 9855 §6.1 keeps an active node segment unchanged, and nothing special is done for the failed neighbor's own segment in link protection, so a packet aimed at `PrefixSID(E)` keeps being repaired towards E until it is dropped or loops.
+  "Broken" says the plan fails; what happens to the traffic (another router repairs it, a drop, a loop) is the walk's status. Keeping both apart matches D24: FRR is local, so a broken backup can still be rescued by the next router.
+- **"Survives":** the plan never passes a failed router. "No backup" is neither.
+- **D = E:** status `unreachable` with `destDown`, kept out of the table and said plainly ("expected, not a protection failure"). No walk.
+- **Ties:** the check uses the path drawn and walked (lowest-id tie-break, D21). Inequality 3 counts a tie as "may use E", so an LFA can fail it and still survive on the drawn flow. One flow per destination (D22).
+- **Source down:** the engine refuses it; the panel says S sends no traffic.
+- **Restore:** the router's links come back; a notice says traffic goes back to the normal paths. The IS-IS overload bit on startup (ISO 10589, RFC 3787) is described there but not modelled: we show the state before and after, not the timing (non-goal, with reboot timers, BFD and graceful restart).
+- **Engine API:** `simulateFailure(topology, source, failed, mode)` takes a list of link ids (as before) or `{ links, nodes }`. The result has `nodes`; flows get `destDown` and `through`. Links and routers can fail together.
+- **UI:** "Fail router" tool (key D) and a right-click menu on routers; the failed router is grey with a dashed red border and ✕, and all its links are drawn as failed. The failure panel adds a "Backup vs down router" column, a router summary line and the reason with real numbers. "Restore all" brings links and routers back.
+- **New example:** `06-link-protecting.yaml`. None of Examples 1–5 has a backup that breaks when a router fails (checked for every source, router and mode): their chosen backups are all node-protecting. The new example's only alternate is link-protecting. 9.4's planned example becomes `07-parallel.yaml`.
+- **Not in the share link:** failed routers, like failed links (D23), are a scenario, not part of the topology.
+- **Other options considered:** classify by Inequality 3 alone (only covers LFA, and disagrees with the drawn path on ties); stop the walk at E and call it "dropped" (hides that FRR at the next router often still gets through, contradicting D24).
+- **No new dependencies.**
+- **Status:** Accepted.

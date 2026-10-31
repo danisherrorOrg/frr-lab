@@ -1,12 +1,21 @@
 import cytoscape from 'cytoscape'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../state/store'
 import { decorate, stepFlow, STYLE, sync, type Highlight } from './canvas'
+
+/** A right-click menu on a router, at this spot inside the canvas box. */
+interface Menu {
+  node: string
+  x: number
+  y: number
+}
 
 /** Cytoscape wrapper: draws the topology and turns clicks into store actions. */
 export function GraphCanvas({ highlight }: { highlight: Highlight }) {
   const box = useRef<HTMLDivElement>(null)
   const cyRef = useRef<cytoscape.Core | null>(null)
+  const [openMenu, setMenu] = useState<Menu | null>(null)
+  const failedNodes = useStore((s) => s.failedNodes)
   const topology = useStore((s) => s.topology)
   const loadCount = useStore((s) => s.loadCount)
   const selection = useStore((s) => s.selection)
@@ -27,6 +36,7 @@ export function GraphCanvas({ highlight }: { highlight: Highlight }) {
     cy.autounselectify(true)
 
     cy.on('tap', (ev) => {
+      setMenu(null)
       const st = useStore.getState()
       const target = ev.target as cytoscape.Core | cytoscape.SingularElementReturnValue
       if (target === cy) {
@@ -37,6 +47,7 @@ export function GraphCanvas({ highlight }: { highlight: Highlight }) {
       const id = el.id()
       if (el.isNode()) {
         if (st.tool === 'add-link') st.linkClick(id)
+        else if (st.tool === 'fail-router') st.toggleFailedNode(id)
         else st.select({ kind: 'node', id })
       } else if (st.tool === 'fail-link') {
         st.toggleFailedLink(id)
@@ -44,6 +55,16 @@ export function GraphCanvas({ highlight }: { highlight: Highlight }) {
         st.select({ kind: 'link', id })
       }
     })
+    // Right-click (or long-press) on a router opens a small menu (Phase 9.3).
+    cy.on('cxttap', 'node', (ev) => {
+      const n = ev.target as cytoscape.NodeSingular
+      const p = ev.renderedPosition
+      setMenu({ node: n.id(), x: p.x, y: p.y })
+    })
+    cy.on('cxttap', (ev) => {
+      if (ev.target === cy) setMenu(null)
+    })
+    cy.on('pan zoom', () => setMenu(null))
     cy.on('dragfree', 'node', (ev) => {
       const n = ev.target as cytoscape.NodeSingular
       useStore.getState().moveRouter(n.id(), n.position())
@@ -78,8 +99,18 @@ export function GraphCanvas({ highlight }: { highlight: Highlight }) {
       selection: selection?.id ?? null,
       linkStart,
       failed: failedLinks,
+      failedNodes,
     })
-  }, [topology, highlight, selection, linkStart, failedLinks])
+  }, [topology, highlight, selection, linkStart, failedLinks, failedNodes])
+
+  // The menu's router may have been deleted or renamed since it opened.
+  const menu = openMenu && topology.nodes.some((n) => n.id === openMenu.node) ? openMenu : null
+  useEffect(() => {
+    if (!menu) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenu(null)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menu])
 
   // Traffic on the repair path: marching dashes, unless the user asked for less motion.
   useEffect(() => {
@@ -95,12 +126,36 @@ export function GraphCanvas({ highlight }: { highlight: Highlight }) {
   }, [highlight])
 
   const cursor = tool === 'select' ? 'cursor-default' : 'cursor-crosshair'
+  const menuDown = menu !== null && failedNodes.includes(menu.node)
   return (
-    <div
-      ref={box}
-      className={`h-full w-full ${cursor}`}
-      role="img"
-      aria-label={`Network diagram: ${topology.nodes.length} routers, ${topology.links.length} links`}
-    />
+    <div className="relative h-full w-full" onContextMenu={(e) => e.preventDefault()}>
+      <div
+        ref={box}
+        className={`h-full w-full ${cursor}`}
+        role="img"
+        aria-label={`Network diagram: ${topology.nodes.length} routers, ${topology.links.length} links`}
+      />
+      {menu && (
+        <div
+          role="menu"
+          aria-label={`Router ${menu.node}`}
+          className="absolute z-10 min-w-36 rounded border border-slate-300 bg-white py-1 text-sm shadow-lg dark:border-slate-600 dark:bg-slate-800"
+          style={{ left: menu.x, top: menu.y }}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            autoFocus
+            className="block w-full px-3 py-1 text-left hover:bg-slate-100 dark:hover:bg-slate-700"
+            onClick={() => {
+              useStore.getState().toggleFailedNode(menu.node)
+              setMenu(null)
+            }}
+          >
+            {menuDown ? `↺ Restore router ${menu.node}` : `✕ Fail router ${menu.node}`}
+          </button>
+        </div>
+      )}
+    </div>
   )
 }

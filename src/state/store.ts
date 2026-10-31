@@ -1,5 +1,5 @@
 // App state (docs/03-architecture.md §1): topology + undo history, chosen source,
-// selection, failed links and settings. Results are not stored here; the UI asks
+// selection, failed links and routers, and settings. Results are not stored here; the UI asks
 // the engine worker for them whenever the topology or source changes.
 import { create } from 'zustand'
 import type { RepairMode } from '../engine/simulate'
@@ -7,7 +7,7 @@ import type { NodeId, Topology } from '../engine/types'
 import * as edit from './edit'
 import { EXAMPLES, exampleTopology } from './examples'
 
-export type Tool = 'select' | 'add-router' | 'add-link' | 'fail-link'
+export type Tool = 'select' | 'add-router' | 'add-link' | 'fail-link' | 'fail-router'
 
 export type Selection = { kind: 'node'; id: NodeId } | { kind: 'link'; id: string } | null
 
@@ -43,6 +43,11 @@ export interface AppState {
    * one failure; with more, the simulation shows which repairs break (D23).
    */
   failedLinks: string[]
+  /**
+   * Routers failed by the fail-router tool or the right-click menu (Phase 9.3): all
+   * their links go down at once, and neighbors use link-protecting backups (D27).
+   */
+  failedNodes: NodeId[]
   /** Which FRR methods the routers run in the simulation. */
   simMode: RepairMode
   /** False = traffic on the repair path; true = after the network reconverges. */
@@ -79,8 +84,10 @@ export interface AppState {
   setTool: (t: Tool) => void
   /** Fail this link, or restore it if it is already failed. */
   toggleFailedLink: (linkId: string) => void
-  /** Bring every failed link back up. */
-  restoreLinks: () => void
+  /** Fail this router, or bring it back up if it is already down. */
+  toggleFailedNode: (id: NodeId) => void
+  /** Bring every failed link and router back up. */
+  restoreAll: () => void
   setSimMode: (m: RepairMode) => void
   setConverged: (on: boolean) => void
   setSimDest: (d: NodeId | null) => void
@@ -109,8 +116,25 @@ function tidy(s: AppState, t: Topology): Partial<AppState> {
     selection: selOk ? sel : null,
     row: rowOk ? s.row : null,
     failedLinks: s.failedLinks.filter((id) => links.has(id)),
+    failedNodes: s.failedNodes.filter((id) => nodes.has(id)),
     simDest: s.simDest !== null && nodes.has(s.simDest) ? s.simDest : null,
     linkStart: s.linkStart !== null && nodes.has(s.linkStart) ? s.linkStart : null,
+  }
+}
+
+/**
+ * Shown when a failed router comes back. The overload bit is only described, not
+ * modelled: we show the state before and after, not the timing (Phase 9.3 non-goal).
+ */
+function backUpNotice(ids: NodeId[]): Notice {
+  const many = ids.length > 1
+  return {
+    kind: 'info',
+    title: `${many ? 'Routers' : 'Router'} ${ids.join(', ')} ${many ? 'are' : 'is'} back up`,
+    lines: [
+      `${many ? 'Their' : 'Its'} links are up again, so traffic goes back to the normal paths in the results table.`,
+      'A router that has just rebooted may set the IS-IS overload bit (ISO 10589, RFC 3787) so others keep transit traffic away from it until it is ready. LFA Lab does not model that wait.',
+    ],
   }
 }
 
@@ -145,6 +169,7 @@ export const useStore = create<AppState>()((set, get) => {
     row: null,
     backup: 'auto',
     failedLinks: [],
+    failedNodes: [],
     simMode: 'tilfa',
     converged: false,
     simDest: null,
@@ -160,6 +185,7 @@ export const useStore = create<AppState>()((set, get) => {
         selection: null,
         row: null,
         failedLinks: [],
+        failedNodes: [],
         converged: false,
         simDest: null,
         linkStart: null,
@@ -288,7 +314,26 @@ export const useStore = create<AppState>()((set, get) => {
         simDest: null,
       })
     },
-    restoreLinks: () => set({ failedLinks: [], converged: false, simDest: null }),
+    toggleFailedNode: (id) => {
+      const down = get().failedNodes
+      const back = down.includes(id)
+      set({
+        failedNodes: back ? down.filter((x) => x !== id) : [...down, id],
+        converged: false,
+        simDest: null,
+        ...(back && { notice: backUpNotice([id]) }),
+      })
+    },
+    restoreAll: () => {
+      const routers = get().failedNodes
+      set({
+        failedLinks: [],
+        failedNodes: [],
+        converged: false,
+        simDest: null,
+        ...(routers.length > 0 && { notice: backUpNotice(routers) }),
+      })
+    },
     setSimMode: (simMode) => set({ simMode, converged: false }),
     setConverged: (converged) => set({ converged }),
     setSimDest: (simDest) => set({ simDest }),

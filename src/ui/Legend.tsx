@@ -18,6 +18,13 @@ export function Legend() {
       <li className="flex items-center gap-1">{line('6 4', '#ea580c')} backup path</li>
       <li className="flex items-center gap-1">{line('2 3', '#dc2626')} ✕ failed link</li>
       <li className="flex items-center gap-1">
+        <span
+          aria-hidden="true"
+          className="inline-block h-3 w-3 rounded-full border border-dashed border-red-600 bg-slate-300/50"
+        />
+        ✕ failed router (all its links down)
+      </li>
+      <li className="flex items-center gap-1">
         <svg width="28" height="14" aria-hidden="true" className="inline-block">
           <line
             x1="0"
