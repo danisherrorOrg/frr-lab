@@ -259,6 +259,22 @@ Needs a rule change: the MVP bans parallel links (D4).
 - [ ] Click a router on the canvas as destination → selects that row in the results table
 - [ ] "Auto layout" and "Fit to screen" buttons; zoom +/− buttons for touch/trackpad users
 
+### 9.6 Results for every router as the DUT
+Today the results table, detail panel and failure view show one source at a time (e.g.
+PE1 in `04-isp-core.yaml`). Users want to see each router's results when *it* is the DUT
+(device under test, the router doing the protecting), without picking them one by one.
+- [ ] Source picker gets an "All routers" choice next to the single-router list
+- [ ] Engine: reuse `computeForSource` for each router (all-sources path from Phase 5 already exists); run it in the worker with progress
+- [ ] Results view for "All routers": one section per DUT (collapsible), same columns as today: Dest · NH · Cost · LFA · RLFA · TI-LFA · ✓/✗; filter by DUT and "only unprotected"
+- [ ] Row click still works: picks that DUT + destination, highlights the path and opens the detail panel
+- [ ] Failure view: with links (or a router, 9.3) failed, show the effect per DUT, e.g. "PE1: 3 affected, 3 survive · P2: 2 affected, 1 breaks"
+- [ ] Quick switch: click a router on the canvas (or right-click "Set as DUT", 9.5) to make it the DUT
+- [ ] CSV export of the all-DUT table (reuse the Phase 5 CSV function)
+- [ ] Speed: stays under 2 s on the 200-node topology; large tables are virtualised or paged
+- [ ] UI test: load Example 4, choose "All routers", see a section for every router
+
+**Done when:** on `04-isp-core.yaml` you can see, in one view, the LFA / RLFA / TI-LFA result for every router as the DUT, and click into any of them.
+
 ---
 
 ## Ideas backlog (suggested, not yet prioritised)
