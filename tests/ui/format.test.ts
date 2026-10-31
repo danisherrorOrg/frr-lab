@@ -1,10 +1,13 @@
+import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { computeForSource } from '../../src/engine/index'
 import { protectionPaths } from '../../src/engine/paths'
 import { adjLabel } from '../../src/engine/labels'
-import { simulateAllSources, type FailureSummary } from '../../src/engine/simulate'
+import { simulateAllSources, simulateFailure, type FailureSummary } from '../../src/engine/simulate'
 import {
+  bundles,
   dutSummary,
+  isBundled,
   lfaTags,
   outcomeText,
   pickBackup,
@@ -13,6 +16,7 @@ import {
   throughText,
   tooltipLines,
 } from '../../src/ui/format'
+import { connectedTopology } from '../arbitraries'
 import { loadFixture } from '../helpers'
 
 const first = (file: string, s: string, d: string) =>
@@ -148,6 +152,102 @@ describe('throughText (Phase 9.3)', () => {
       ),
     ).toBe(
       "PQ node N is itself down. N is a second failure: E's backup was planned for the link E–D alone, and FRR plans for one failure at a time.",
+    )
+  })
+
+  // D29, D33: with parallel links, text names the one link meant.
+  it('names the link of a bundle the backup was planned for', () => {
+    // Example 7, source S, fail link S-E and router A: S's LFA for D is A, which is down.
+    const t = loadFixture('07-parallel.yaml')
+    for (const mode of ['lfa', 'tilfa'] as const) {
+      const f = simulateFailure(t, 'S', { links: ['S-E'], nodes: ['A'] }, mode).flows.find(
+        (x) => x.dest === 'D',
+      )!
+      expect(f.through).toBeDefined()
+      const text = throughText(f.through!, f.plr!, f.next!, f.dest, f.hitLink, bundles(t))
+      expect(text).toContain(
+        "A is a second failure: S's backup was planned for the link S–E (S-E) alone",
+      )
+    }
+    // S has one link to E here (no bundle), so the text stays as before.
+    const b = bundles(loadFixture('01-square.yaml'))
+    expect(
+      throughText(
+        { node: 'N', at: 'S', why: { method: 'rlfa', pq: 'N', leg: 'to-pq' } },
+        'E',
+        'D',
+        'D',
+        'E-D',
+        b,
+      ),
+    ).toContain('planned for the link E–D alone')
+  })
+
+  it('names the protected link of a bundle, and the link of an Adj-SID', () => {
+    const b = new Set(['E|S', 'B|C'])
+    expect(
+      throughText(
+        {
+          node: 'E',
+          at: 'N',
+          why: { method: 'lfa', via: 'N', check: { distND: 2, distNE: 1, distED: 1 } },
+        },
+        'S',
+        'E',
+        'D',
+        'S-E#2',
+        b,
+      ),
+    ).toMatch(/so N only protects the link S–E \(S-E#2\), not the router/)
+    // Example 3's ring with B–C as a bundle (§9), fail S–E and router C: the Adj-SID is on B-C#2.
+    expect(
+      throughText(
+        {
+          node: 'C',
+          at: 'B',
+          why: {
+            method: 'tilfa',
+            segment: { kind: 'adj', from: 'B', to: 'C', link: 'B-C#2', label: 24002 },
+          },
+        },
+        'S',
+        'E',
+        'E',
+        'S-E',
+        b,
+      ),
+    ).toBe(
+      "the segment list holds Adj-SID(B→C) of link B-C#2 (label 24002), a link of C. C is a second failure: S's backup was planned for the link S–E (S-E) alone, and FRR plans for one failure at a time.",
+    )
+  })
+
+  it('names the failed link whenever the PLR and its neighbor have several (random networks)', () => {
+    fc.assert(
+      fc.property(
+        connectedTopology({ parallel: true }).filter((t) => t.nodes.length <= 10),
+        fc.nat(),
+        fc.nat(),
+        (t, i, j) => {
+          const ids = t.nodes.map((n) => n.id)
+          const router = ids[i % ids.length]!
+          const link = t.links[j % t.links.length]!.id
+          const b = bundles(t)
+          for (const s of ids) {
+            if (s === router) continue
+            for (const f of simulateFailure(t, s, { links: [link], nodes: [router] }, 'lfa')
+              .flows) {
+              if (!f.through || !isBundled(b, f.plr!, f.next!)) continue
+              const text = throughText(f.through, f.plr!, f.next!, f.dest, f.hitLink, b)
+              // Every "the link PLR–E" is followed by the link's id.
+              const named = `the link ${f.plr}–${f.next} (${f.hitLink})`
+              expect(text.split(`the link ${f.plr}–${f.next}`).length).toBe(
+                text.split(named).length,
+              )
+            }
+          }
+        },
+      ),
+      { numRuns: 60 },
     )
   })
 })

@@ -111,13 +111,22 @@ export function drawnFlow(sim: FailureSimulation, dest: NodeId | null): Flow | u
  * "N's path to D goes through E: dist(N,D) = 2 is not < dist(N,E) + dist(E,D) = 1+1 = 2 …"
  * `next` is the neighbor the PLR protects against. Only when that neighbor is the
  * failed router is it a node-protection story; any other failed router is a second
- * failure the backup was never planned for (D28).
+ * failure the backup was never planned for (D28). `link` is the PLR's failed link:
+ * with parallel links the text names it, since each link has its own backup (D29).
  */
-export function throughText(t: Through, plr: NodeId, next: NodeId, dest: NodeId): string {
+export function throughText(
+  t: Through,
+  plr: NodeId,
+  next: NodeId,
+  dest: NodeId,
+  link?: string,
+  b?: Bundles,
+): string {
   const { node, at, why } = t
   const hop = `${at}→${node}`
+  const protectedLink = linkName(b, plr, next, link)
   const second =
-    `${node} is a second failure: ${plr}'s backup was planned for the link ${plr}–${next} ` +
+    `${node} is a second failure: ${plr}'s backup was planned for the link ${protectedLink} ` +
     `alone, and FRR plans for one failure at a time.`
   if (why.method === 'ecmp' || why.method === 'lfa') {
     const who = why.method === 'ecmp' ? `the other ECMP next hop ${why.via}` : `LFA ${why.via}`
@@ -126,7 +135,7 @@ export function throughText(t: Through, plr: NodeId, next: NodeId, dest: NodeId)
       return (
         `${who} reaches ${dest} through ${node}: dist(${why.via},${dest}) = ${distND} is not < ` +
         `dist(${why.via},${node}) + dist(${node},${dest}) = ${distNE}+${distED} = ${distNE + distED}, ` +
-        `so ${why.via} only protects the link ${plr}–${node}, not the router (RFC 5286 §3.2).`
+        `so ${why.via} only protects the link ${protectedLink}, not the router (RFC 5286 §3.2).`
       )
     }
     const part =
@@ -143,7 +152,7 @@ export function throughText(t: Through, plr: NodeId, next: NodeId, dest: NodeId)
           : `the tunnel to PQ node ${why.pq} goes through ${node} (${hop})`
         : `PQ node ${why.pq} reaches ${dest} through ${node} (${hop})`
     return node === next
-      ? `${leg}. Remote LFA (RFC 7490) only protects the link ${plr}–${node}, not the router (RFC 8102 §2.1).`
+      ? `${leg}. Remote LFA (RFC 7490) only protects the link ${protectedLink}, not the router (RFC 8102 §2.1).`
       : `${leg}. ${second}`
   }
   // TypeScript can't narrow the 'ecmp' | 'lfa' member away by the checks above.
@@ -155,10 +164,10 @@ export function throughText(t: Through, plr: NodeId, next: NodeId, dest: NodeId)
       : seg.kind === 'prefix' && seg.node === node
         ? `the segment list holds Prefix-SID(${node}) (label ${seg.label}), the label of the router that is down`
         : seg.kind === 'adj'
-          ? `the segment list holds Adj-SID(${seg.from}→${seg.to}) (label ${seg.label}), a link of ${node}`
+          ? `the segment list holds Adj-SID(${seg.from}→${seg.to})${isBundled(b, seg.from, seg.to) ? ` of link ${seg.link}` : ''} (label ${seg.label}), a link of ${node}`
           : `segment Prefix-SID(${seg.node}) follows normal paths through ${node} (${hop})`
   return node === next
-    ? `${part}. TI-LFA link protection only avoids the link ${plr}–${node}; node protection would plan around the router (RFC 9855 §1).`
+    ? `${part}. TI-LFA link protection only avoids the link ${protectedLink}; node protection would plan around the router (RFC 9855 §1).`
     : `${part}. ${second}`
 }
 

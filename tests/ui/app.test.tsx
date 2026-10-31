@@ -498,6 +498,23 @@ describe('Phase 9.3: router failure', () => {
     expect(rowOf('N').querySelectorAll('td')[2]?.textContent).toBe('–')
   })
 
+  it('names the link of a bundle the broken backup was planned for (D33)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'parallel')
+    useStore.getState().toggleFailedLink('S-E')
+    useStore.getState().toggleFailedNode('A')
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    await user.click(within(panel).getByLabelText('LFA only'))
+    const row = (await within(panel).findAllByRole('row')).find(
+      (r) => r.querySelector('td')?.textContent === 'D',
+    )!
+    await user.click(row)
+    expect(panel.textContent).toContain(
+      "LFA A is itself down. A is a second failure: S's backup was planned for the link S–E (S-E) alone",
+    )
+  })
+
   it('the failed router as source sends nothing', async () => {
     render(<App />)
     useStore.getState().toggleFailedNode('S')

@@ -261,6 +261,7 @@ For every destination D:
   - *Remote LFA:* the tunnel to the PQ node, or the PQ node's path to D, goes through E (RFC 8102 §2.1).
   - *TI-LFA:* the segment whose path goes through E: `PrefixSID(E)` itself, an Adj-SID on a link of E, or a Prefix-SID whose normal path crosses E (RFC 9855 §1: link protection only avoids the link).
   These reasons (and the RFC 5286 / 8102 / 9855 node-protection notes) apply when the failed router met is E, the PLR's protected neighbor. When it is another failed router (several things down), it is a **second failure** the backup was never planned for, and the panel says that instead; if the backup's own neighbor or PQ node is that router, it says it "is itself down" (D28).
+  With parallel links (§9) the reason names the one link the backup was planned for, "the link S–E (S-E)", and the link of an Adj-SID, "Adj-SID(B→C) of link B-C#2": each link has its own backup and Adj-SID (D33).
   What then happens to the traffic comes from the walk: the router before E finds its own link to E down and uses its own backup (D24), so traffic may still get through, be dropped, or loop.
 - **No backup:** dropped at the PLR, as for a link.
 - **Converge:** SPF with all of E's links removed.

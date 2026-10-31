@@ -124,12 +124,13 @@ function Chain({ f }: { f: Flow }) {
 
 /** A backup broken by a router failure: where it meets the router, and why (D27). */
 function Through({ f }: { f: Flow }) {
+  const b = useContext(BundleContext)
   if (!f.through) return null
   return (
     <>
       {' '}
       But that backup goes through <strong>{f.through.node}</strong>, which is down:{' '}
-      {throughText(f.through, f.plr!, f.next!, f.dest)}
+      {throughText(f.through, f.plr!, f.next!, f.dest, f.hitLink, b)}
     </>
   )
 }
