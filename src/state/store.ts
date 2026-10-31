@@ -78,6 +78,8 @@ export interface AppState {
   /** First router clicked with the add-link tool. */
   linkStart: NodeId | null
   notice: Notice | null
+  /** Guided tour step (TODO backlog), or null when the tour is closed. */
+  tour: number | null
 
   loadTopology: (t: Topology, source?: NodeId, warnings?: string[]) => void
   loadExample: (key: string) => void
@@ -119,6 +121,7 @@ export interface AppState {
   setSimDest: (d: NodeId | null) => void
   setExtended: (on: boolean) => void
   setNotice: (n: Notice | null) => void
+  setTour: (step: number | null) => void
 }
 
 /** Keep the chosen source if it still exists, else 'S', else the first router. */
@@ -205,6 +208,7 @@ export const useStore = create<AppState>()((set, get) => {
     tool: 'select',
     linkStart: null,
     notice: null,
+    tour: null,
 
     loadTopology: (t, source, warnings = []) => {
       const placed = edit.withPositions(t)
@@ -386,6 +390,7 @@ export const useStore = create<AppState>()((set, get) => {
     setSimDest: (simDest) => set({ simDest }),
     setExtended: (extended) => set({ settings: { ...get().settings, extended } }),
     setNotice: (notice) => set({ notice }),
+    setTour: (tour) => set({ tour }),
   }
 })
 

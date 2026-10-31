@@ -31,7 +31,7 @@ async function share() {
   }
 }
 
-/** Top bar: examples, import, export, share, undo / redo, theme. */
+/** Top bar: examples, import, export, share, undo / redo, tour, theme. */
 export function Toolbar() {
   const fileInput = useRef<HTMLInputElement>(null)
   const [theme, setTheme] = useState<Theme>(currentTheme)
@@ -45,6 +45,7 @@ export function Toolbar() {
   const canRedo = useStore((s) => s.future.length > 0)
   const undo = useStore((s) => s.undo)
   const redo = useStore((s) => s.redo)
+  const setTour = useStore((s) => s.setTour)
 
   const importFile = async (file: File) => {
     const { loadTopology, setNotice } = useStore.getState()
@@ -114,6 +115,14 @@ export function Toolbar() {
       <button
         type="button"
         className={`${button} ml-auto`}
+        onClick={() => setTour(0)}
+        title="Guided tour"
+      >
+        ? Tour
+      </button>
+      <button
+        type="button"
+        className={button}
         onClick={toggleTheme}
         aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
         title={theme === 'dark' ? 'Light mode' : 'Dark mode'}

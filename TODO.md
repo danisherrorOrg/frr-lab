@@ -294,7 +294,7 @@ Things that fit the "learn and check FRR" goal and stay offline / no backend.
 - [x] Bug: fail a router, restore it, and the "back up" notice appears at the top; until that notice is closed with ✕, the router can't be failed again. Check in Chrome, find the cause, add a UI test *(Cytoscape only re-reads where its box is when the box changes size; the notice moved it without resizing, so clicks landed one notice-height off. The canvas now re-measures when a notice opens or closes and before each click. Failing the router again also takes it off the notice, or closes the notice if no router in it is still up.)*
 - [x] Compare view: LFA, RLFA and TI-LFA paths for one destination side by side *(D36, `02-algorithms.md` §10)*
   - [x] With links or routers down: the three repair modes side by side for the traffic on the diagram (delivered / dropped / loops, and why) *(D37, §10.1)*
-- [ ] Guided tour on first visit (load Example 2, fail S–E, read the TI-LFA stack)
+- [x] Guided tour on first visit (load Example 2, fail S–E, read the TI-LFA stack) *(D38)*
 - [ ] Clickable P / Q / PQ sets in the detail panel that highlight those routers on the canvas
 
 **Design checks (for engineers)**

@@ -346,3 +346,12 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Cost:** three simulations instead of one while something is down; each is a few ms on the examples, and they run in the worker.
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D38 – Guided tour on first visit (2026-10-31)
+- **Why:** TODO backlog "Guided tour". New visitors land on a busy screen and don't know where to start; the shortest useful lesson is Example 2 with S–E failed and the TI-LFA stack read out.
+- **What:** a small card in the bottom-right corner (full width on phones), not modal, so the app stays usable. Steps: welcome (Start tour / No thanks) → Example 2 with row S → E open and why A is not an LFA → S–E failed, traffic on the TI-LFA path → the label stack, each label explained (Prefix-SID = SRGB + index, and the part of the path it covers) → "Your turn" tips. A "? Tour" button in the toolbar opens it again.
+- **Numbers come from the engine** (`tourFacts()` in `src/ui/tour-steps.ts` calls `computeForSource`), so the tour can't disagree with the results table. Each step sets the whole state it needs (loads Example 2 if the network differs, fails or restores S–E), so Back / Next work even after the user clicks around.
+- **First visit:** offered once, remembered in `localStorage` (`lfa-lab-tour-seen`); not offered when the page opens from a share link. Blocked storage means it is not offered, rather than offered on every visit.
+- **Other options considered:** a tour library (new dependency for five steps); spotlighting page elements (fragile across the phone and desktop layouts).
+- **No new dependencies.**
+- **Status:** Accepted.

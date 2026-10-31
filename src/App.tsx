@@ -21,6 +21,8 @@ import type { WalkPath } from './ui/PacketWalk'
 import { ResultsTable } from './ui/ResultsTable'
 import { Sidebar } from './ui/Sidebar'
 import { Toolbar } from './ui/Toolbar'
+import { Tour } from './ui/Tour'
+import { isFirstVisit, markTourSeen } from './ui/tour-steps'
 import { useResults } from './ui/useResults'
 import { useAllModes, useSimulation } from './ui/useSimulation'
 
@@ -90,9 +92,20 @@ function useShareLink() {
   }, [])
 }
 
+/** Offer the guided tour once, on the first visit (TODO backlog). */
+function useFirstVisitTour() {
+  useEffect(() => {
+    if (!isFirstVisit(window.location.hash)) return
+    // Seen once it is offered, so a reload doesn't offer it again.
+    markTourSeen()
+    useStore.getState().setTour(0)
+  }, [])
+}
+
 export function App() {
   useShortcuts()
   useShareLink()
+  useFirstVisitTour()
   const topology = useStore((s) => s.topology)
   const source = useStore((s) => s.source)
   const extended = useStore((s) => s.settings.extended)
@@ -382,6 +395,7 @@ export function App() {
           <CoverageReport source={source} />
         </main>
       </div>
+      <Tour />
     </div>
   )
 }
