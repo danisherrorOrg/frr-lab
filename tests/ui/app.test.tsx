@@ -171,14 +171,14 @@ describe('Phase 7: failure simulation, coverage, sharing, keyboard', () => {
     const rows = within(panel).getAllByRole('row')
     const rowOf = (d: string) => rows.find((r) => r.querySelector('td')?.textContent === d)!
     expect(rowOf('C').textContent).toContain('S · TI-LFA')
-    expect(rowOf('E').textContent).toContain('S · TI-LFA, then C · TI-LFA ✗ loops back to B')
+    expect(rowOf('E').textContent).toContain('S · TI-LFA, then C · TI-LFA ✗ loops back to S')
 
     // E's story names the other failed link and the router that repairs again.
     await user.click(rowOf('E'))
     expect(panel.textContent).toContain(
       'At C it finds C–E down too, and C switches to its own TI-LFA backup.',
     )
-    expect(panel.textContent).toContain('S→A→B→C→B…')
+    expect(panel.textContent).toContain('S→A→B→C→B→A→S…')
 
     // Restore one link: back to a single failure, E's repair works again.
     await user.click(within(panel).getByRole('button', { name: 'Restore E–C' }))

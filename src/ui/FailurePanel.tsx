@@ -356,8 +356,9 @@ export function FailurePanel({ source, simulation: sim, error }: Props) {
           )}
           <p className="mt-1 text-xs text-slate-500">
             &quot;Repair = final?&quot; compares the repairing router&apos;s backup with its own
-            path after convergence, for traffic that gets through. TI-LFA always matches (RFC 9855
-            §3); LFA and Remote LFA may not.
+            path after convergence, for traffic that gets through. With one failed link TI-LFA
+            always matches (RFC 9855 §3); LFA and Remote LFA may not. With several, a repair passed
+            on by more than one router may not match either.
           </p>
         </>
       )}

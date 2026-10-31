@@ -165,6 +165,9 @@ describe('simulateFailure: repair vs post-convergence path', () => {
     // Normal path uses the lowest id, A. Fail S–A: B is the other ECMP next hop.
     const d = flow(simulateFailure(u, 'S', ['S-A'], 'lfa').flows, 'D')
     expect(d).toMatchObject({ method: 'ecmp', repair: ['S', 'B', 'D'], match: 'same' })
+    // The same in TI-LFA mode: the router just stops using the failed member (D22).
+    const t = flow(simulateFailure(u, 'S', ['S-A'], 'tilfa').flows, 'D')
+    expect(t).toMatchObject({ method: 'ecmp', repair: ['S', 'B', 'D'], match: 'same' })
   })
 })
 
@@ -219,16 +222,17 @@ describe('simulateFailure: several failed links (Phase 9.2, D24)', () => {
       afterCost: 3,
       match: 'same',
     })
-    // E: S's repair reaches C, finds C–E down, and C's own backup sends it back to B.
+    // E: S's repair reaches C, finds C–E down, and C's own backup sends it back the
+    // way it came. At S it is the same packet as at the start: a loop.
     const e = flow(sim.flows, 'E')
     expect(e).toMatchObject({
       hitLink: 'S-E',
-      repair: ['S', 'A', 'B', 'C', 'B'],
+      repair: ['S', 'A', 'B', 'C', 'B', 'A', 'S'],
       repairs: [
         { at: 'S', link: 'S-E', method: 'tilfa' },
         { at: 'C', link: 'E-C', next: 'E', target: 'E', method: 'tilfa' },
       ],
-      loopAt: 'B',
+      loopAt: 'S',
       status: 'unreachable',
     })
     // Both of E's links are down: nothing reaches it, and repair = final has no meaning.
@@ -241,8 +245,8 @@ describe('simulateFailure: several failed links (Phase 9.2, D24)', () => {
     for (const d of ['C', 'E']) {
       expect(flow(sim.flows, d)).toMatchObject({
         status: 'unreachable',
-        repair: ['S', 'A', 'B', 'A'],
-        loopAt: 'A',
+        repair: ['S', 'A', 'B', 'A', 'S'],
+        loopAt: 'S',
       })
       expect(flow(sim.flows, d).repairs?.map((r) => r.at)).toEqual(['S', 'B'])
     }
@@ -348,6 +352,25 @@ describe('simulateFailure: several failed links (Phase 9.2, D24)', () => {
       after: ['S', 'A', 'B', 'D'],
       match: 'same',
     })
+  })
+
+  it('a failed Adj-SID link: the router uses its normal path to that neighbor', () => {
+    // Example 4: PE1's TI-LFA backup to P1 is [Adj P2→P1, Prefix P1] (P2 reaches P1 more
+    // cheaply through PE1, so the Adj-SID forces the 30 link). With P1–P2 down too, P2
+    // sends the traffic to P1 its normal way, through PE1, whose link to P1 is down:
+    // PE1 repairs it again, the same packet as at the start, so it loops.
+    const isp = loadFixture('04-isp-core.yaml')
+    const p1 = flow(simulateFailure(isp, 'PE1', ['PE1-P1', 'P1-P2'], 'tilfa').flows, 'P1')
+    expect(p1).toMatchObject({
+      repair: ['PE1', 'P2', 'PE1'],
+      repairs: [
+        { at: 'PE1', link: 'PE1-P1', target: 'P1', method: 'tilfa' },
+        { at: 'P2', link: 'P1-P2', next: 'P1', target: 'P1', method: 'tilfa' },
+      ],
+      loopAt: 'PE1',
+      status: 'looped',
+    })
+    expect(p1.drop).toBeUndefined()
   })
 
   it('a single failure is repaired by one router at most; repeats are ignored; none is an error', () => {

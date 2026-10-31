@@ -303,7 +303,9 @@ function forward(
 
     if (!repairedHere) {
       const key = `${at}|${stack.map(instrKey).join(',')}`
-      if (seen.has(key) || path.length > MAX_HOPS) return loop(path, repairs, repairIdx)
+      // Back at a router with the same labels: the exact loop, shown up to here.
+      if (seen.has(key)) return { path, repairs, delivered: false, loopAt: at }
+      if (path.length > MAX_HOPS) return ttlLoop(path, repairs, repairIdx)
       seen.add(key)
     }
 
@@ -326,8 +328,15 @@ function forward(
       }
     }
     // A failed Adj-SID hop is repaired towards its far end (Adj-SID B-flag, RFC 8667 §2.2.1).
+    // Only TI-LFA stacks carry Adj-SIDs mid-path, and a fresh backup's own first hop
+    // was handled above. When the router's normal path to that neighbor doesn't use
+    // the link (the Adj-SID forced a costlier link), that normal path is the backup.
     const target = 'hop' in top ? top.hop : top.to
-    const r = repairAt(table, resultsAt(at), next, target, mode)
+    const viaNormal =
+      'hop' in top && table.from.get(at)!.firstHops.get(target)![0] !== target
+        ? { method: 'tilfa' as const, instrs: [{ to: target }] }
+        : undefined
+    const r = viaNormal ?? repairAt(table, resultsAt(at), next, target, mode)
     if (r === undefined) {
       return {
         path,
@@ -344,10 +353,10 @@ function forward(
 }
 
 /**
- * A looping walk, cut where traffic first comes back to a router it has already
- * passed: that is where the circle shows, and the rest only repeats it.
+ * Out of hops (labels keep piling up, so no state repeats exactly): cut the path
+ * where traffic first comes back to a router, so the drawing stays readable.
  */
-function loop(path: NodeId[], repairs: RepairStep[], repairIdx: number[]): Walk {
+function ttlLoop(path: NodeId[], repairs: RepairStep[], repairIdx: number[]): Walk {
   const k = path.findIndex((x, j) => path.indexOf(x) < j)
   if (k < 0) return { path, repairs, delivered: false, loopAt: path.at(-1)! }
   return {
@@ -374,6 +383,13 @@ function repairAt(
   const p = r?.protections.find((x) => x.protectedLink.to === next)
   if (r === undefined || p === undefined) return undefined
 
+  // Another primary next hop is always loop-free and avoids the link (D16). It comes
+  // first in every mode: the router just stops using the failed member (D22).
+  const other = r.nextHops.find((n) => n !== next)
+  if (p.ecmpProtected && other !== undefined) {
+    return { method: 'ecmp', instrs: [{ hop: other }, { to: t }] }
+  }
+
   if (mode === 'tilfa') {
     const { path, segments } = p.tilfa
     if (!path || !segments) return undefined
@@ -382,11 +398,6 @@ function repairAt(
     return { method: 'tilfa', instrs: [{ hop: path[1]! }, ...segs] }
   }
 
-  // Another primary next hop is always loop-free and avoids the link (D16).
-  const other = r.nextHops.find((n) => n !== next)
-  if (p.ecmpProtected && other !== undefined) {
-    return { method: 'ecmp', instrs: [{ hop: other }, { to: t }] }
-  }
   if (p.lfa.best !== undefined) {
     return { method: 'lfa', instrs: [{ hop: p.lfa.best }, { to: t }] }
   }
