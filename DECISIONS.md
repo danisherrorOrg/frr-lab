@@ -336,3 +336,13 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Other options considered:** draw all three on the main canvas at once (paths overlap on small networks and the colours would need a new key); a three-column table without diagrams (loses the "see it" part, which is the point for students).
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D37 – Compare view while links or routers are down (2026-10-31)
+- **Why:** user feedback on D36: the compare view showed only the planned backups. Comparing the three methods under a real failure (which one delivers, drops or loops, and why) is the more useful lesson.
+- **What:** while anything is down, the "Compare repairs" section replaces "Compare backups". It runs `simulateFailure()` in all three repair modes (in the engine worker, `useAllModes`) and shows the flow to the destination drawn on the diagram, side by side (`docs/02-algorithms.md` §10.1). Each card has a small diagram with everything that is down (links red ✕, routers dashed and greyed) and the path the traffic really takes, the repairing routers, cost, labels, the down-router reason (the failure panel's `throughText`) and the repair against the final path. "Show on the diagram" switches the failure panel's mode; the card of the current mode is outlined.
+- **No new engine code:** the cards read the simulator's `Flow`. Fixed engine tests pin the worked cases (Examples 3, 4 and 6); UI tests check the cards and the mode switch. Checked in Chrome (Example 6, router E down), no console errors.
+- **The small diagram** moved to `src/ui/MiniMap.tsx` so both views share it.
+- **Other options considered:** keep the planned backups under a failure with a note (D36) — it answers "what was planned", not "what happens"; compute only the current mode — then there is nothing to compare.
+- **Cost:** three simulations instead of one while something is down; each is a few ms on the examples, and they run in the worker.
+- **No new dependencies.**
+- **Status:** Accepted.

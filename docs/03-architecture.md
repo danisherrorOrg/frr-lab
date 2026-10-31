@@ -81,6 +81,8 @@ LFA LAB/
 │   │   ├── FailureByDut.tsx the same failure from every router (D31)
 │   │   ├── DetailPanel.tsx  P/Q spaces, segment list, explain steps
 │   │   ├── CompareView.tsx  the three backups side by side, each with a small diagram
+│   │   ├── CompareFailure.tsx  the three repair modes side by side while something is down
+│   │   ├── MiniMap.tsx      small SVG copy of the diagram with one path
 │   │   ├── CoverageReport.tsx
 │   │   └── PropertiesPanel.tsx  edit selected node/link
 │   ├── App.tsx  main.tsx

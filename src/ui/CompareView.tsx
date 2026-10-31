@@ -1,10 +1,10 @@
-import { useId, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { BackupComparison, BackupOption, CompareMethod } from '../engine/compare'
 import type { ProtectionPaths } from '../engine/paths'
 import type { NodeId, Topology } from '../engine/types'
 import { useStore, type BackupKind } from '../state/store'
-import { COLORS } from './canvas'
 import { bundles, hopName, linkName, METHOD_NAME, segmentText, type Bundles } from './format'
+import { MiniMap } from './MiniMap'
 
 interface Props {
   comparison: BackupComparison
@@ -12,8 +12,6 @@ interface Props {
   paths: ProtectionPaths
   drawn: Exclude<BackupKind, 'auto'> | null
   onBackup: (b: BackupKind) => void
-  /** Something is down: the diagram shows the simulated traffic, not a planned backup. */
-  drawOff?: boolean
 }
 
 const RFC: Record<CompareMethod, string> = { lfa: 'RFC 5286', rlfa: 'RFC 7490', tilfa: 'RFC 9855' }
@@ -26,7 +24,7 @@ const arrow = (ids: NodeId[]) => ids.join('→')
  * docs/02-algorithms.md §10): each one's path, cost, labels and how it compares
  * with the path S takes once the network has reconverged.
  */
-export function CompareView({ comparison: c, paths, drawn, onBackup, drawOff = false }: Props) {
+export function CompareView({ comparison: c, paths, drawn, onBackup }: Props) {
   const topology = useStore((s) => s.topology)
   const b = useMemo(() => bundles(topology), [topology])
   const sE = linkName(b, c.s, c.e, c.link)
@@ -50,12 +48,6 @@ export function CompareView({ comparison: c, paths, drawn, onBackup, drawOff = f
         )}
       </p>
       <p className="mt-1 text-slate-600 dark:text-slate-300">{verdict(c)}</p>
-      {drawOff && (
-        <p className="mt-1 text-xs text-slate-500">
-          Something is down, so the main diagram shows the simulated traffic; the small diagrams
-          below show the planned backups.
-        </p>
-      )}
       <ul className="mt-2 grid gap-3 md:grid-cols-3">
         {c.options.map((o) => (
           <li
@@ -72,8 +64,8 @@ export function CompareView({ comparison: c, paths, drawn, onBackup, drawOff = f
               o={o}
               b={b}
               topology={topology}
-              drawable={!drawOff && paths[o.method] !== undefined}
-              drawn={!drawOff && drawn === o.method}
+              drawable={paths[o.method] !== undefined}
+              drawn={drawn === o.method}
               onDraw={() => onBackup(o.method)}
             />
           </li>
@@ -126,7 +118,20 @@ function Card({
         </h3>
         <span className={`text-xs font-semibold ${status.cls}`}>{status.text}</span>
       </div>
-      <MiniMap topology={topology} c={c} o={o} />
+      <MiniMap
+        topology={topology}
+        s={c.s}
+        d={c.d}
+        {...(o.found && { path: o.path!, links: o.links! })}
+        down={new Set([c.link])}
+        {...(o.via !== undefined && { mark: o.via })}
+        star={o.method === 'rlfa'}
+        label={
+          o.found
+            ? `${METHOD_NAME[o.method]} path ${arrow(o.path!)}`
+            : `No ${METHOD_NAME[o.method]} path`
+        }
+      />
       {o.found ? (
         <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-xs">
           <dt className="text-slate-500">How</dt>
@@ -202,186 +207,6 @@ function whyNot(c: BackupComparison, o: BackupOption): string {
   return `${c.d} can't be reached once the link fails.`
 }
 
-function Mono({ children }: { children: React.ReactNode }) {
+export function Mono({ children }: { children: React.ReactNode }) {
   return <span className="font-mono">{children}</span>
-}
-
-const W = 240
-const H = 150
-const PAD = 16
-
-/**
- * A small copy of the diagram with only this method's path on it, so the three
- * can be seen at once. Positions come from the topology; routers without one are
- * put on a circle.
- */
-function MiniMap({
-  topology: t,
-  c,
-  o,
-}: {
-  topology: Topology
-  c: BackupComparison
-  o: BackupOption
-}) {
-  const marker = useId()
-  const pos = useMemo(() => {
-    const raw = new Map<NodeId, { x: number; y: number }>()
-    t.nodes.forEach((n, i) => {
-      const a = (2 * Math.PI * i) / t.nodes.length
-      raw.set(n.id, n.pos ?? { x: Math.cos(a) * 100, y: Math.sin(a) * 100 })
-    })
-    const xs = [...raw.values()].map((p) => p.x)
-    const ys = [...raw.values()].map((p) => p.y)
-    const [x0, y0] = [Math.min(...xs), Math.min(...ys)]
-    const w = Math.max(...xs) - x0 || 1
-    const h = Math.max(...ys) - y0 || 1
-    const k = Math.min((W - 2 * PAD) / w, (H - 2 * PAD) / h)
-    const dx = (W - w * k) / 2
-    const dy = (H - h * k) / 2
-    const out = new Map<NodeId, { x: number; y: number }>()
-    for (const [id, p] of raw) out.set(id, { x: dx + (p.x - x0) * k, y: dy + (p.y - y0) * k })
-    return out
-  }, [t])
-
-  // Links of a bundle are spread apart, so the one the path takes can be seen (D29).
-  const offset = useMemo(() => {
-    const groups = new Map<string, string[]>()
-    for (const l of t.links) {
-      const k = l.a < l.b ? `${l.a}|${l.b}` : `${l.b}|${l.a}`
-      groups.set(k, [...(groups.get(k) ?? []), l.id])
-    }
-    const out = new Map<string, number>()
-    for (const ids of groups.values())
-      ids.forEach((id, i) => out.set(id, (i - (ids.length - 1) / 2) * 7))
-    return out
-  }, [t])
-
-  const ends = (linkId: string, from: NodeId, to: NodeId, trim = 0) => {
-    const l = t.links.find((x) => x.id === linkId)!
-    const p = pos.get(from)!
-    const q = pos.get(to)!
-    const len = Math.hypot(q.x - p.x, q.y - p.y) || 1
-    const [ux, uy] = [(q.x - p.x) / len, (q.y - p.y) / len]
-    // Offset relative to the link's own a→b direction, so both ends agree.
-    const sign = l.a === from ? 1 : -1
-    const off = (offset.get(linkId) ?? 0) * sign
-    const [ox, oy] = [-uy * off, ux * off]
-    return {
-      x1: p.x + ox + ux * trim,
-      y1: p.y + oy + uy * trim,
-      x2: q.x + ox - ux * trim,
-      y2: q.y + oy - uy * trim,
-    }
-  }
-
-  const label = o.found
-    ? `${METHOD_NAME[o.method]} path ${arrow(o.path!)}`
-    : `No ${METHOD_NAME[o.method]} path`
-  const mark = o.method === 'lfa' ? o.via : o.method === 'rlfa' ? o.via : undefined
-
-  return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      role="img"
-      aria-label={label}
-      className="mx-auto my-1 h-auto w-full max-w-72"
-    >
-      <defs>
-        <marker
-          id={marker}
-          viewBox="0 0 10 10"
-          refX="9"
-          refY="5"
-          markerWidth="5"
-          markerHeight="5"
-          orient="auto"
-        >
-          <path d="M0,0 L10,5 L0,10 z" fill={COLORS.backup} />
-        </marker>
-      </defs>
-      {t.links.map((l) => {
-        const failed = l.id === c.link
-        const e = ends(l.id, l.a, l.b)
-        return (
-          <line
-            key={l.id}
-            {...e}
-            strokeWidth={failed ? 2.5 : 1.5}
-            strokeDasharray={failed ? '3 3' : undefined}
-            className={failed ? 'stroke-red-600' : 'stroke-slate-300 dark:stroke-slate-600'}
-          />
-        )
-      })}
-      {(() => {
-        const l = ends(c.link, c.s, c.e)
-        return (
-          <text
-            x={(l.x1 + l.x2) / 2}
-            y={(l.y1 + l.y2) / 2 + 4}
-            textAnchor="middle"
-            fontSize="12"
-            fontWeight="bold"
-            className="fill-red-600"
-          >
-            ✕
-          </text>
-        )
-      })()}
-      {o.found &&
-        o.links!.map((id, i) => (
-          <line
-            key={`${id}-${i}`}
-            {...ends(id, o.path![i]!, o.path![i + 1]!, 11)}
-            stroke={COLORS.backup}
-            strokeWidth="3.5"
-            markerEnd={`url(#${marker})`}
-          />
-        ))}
-      {t.nodes.map((n) => {
-        const p = pos.get(n.id)!
-        const ring =
-          n.id === c.s
-            ? 'stroke-blue-700'
-            : n.id === c.d
-              ? 'stroke-orange-700'
-              : n.id === mark
-                ? 'stroke-yellow-700'
-                : 'stroke-slate-500'
-        const thick = n.id === c.s || n.id === c.d || n.id === mark
-        return (
-          <g key={n.id}>
-            <circle
-              cx={p.x}
-              cy={p.y}
-              r="10"
-              strokeWidth={thick ? 2.5 : 1}
-              className={`fill-slate-100 dark:fill-slate-700 ${ring}`}
-            />
-            <text
-              x={p.x}
-              y={p.y + 3.5}
-              textAnchor="middle"
-              fontSize="9"
-              fontWeight="bold"
-              className="fill-slate-900 dark:fill-slate-100"
-            >
-              {n.id}
-            </text>
-            {o.method === 'rlfa' && n.id === mark && (
-              <text
-                x={p.x}
-                y={p.y - 13}
-                textAnchor="middle"
-                fontSize="10"
-                className="fill-yellow-700 dark:fill-yellow-400"
-              >
-                ★
-              </text>
-            )}
-          </g>
-        )
-      })}
-    </svg>
-  )
 }

@@ -399,3 +399,18 @@ Worked checks:
 | 4, PE1→P1, link PE1–P1 | none | **used**: PQ = PE2 via P2, PE1-P2-P4-PE2-P3-P1, 50, **longer** than 40 | PE1-P2-P1, 40, `24000 16001`, same |
 
 A case where the LFA is longer: S–E 1, E–D 1, S–N 5, N–D 1, S–M 1, M–N 1. M and N are both node-protecting LFAs; N is downstream (`1 < 2`) and M is not (`2 < 2` ✗), so N wins (D7): S-N-D costs 6, but after reconvergence S uses S-M-N-D (3).
+
+### 10.1 With links or routers down (D37)
+While anything is down, the compare view stops showing the plan and shows what the traffic really does. It runs the failure simulation (§8) once per repair mode (LFA only, LFA + Remote LFA, TI-LFA) and lines up the flow to the destination on the diagram. Nothing new is computed: each card is that mode's `Flow`.
+
+Each card shows: delivered / dropped at X / loops at X / unreachable; the path taken (… when it loops); which routers repair, in order; the cost against the normal cost; the labels the first repairing router puts on; whether a down router breaks the planned backup (D27, with the same reason text as the failure panel); and the repair against the final path (`match`, judged at the PLR, §8 step 6), or "lost until the network reconverges". The path after convergence is the same in every mode, so it is shown once above the cards.
+
+Worked checks:
+
+| Failure | LFA only | LFA + Remote LFA | TI-LFA |
+|---|---|---|---|
+| Example 3, S→E, link S–E | dropped at S (no backup) | dropped at S | delivered S-A-B-C-E, 13, `16004 24005 16002`, same |
+| Example 6, S→D, router E | delivered S-N-M-D, 21 (S, then N repair; S's LFA N breaks at E) | same as LFA only (an LFA exists) | loops S→N→S: the backup `[Prefix D]` out via N goes back through E |
+| Example 4, PE1→P3, links PE1–P1 and P2–P4 | dropped at PE1 | delivered, 70, longer than 50 | delivered, 100 (PE1, P2, then PE1 again repair), longer than 50 |
+
+Example 6 is the lesson: with a router down, link-protecting TI-LFA can do worse than plain LFA, because each router repairs only its own link (RFC 9855 §1; node protection is Later #1).

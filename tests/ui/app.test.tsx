@@ -869,3 +869,59 @@ describe('Compare view', () => {
     expect(within(card('Remote LFA')).getByRole('button').hasAttribute('disabled')).toBe(true)
   })
 })
+
+// The compare view with links or routers down: the three repair modes side by side (§10.1).
+describe('Compare view under a failure', () => {
+  const card = async (name: string) =>
+    within(await screen.findByRole('region', { name: 'Compare repairs' })).getByRole('listitem', {
+      name,
+    })
+
+  it('Example 3, S–E down: LFA and Remote LFA drop, TI-LFA delivers', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'ring5-high')
+    act(() => {
+      useStore.getState().toggleFailedLink('S-E')
+      useStore.getState().setSimDest('E')
+    })
+    const compare = await screen.findByRole('region', { name: 'Compare repairs' })
+    expect(compare.textContent).toContain('S → E while link S–E is down')
+    expect(compare.textContent).toContain('Delivered with TI-LFA.')
+    expect(compare.textContent).toContain('Dropped with LFA only and LFA + Remote LFA.')
+    expect(screen.queryByRole('region', { name: 'Compare backups' })).toBeNull()
+
+    expect((await card('LFA only')).textContent).toContain('✗ Dropped at S')
+    expect((await card('LFA only')).textContent).toContain('S has no backup for link S–E')
+    const ti = await card('TI-LFA')
+    expect(ti.textContent).toContain('✓ Delivered')
+    expect(ti.textContent).toContain('16004, 24005, 16002 leaving S')
+    expect(ti.textContent).toContain('13 (+12 vs normal 1)')
+    // TI-LFA is the default mode, so it is the one on the main diagram.
+    expect(within(ti).getByRole('button').textContent).toBe('Shown on the diagram')
+
+    // "Show on the diagram" switches the failure simulation's mode.
+    await user.click(within(await card('LFA only')).getByRole('button', { name: /Show LFA only/ }))
+    expect(useStore.getState().simMode).toBe('lfa')
+  })
+
+  it('Example 6, router E down: LFA delivers through N, TI-LFA loops and its backup breaks', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'link-protecting')
+    act(() => {
+      useStore.getState().toggleFailedNode('E')
+      useStore.getState().setSimDest('D')
+    })
+    const lfa = await card('LFA only')
+    expect(lfa.textContent).toContain('✓ Delivered')
+    expect(lfa.textContent).toContain('S uses LFA, then N uses LFA.')
+    expect(lfa.textContent).toContain('✗ Backup breaks')
+    const ti = await card('TI-LFA')
+    expect(ti.textContent).toContain('↻ Loops at S')
+    expect(ti.textContent).toContain('Lost until the network reconverges onto S→N→M→D (cost 21)')
+    expect(within(ti).getByRole('img').getAttribute('aria-label')).toBe(
+      'TI-LFA: traffic goes S→N→S…',
+    )
+  })
+})

@@ -7,6 +7,7 @@ import { isRow, useStore, type Tool } from './state/store'
 import type { NodeId } from './engine/types'
 import { AllResults } from './ui/AllResults'
 import type { Highlight } from './ui/canvas'
+import { CompareFailure } from './ui/CompareFailure'
 import { CompareView } from './ui/CompareView'
 import { CoverageReport } from './ui/CoverageReport'
 import { DetailPanel } from './ui/DetailPanel'
@@ -21,7 +22,7 @@ import { ResultsTable } from './ui/ResultsTable'
 import { Sidebar } from './ui/Sidebar'
 import { Toolbar } from './ui/Toolbar'
 import { useResults } from './ui/useResults'
-import { useSimulation } from './ui/useSimulation'
+import { useAllModes, useSimulation } from './ui/useSimulation'
 
 const TOOL_KEYS: Record<string, Tool> = {
   v: 'select',
@@ -112,6 +113,9 @@ export function App() {
   const setSimDest = useStore((s) => s.setSimDest)
   const { results, loading, error } = useResults(topology, source, extended)
   const sim = useSimulation(topology, source, failedLinks, failedNodes, simMode, extended)
+  // The compare view under a failure runs every mode side by side (§10.1).
+  const allModes = useAllModes(topology, source, failedLinks, failedNodes, extended)
+  const setSimMode = useStore((s) => s.setSimMode)
 
   /**
    * A router clicked on the canvas (Phase 9.5): with one DUT, open its row as the
@@ -354,15 +358,27 @@ export function App() {
               )}
             </div>
           </div>
-          {selected && (
-            <CompareView
-              comparison={selected.comparison}
-              paths={selected.paths}
-              drawn={selected.drawn?.kind ?? null}
-              onBackup={setBackup}
-              drawOff={anyFailed}
-            />
-          )}
+          {anyFailed
+            ? shownFlow &&
+              allModes &&
+              source !== null && (
+                <CompareFailure
+                  source={source}
+                  dest={shownFlow.dest}
+                  sims={allModes}
+                  mode={simMode}
+                  onMode={setSimMode}
+                  downLinks={downLinks}
+                />
+              )
+            : selected && (
+                <CompareView
+                  comparison={selected.comparison}
+                  paths={selected.paths}
+                  drawn={selected.drawn?.kind ?? null}
+                  onBackup={setBackup}
+                />
+              )}
           <CoverageReport source={source} />
         </main>
       </div>
