@@ -54,10 +54,10 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 - [x] Detail panel: candidates, spaces, segment list, label stack, explain steps
 
 ## Phase 7 – Failure simulation + reports (2–3 days)
-- [ ] Fail-link mode, animated repair path, then "Converge" view
-- [ ] Coverage report panel
-- [ ] Share-by-URL
-- [ ] Dark mode, keyboard support, phone layout
+- [x] Fail-link mode, animated repair path, then "Converge" view
+- [x] Coverage report panel
+- [x] Share-by-URL
+- [x] Dark mode, keyboard support, phone layout
 
 🎯 **Milestone B: MVP (v0.1).**
 

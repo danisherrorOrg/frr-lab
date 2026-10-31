@@ -51,9 +51,11 @@ These numbers were checked with a throwaway Python script on 2026-10-29 (not par
 - Invalid YAML: duplicate ids, duplicate SIDs, unknown node in a link, metric 0 or negative.
 
 ## 5. Manual release checklist
-- [ ] Every built-in example loads and gives the expected results
-- [ ] Fail-link animation follows the TI-LFA path
-- [ ] Share link round-trips (open it in a private window)
-- [ ] 200-node generated topology: all-sources coverage < 2 s, UI stays responsive
-- [ ] Dark mode, phone width, keyboard only
-- [ ] Explain text numbers match the table numbers
+- [x] Every built-in example loads and gives the expected results
+- [x] Fail-link animation follows the TI-LFA path
+- [x] Share link round-trips (open it in a private window)
+- [x] 200-node generated topology: all-sources coverage < 2 s, UI stays responsive
+- [x] Dark mode, phone width, keyboard only
+- [x] Explain text numbers match the table numbers
+
+Last run: 2026-10-31 (Phase 7), in Chrome against `npm run dev` and `npm run preview`. 200-router all-sources coverage took 0.77 s in the worker. The browser window couldn't be resized, so phone width was checked in a 390 px frame. The share link was checked by reloading the page from the link, not in a private window. "Offline" was checked as "every request goes to the page's own host"; there is no service worker, so a cold load still needs the files.

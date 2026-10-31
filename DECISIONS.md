@@ -138,3 +138,22 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Testing:** jsdom has no `<canvas>`, so the smoke test stubs `GraphCanvas`; the drawing logic lives in `ui/canvas.ts` and is tested with headless Cytoscape. Where `Worker` doesn't exist, the engine client runs the same protocol on the main thread (`createInlineWorker`).
 - **Bundle size:** 679 kB (218 kB gzipped), mostly Cytoscape. Vite warns above 500 kB; fine for now, revisit at launch (code-split the canvas).
 - **Status:** Accepted.
+
+### D22 – Failure simulation, coverage panel, share link, theme, keyboard and phone layout (2026-10-31)
+- **One failed link at a time.** Clicking a second link moves the failure; clicking the failed link again restores it. FRR protects against one failure (D4), and two at once would need rules the RFCs don't give.
+- **Any link can fail, not only links at S.** Traffic follows normal tables up to the router before the failed link (the PLR), which uses its own backup. This shows that FRR is local: a far-away failure is repaired by whoever is next to it. Rules in `docs/02-algorithms.md` §8.
+- **"Routers run" modes:** LFA only, LFA + Remote LFA, TI-LFA, like the settings on a real router. Default TI-LFA. An ECMP destination uses its other primary next hop first (RFC 5286 §3.4), so ECMP is shown as its own method.
+- **Repair vs final path is compared at the PLR,** not end to end from S: that is the claim RFC 9855 §3 makes for TI-LFA. S's own final path is shown in the Converge view.
+- **One flow per destination,** using the lowest-id ECMP tie-break of the drawings (D21). Real routers would hash flows over all ECMP paths.
+- **Engine calls:** the simulation runs in the worker (new `simulate` message), like the other engine calls. `simulate.ts` imports `computeForSource` from `index.ts`, so it isn't re-exported from `index.ts` (that would be an import cycle).
+- **Drawing:** the repair path is the orange dashed backup line with moving dashes (off when the OS asks for reduced motion). The final path is green with a halo and chevron arrows. Cytoscape can't draw double lines on edges, so the halo and arrow shape carry the meaning as well as the colour.
+- **Coverage panel:** runs in the worker only while open, again on every edit, with a progress bar. Lists the first 100 unprotected pairs; the CSV has them all. 200 routers / 600 links, all sources: 0.77 s in Chrome.
+- **Share link:** `#t=<lz-string of the YAML text>&s=<source>`. Using the YAML text means a shared link is checked by exactly the same rules as an imported file. The data stays in the fragment, which browsers never send to a server. Opening a link starts with an empty undo history.
+- **Dark mode:** the ☾/☀ button sets the `.dark` class (D13). A choice made with the button is saved in `localStorage`; with no saved choice the OS setting is used. Storage errors are ignored.
+- **Keyboard:** every canvas tool has a form in the sidebar (pick an item to edit, add a router, add a link from/to, pick the failed link). Shortcuts: V/R/L/F pick a tool, C toggles Converge, arrow keys move through table rows.
+- **Phone layout:** canvas first, then tools, then results; results become cards below 640 px.
+- **Tooling added:** `lz-string` (runtime, planned in `docs/03-architecture.md` §2). Ships its own types.
+- **Bundle:** 710 kB (226 kB gzipped). Code-splitting the canvas is still a launch task (D21).
+- **Other options considered:** several failed links at once (no RFC rules for it); comparing repair and final paths end to end from S (would flag TI-LFA as "different" when the PLR isn't S); JSON instead of YAML in the share link (needs its own validation); the Clipboard API alone for sharing (fails without permission, so the link is also put in the address bar).
+- **Status:** Accepted.
+

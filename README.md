@@ -2,7 +2,7 @@
 
 A free, open-source browser tool that **computes and shows backup paths for IS-IS networks**: LFA, Remote LFA and TI-LFA. You can also break a link to see where traffic goes.
 
-> **Status:** In progress (2026-10-30). Engine done (Milestone A); UI basics done (Phase 6). Next: failure simulation and reports (Phase 7).
+> **Status:** MVP feature-complete (2026-10-31, Milestone B). Engine, UI, failure simulation, coverage report and share links are done. Next: launch (Phase 8).
 
 ## The problem
 Routers use Fast Reroute (FRR) to switch traffic onto a pre-computed backup path within about 50 ms when a link or node fails. There are three main types:

@@ -154,18 +154,18 @@ clear "done when".
 
 ## Phase 7 – Failure simulation + reports (2–3 days)
 
-- [ ] Fail-link mode: click a link to fail it
-- [ ] Animate traffic moving onto the repair path for affected destinations
-- [ ] "Converge" button: show the final post-convergence path
-- [ ] Show whether the repair path equals the post-convergence path
-- [ ] `CoverageReport.tsx`: per-source and all-sources numbers, unprotected list, CSV download, progress bar
-- [ ] `io/share-url.ts`: topology → lz-string → URL hash, and back; test the round trip
-- [ ] Dark mode toggle (☾/☀)
-- [ ] Keyboard support for all tools and the table
-- [ ] Line styles + icons as well as colours
-- [ ] Phone layout: canvas on top, results as cards
-- [ ] Check it works offline after first load (static files only, no network calls)
-- [ ] Run the manual release checklist in `docs/05-testing.md` §5
+- [x] Fail-link mode: click a link to fail it
+- [x] Animate traffic moving onto the repair path for affected destinations
+- [x] "Converge" button: show the final post-convergence path
+- [x] Show whether the repair path equals the post-convergence path
+- [x] `CoverageReport.tsx`: per-source and all-sources numbers, unprotected list, CSV download, progress bar
+- [x] `io/share-url.ts`: topology → lz-string → URL hash, and back; test the round trip
+- [x] Dark mode toggle (☾/☀)
+- [x] Keyboard support for all tools and the table
+- [x] Line styles + icons as well as colours
+- [x] Phone layout: canvas on top, results as cards
+- [x] Check it works offline after first load (static files only, no network calls)
+- [x] Run the manual release checklist in `docs/05-testing.md` §5
 
 🎯 **Milestone B: MVP (v0.1).**
 

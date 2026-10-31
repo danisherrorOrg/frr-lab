@@ -213,3 +213,22 @@ With SRGB 16000 and SID indices S=1, E=2, A=3, B=4, C=5, Adj-SID B→C = 24005, 
 - RFC 8667 – IS-IS Extensions for Segment Routing.
 - RFC 9855 – Topology Independent Fast Reroute Using Segment Routing (TI-LFA), October 2025 (was `draft-ietf-rtgwg-segment-routing-ti-lfa`). https://www.rfc-editor.org/rfc/rfc9855
 - RFC 6571 – LFA applicability (good background on coverage in real topologies).
+
+---
+
+## 8. Failure simulation (F5)
+Code: `src/engine/simulate.ts`. One link fails at a time (FRR protects against a single failure, D4).
+
+For every destination D that S reaches before the failure:
+1. **Normal path:** follow S's normal shortest path hop by hop. Ties use the lowest router id at each hop, the same rule as the drawings (§4.1), so one flow is shown per destination.
+2. **Affected?** Yes if that path crosses the failed link in either direction. The router just before the link is the **point of local repair (PLR)**, and the router after it is its next hop E. The PLR can be S or any router further along.
+3. **Repair:** the PLR switches to its pre-computed backup for (D, link PLR–E); every other router keeps its normal table. What the backup is depends on which FRR methods the routers run:
+   - *LFA only:* another primary next hop if D is ECMP (`ecmp`), else the best LFA. The path is PLR → N, then N's normal path to D (RFC 5286 §4).
+   - *LFA + Remote LFA:* as above, else the PQ node path PLR → (exit neighbor) → PQ → D (RFC 7490, D11).
+   - *TI-LFA:* the PLR's post-convergence path (RFC 9855 §3).
+   - None of these: traffic is **dropped** until the network reconverges.
+   The repair path shown is S's normal path up to the PLR, then the PLR's backup.
+4. **Converge:** remove the link and run SPF again from S (same tie-break). That is S's final path. If D can't be reached, it is unreachable.
+5. **Repair = final?** Compare the PLR's backup with the PLR's own post-convergence path: `same` (same routers), `same-cost` (other routers, equal cost) or `longer` (costlier). TI-LFA is always `same` (a property test checks it); LFA and RLFA may not be. The comparison is made at the PLR because that is where FRR acts: when the PLR is not S, S itself may later pick a quite different path.
+
+Worked check (Example 2, fail S–E, TI-LFA): C and E are affected; E is repaired on S→A→B→C→E (cost 4), which is also the final path. With "LFA only", E has no LFA and is dropped, while C uses LFA A.
