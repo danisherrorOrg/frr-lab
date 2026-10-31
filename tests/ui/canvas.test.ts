@@ -49,6 +49,20 @@ describe('canvas sync', () => {
 })
 
 describe('canvas highlight', () => {
+  it('a picked set: its routers ringed, the rest faded, S and D left clear', () => {
+    const { cy, t } = draw('02-ring5.yaml')
+    decorate(cy, t, { source: 'S', dest: 'E', qSpace: ['B', 'C'], pq: 'B', spot: ['B', 'C'] }, none)
+    expect(cy.getElementById('B').classes()).toEqual(['q-space', 'pq', 'spot'])
+    expect(cy.getElementById('C').classes()).toEqual(['q-space', 'spot'])
+    expect(cy.getElementById('A').classes()).toEqual(['faded'])
+    expect(cy.getElementById('S').hasClass('faded')).toBe(false)
+    expect(cy.getElementById('E').hasClass('faded')).toBe(false)
+
+    // Unpicking clears both marks.
+    decorate(cy, t, { source: 'S', dest: 'E' }, none)
+    expect(cy.nodes('.spot, .faded')).toHaveLength(0)
+  })
+
   it('Example 2: primary, dashed backup with direction, P/Q shading, ★ on the PQ node', () => {
     const { cy, t } = draw('02-ring5.yaml')
     decorate(

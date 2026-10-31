@@ -11,6 +11,11 @@ export interface Highlight {
   backup?: NodeId[]
   pSpace?: NodeId[]
   qSpace?: NodeId[]
+  /**
+   * One Remote LFA set picked in the detail panel: these routers are ringed and every
+   * other router fades, so the set stands out. Undefined = nothing picked.
+   */
+  spot?: NodeId[]
   /** The chosen PQ node, drawn with ★. */
   pq?: NodeId
   /** Path after the network reconverges (failure simulation, F5): green line with a halo. */
@@ -97,6 +102,17 @@ export const STYLE: cytoscape.StylesheetJson = [
       color: '#64748b',
     },
   },
+  {
+    // A picked P / Q / PQ set (detail panel): ring its routers, fade the others.
+    selector: 'node.spot',
+    style: {
+      'underlay-color': '#4f46e5',
+      'underlay-opacity': 0.35,
+      'underlay-padding': 8,
+      'underlay-shape': 'ellipse',
+    },
+  },
+  { selector: 'node.faded', style: { opacity: 0.35 } },
   { selector: 'node.pq', style: { 'border-color': '#a16207', 'border-width': 4 } },
   { selector: 'node.source', style: { 'border-color': '#1d4ed8', 'border-width': 5 } },
   {
@@ -234,7 +250,7 @@ export function sync(cy: cytoscape.Core, t: Topology) {
 }
 
 const CLASSES =
-  'p-space q-space pq down source dest sel link-start primary backup final primary-fwd primary-rev backup-fwd backup-rev final-fwd final-rev flowing failed packet-at packet-hop walk-stack walk-current'
+  'p-space q-space pq spot faded down source dest sel link-start primary backup final primary-fwd primary-rev backup-fwd backup-rev final-fwd final-rev flowing failed packet-at packet-hop walk-stack walk-current'
 
 export function decorate(
   cy: cytoscape.Core,
@@ -269,6 +285,15 @@ export function decorate(
     add(h.pSpace, 'p-space')
     add(h.qSpace, 'q-space')
     add(h.pq === undefined ? [] : [h.pq], 'pq')
+    if (h.spot) {
+      const spot = new Set(h.spot)
+      // S and D stay clear: RFC 7490 never lists them in a set, but they give the context.
+      const keep = new Set([h.source, h.dest])
+      cy.nodes().forEach((n) => {
+        if (spot.has(n.id())) n.addClass('spot')
+        else if (!keep.has(n.id())) n.addClass('faded')
+      })
+    }
     add(h.source === null ? [] : [h.source], 'source')
     add(h.dest === undefined ? [] : [h.dest], 'dest')
     if (extra.linkStart) cy.getElementById(extra.linkStart).addClass('link-start')

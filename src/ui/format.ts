@@ -11,7 +11,7 @@ import type {
   SourceFailure,
   Through,
 } from '../engine/simulate'
-import type { NodeId, Segment, Topology } from '../engine/types'
+import type { NodeId, Protection, Segment, Topology } from '../engine/types'
 import type { BackupKind, Selection } from '../state/store'
 import type { Highlight } from './canvas'
 
@@ -94,6 +94,37 @@ export function walkMarks(
         current: i === step,
       })),
     }),
+  }
+}
+
+/** A Remote LFA set picked in the detail panel, to show on its own on the diagram. */
+export type SpaceKind = 'p' | 'extP' | 'q' | 'pq'
+
+/** The routers in one Remote LFA set (RFC 7490 §5.2–5.3). */
+export function spaceSet(rlfa: Protection['rlfa'], kind: SpaceKind): NodeId[] {
+  return { p: rlfa.pSpace, extP: rlfa.extPSpace, q: rlfa.qSpace, pq: rlfa.pq }[kind]
+}
+
+/**
+ * The P/Q shading for one row. With no set picked: the P-space in use (extended or
+ * plain) and the Q-space. With one picked: only that set, its routers ringed
+ * (`spot`) and the rest faded. PQ nodes are in both spaces, so they get both shades.
+ * The ★ on the chosen PQ node stays either way.
+ */
+export function spaceMarks(
+  rlfa: Protection['rlfa'],
+  focus: SpaceKind | null,
+): Pick<Highlight, 'pSpace' | 'qSpace' | 'pq' | 'spot'> {
+  const pq = rlfa.needed && rlfa.best !== undefined ? { pq: rlfa.best } : {}
+  // An edit can empty the picked set; then fall back to the normal shading.
+  const ids = focus === null ? [] : spaceSet(rlfa, focus)
+  if (focus === null || ids.length === 0)
+    return { pSpace: rlfa.extended ? rlfa.extPSpace : rlfa.pSpace, qSpace: rlfa.qSpace, ...pq }
+  return {
+    ...(focus !== 'q' && { pSpace: ids }),
+    ...((focus === 'q' || focus === 'pq') && { qSpace: ids }),
+    ...pq,
+    spot: ids,
   }
 }
 

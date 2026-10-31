@@ -15,6 +15,7 @@ import {
   pickBackup,
   protectedBy,
   segmentsShort,
+  spaceMarks,
   throughText,
   tooltipLines,
 } from '../../src/ui/format'
@@ -392,5 +393,45 @@ describe('walkMarks', () => {
   it('nothing before the walk starts; no stacks when they are hidden', () => {
     expect(walkMarks(w, null, true)).toEqual({})
     expect(walkMarks(w, 3, false)).toEqual({ packetAt: 'A' })
+  })
+})
+
+describe('spaceMarks: P / Q / PQ sets picked in the detail panel', () => {
+  // docs/02-algorithms.md §6 Example 2: P {A,B}, extended P {A,B,C}, Q {B,C}, PQ {B,C}, ★ B.
+  const rlfa = first('02-ring5.yaml', 'S', 'E').rlfa
+
+  it('nothing picked: extended P and Q shaded, ★ B, nothing ringed', () => {
+    expect(spaceMarks(rlfa, null)).toEqual({ pSpace: ['A', 'B', 'C'], qSpace: ['B', 'C'], pq: 'B' })
+    expect(spaceMarks({ ...rlfa, extended: false }, null).pSpace).toEqual(['A', 'B'])
+  })
+
+  it('one set picked: only that set, its routers ringed', () => {
+    expect(spaceMarks(rlfa, 'p')).toEqual({ pSpace: ['A', 'B'], pq: 'B', spot: ['A', 'B'] })
+    expect(spaceMarks(rlfa, 'extP')).toEqual({
+      pSpace: ['A', 'B', 'C'],
+      pq: 'B',
+      spot: ['A', 'B', 'C'],
+    })
+    expect(spaceMarks(rlfa, 'q')).toEqual({ qSpace: ['B', 'C'], pq: 'B', spot: ['B', 'C'] })
+    // PQ nodes are in both spaces, so they get both shades.
+    expect(spaceMarks(rlfa, 'pq')).toEqual({
+      pSpace: ['B', 'C'],
+      qSpace: ['B', 'C'],
+      pq: 'B',
+      spot: ['B', 'C'],
+    })
+  })
+
+  it('no ★ when an LFA already protects the link (Example 1)', () => {
+    const square = first('01-square.yaml', 'S', 'D').rlfa
+    expect(spaceMarks(square, 'pq')).toEqual({
+      pSpace: ['D', 'N'],
+      qSpace: ['D', 'N'],
+      spot: ['D', 'N'],
+    })
+  })
+
+  it('a picked set that is now empty falls back to the normal shading', () => {
+    expect(spaceMarks({ ...rlfa, pq: [] }, 'pq')).toEqual(spaceMarks(rlfa, null))
   })
 })

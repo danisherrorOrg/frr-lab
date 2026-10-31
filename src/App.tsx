@@ -13,7 +13,7 @@ import { CoverageReport } from './ui/CoverageReport'
 import { DetailPanel } from './ui/DetailPanel'
 import { FailureByDut } from './ui/FailureByDut'
 import { FailurePanel } from './ui/FailurePanel'
-import { bundles, drawnFlow, pickBackup, walkMarks } from './ui/format'
+import { bundles, drawnFlow, pickBackup, spaceMarks, walkMarks, type SpaceKind } from './ui/format'
 import { GraphCanvas } from './ui/GraphCanvas'
 import { Legend } from './ui/Legend'
 import { NoticeBox } from './ui/NoticeBox'
@@ -188,6 +188,13 @@ export function App() {
     if (walkStep !== null) setWalkStep(0, path)
   }
 
+  // A P / Q / PQ set picked in the detail panel belongs to one row, like the walk step.
+  const rowKey = row && source !== null ? `${source}|${row.dest}|${row.via}|${row.link ?? ''}` : ''
+  const [spaceAt, setSpaceAt] = useState<{ key: string; kind: SpaceKind } | null>(null)
+  const space = spaceAt !== null && spaceAt.key === rowKey ? spaceAt.kind : null
+  const setSpace = (kind: SpaceKind | null) =>
+    setSpaceAt(kind === null ? null : { key: rowKey, kind })
+
   // Packet walk of the simulated traffic drawn in the failure view (§8.3). Its step
   // belongs to one flow under one failure; anything else starts fresh.
   const shownFlow = anyFailed && sim.simulation ? drawnFlow(sim.simulation, simDest) : undefined
@@ -274,14 +281,13 @@ export function App() {
           avoid: [protectedLink.id],
         }),
       }),
-      pSpace: rlfa.extended ? rlfa.extPSpace : rlfa.pSpace,
-      qSpace: rlfa.qSpace,
-      ...(rlfa.needed && rlfa.best !== undefined && { pq: rlfa.best }),
+      ...spaceMarks(rlfa, space),
       ...walkMarks(walk, walkStep, walkOnCanvas, bundles(topology)),
     }
   }, [
     walk,
     walkStep,
+    space,
     flowTrace,
     flowStep,
     walkOnCanvas,
@@ -362,6 +368,9 @@ export function App() {
                   onPhp={setPhp}
                   walkOnCanvas={walkOnCanvas}
                   onWalkOnCanvas={setWalkOnCanvas}
+                  space={space}
+                  onSpace={setSpace}
+                  spacesOff={anyFailed}
                 />
               ) : (
                 <p className="text-sm text-slate-500">

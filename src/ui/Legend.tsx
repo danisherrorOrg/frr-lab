@@ -45,6 +45,9 @@ export function Legend() {
       <li className="flex items-center gap-1">{swatch('#bbf7d0')} Q-space</li>
       <li className="flex items-center gap-1">★ chosen PQ node</li>
       <li className="flex items-center gap-1">
+        {swatch('rgba(79, 70, 229, 0.35)')} ringed = the set picked in the details
+      </li>
+      <li className="flex items-center gap-1">
         {swatch('rgba(124, 58, 237, 0.45)')} packet walk: where the packet is now
       </li>
       <li>Metrics: one number = same both ways; two numbers = cost leaving each end.</li>

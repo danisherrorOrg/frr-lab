@@ -295,7 +295,7 @@ Things that fit the "learn and check FRR" goal and stay offline / no backend.
 - [x] Compare view: LFA, RLFA and TI-LFA paths for one destination side by side *(D36, `02-algorithms.md` §10)*
   - [x] With links or routers down: the three repair modes side by side for the traffic on the diagram (delivered / dropped / loops, and why) *(D37, §10.1)*
 - [x] Guided tour on first visit (load Example 2, fail S–E, read the TI-LFA stack) *(D38)*
-- [ ] Clickable P / Q / PQ sets in the detail panel that highlight those routers on the canvas
+- [x] Clickable P / Q / PQ sets in the detail panel that highlight those routers on the canvas *(D39)*
 
 **Design checks (for engineers)**
 - [ ] Per-link view: pick a link, list every (source, destination) it protects and how

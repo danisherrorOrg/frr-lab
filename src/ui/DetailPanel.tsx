@@ -1,9 +1,19 @@
 import type { PacketWalk as Walk } from '../engine/packet-walk'
 import type { ProtectionPaths } from '../engine/paths'
 import type { DestinationResult, NodeId, Protection } from '../engine/types'
-import { useMemo } from 'react'
+import { Fragment, useMemo } from 'react'
 import { useStore, type BackupKind } from '../state/store'
-import { bundles, hopName, isBundled, lfaTags, linkName, METHOD_NAME, segmentText } from './format'
+import {
+  bundles,
+  hopName,
+  isBundled,
+  lfaTags,
+  linkName,
+  METHOD_NAME,
+  segmentText,
+  spaceSet,
+  type SpaceKind,
+} from './format'
 import { PacketWalk, type WalkPath } from './PacketWalk'
 
 interface Props {
@@ -29,9 +39,20 @@ interface Props {
   /** Draw the label stacks on the diagram during the walk. */
   walkOnCanvas?: boolean
   onWalkOnCanvas?: (on: boolean) => void
+  /** The Remote LFA set shown on its own on the diagram, if any. */
+  space?: SpaceKind | null
+  onSpace?: (kind: SpaceKind | null) => void
+  /** Links or routers are down: the diagram shows the simulated traffic, not the sets. */
+  spacesOff?: boolean
 }
 
 const h3 = 'mt-3 mb-1 text-sm font-semibold'
+const SPACES: { kind: SpaceKind; name: string }[] = [
+  { kind: 'p', name: 'P-space' },
+  { kind: 'extP', name: 'Extended P' },
+  { kind: 'q', name: 'Q-space' },
+  { kind: 'pq', name: 'PQ' },
+]
 const set = (ids: NodeId[]) => (ids.length === 0 ? '∅' : `{${ids.join(', ')}}`)
 
 /** Everything behind one results row: LFA candidates, RLFA spaces, TI-LFA labels, explain steps (F3, F7). */
@@ -53,6 +74,9 @@ export function DetailPanel({
   onPhp = () => {},
   walkOnCanvas = true,
   onWalkOnCanvas = () => {},
+  space = null,
+  onSpace = () => {},
+  spacesOff = false,
 }: Props) {
   const e = p.protectedLink.to
   const kinds = ['lfa', 'rlfa', 'tilfa'] as const
@@ -157,15 +181,45 @@ export function DetailPanel({
       )}
 
       <h3 className={h3}>Remote LFA (RFC 7490)</h3>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3">
-        <dt className="text-slate-500">P-space</dt>
-        <dd>{set(p.rlfa.pSpace)}</dd>
-        <dt className="text-slate-500">Extended P</dt>
-        <dd>{set(p.rlfa.extPSpace)}</dd>
-        <dt className="text-slate-500">Q-space</dt>
-        <dd>{set(p.rlfa.qSpace)}</dd>
-        <dt className="text-slate-500">PQ ({p.rlfa.extended ? 'extended' : 'plain'} P)</dt>
-        <dd>{set(p.rlfa.pq)}</dd>
+      <p className="text-xs text-slate-500">
+        {spacesOff
+          ? 'Something is down, so the diagram shows the simulated traffic, not these sets.'
+          : 'Click a set to show only its routers on the diagram.'}
+      </p>
+      <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-3">
+        {SPACES.map(({ kind, name }) => {
+          const ids = spaceSet(p.rlfa, kind)
+          const label = kind === 'pq' ? `PQ (${p.rlfa.extended ? 'extended' : 'plain'} P)` : name
+          const on = space === kind
+          return (
+            <Fragment key={kind}>
+              <dt className="text-slate-500">{label}</dt>
+              <dd>
+                <button
+                  type="button"
+                  aria-pressed={on}
+                  aria-label={`${label} ${set(ids)}`}
+                  title={
+                    ids.length === 0
+                      ? 'Empty set: nothing to show'
+                      : on
+                        ? 'Click again to show P and Q together'
+                        : `Show only ${label} on the diagram`
+                  }
+                  disabled={spacesOff || ids.length === 0}
+                  onClick={() => onSpace(on ? null : kind)}
+                  className={`-mx-1 rounded px-1 text-left focus:outline-2 focus:outline-indigo-500 enabled:hover:bg-indigo-50 disabled:cursor-default dark:enabled:hover:bg-slate-800 ${
+                    on
+                      ? 'bg-indigo-100 font-semibold text-indigo-900 ring-1 ring-indigo-400 dark:bg-indigo-950 dark:text-indigo-100'
+                      : ''
+                  } ${ids.length > 0 && !spacesOff ? 'underline decoration-dotted underline-offset-2' : ''}`}
+                >
+                  {set(ids)}
+                </button>
+              </dd>
+            </Fragment>
+          )
+        })}
         <dt className="text-slate-500">Chosen</dt>
         <dd>
           {!p.rlfa.needed

@@ -355,3 +355,12 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Other options considered:** a tour library (new dependency for five steps); spotlighting page elements (fragile across the phone and desktop layouts).
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D39 – Clickable P / Q / PQ sets in the detail panel (2026-10-31)
+- **Why:** TODO backlog. The diagram shades extended P and Q together, so on a busy network it is hard to tell which routers are in which set, or which are PQ nodes.
+- **What:** each Remote LFA set in the detail panel (P-space, extended P, Q-space, PQ) is a toggle button. Pressing one draws only that set: P sets blue, Q-space green, PQ nodes both. Its routers get an indigo ring and every other router fades, except S and D, which give the context (RFC 7490 never lists them in a set). Paths and the ★ on the chosen PQ node stay. Pressing it again goes back to P and Q together.
+- **Scope:** the pick belongs to one row (like the packet-walk step), so another row starts with nothing picked. Empty sets are not clickable. While anything is down the diagram shows the simulated traffic, so the buttons are off and a note says so. If an edit empties the picked set, the normal shading comes back.
+- **Code:** `spaceMarks()` / `spaceSet()` in `src/ui/format.ts` (read the engine's `Protection.rlfa`, no new routing maths); `spot` on the canvas `Highlight` adds the `spot` / `faded` classes. Tests: format (Examples 1 to 3), headless canvas, and App (toggle, row change, empty set, failure). Checked in Chrome on Example 2, no console errors.
+- **Other options considered:** hover to highlight (no touch or keyboard support); several sets at once (the shading already does that).
+- **No new dependencies.**
+- **Status:** Accepted.

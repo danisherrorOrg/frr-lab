@@ -572,6 +572,61 @@ describe('Phase 9.1: close the detail panel', () => {
   })
 })
 
+describe('Clickable P / Q / PQ sets', () => {
+  // Example 2, S → E: P {A, B}, extended P {A, B, C}, Q {B, C}, PQ {B, C}, ★ B.
+  it('a click shows only that set on the diagram; a second click shows P and Q again', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await rowFor('E'))
+    expect(canvas.highlight).toMatchObject({ pSpace: ['A', 'B', 'C'], qSpace: ['B', 'C'] })
+    expect(canvas.highlight?.spot).toBeUndefined()
+
+    const q = screen.getByRole('button', { name: 'Q-space {B, C}' })
+    await user.click(q)
+    expect(q.getAttribute('aria-pressed')).toBe('true')
+    expect(canvas.highlight).toMatchObject({ qSpace: ['B', 'C'], spot: ['B', 'C'], pq: 'B' })
+    expect(canvas.highlight?.pSpace).toBeUndefined()
+    // The paths stay drawn.
+    expect(canvas.highlight?.primary).toEqual(['S', 'E'])
+
+    await user.click(screen.getByRole('button', { name: 'P-space {A, B}' }))
+    expect(q.getAttribute('aria-pressed')).toBe('false')
+    expect(canvas.highlight).toMatchObject({ pSpace: ['A', 'B'], spot: ['A', 'B'] })
+
+    await user.click(screen.getByRole('button', { name: 'P-space {A, B}' }))
+    expect(canvas.highlight?.spot).toBeUndefined()
+    expect(canvas.highlight?.pSpace).toEqual(['A', 'B', 'C'])
+  })
+
+  it('a new row starts with no set picked; empty sets are not clickable', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await rowFor('E'))
+    await user.click(screen.getByRole('button', { name: /^PQ .*\{B, C\}$/ }))
+    expect(canvas.highlight?.spot).toEqual(['B', 'C'])
+
+    await user.click(await rowFor('A'))
+    expect(canvas.highlight?.spot).toBeUndefined()
+
+    // Example 3: no PQ node, so the empty PQ set can't be picked.
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'ring5-high')
+    await user.click(await rowFor('E'))
+    const pq = screen.getByRole('button', { name: /^PQ .*∅$/ })
+    expect((pq as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('while something is down the sets are not clickable', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await rowFor('E'))
+    act(() => useStore.getState().toggleFailedLink('S-E'))
+    expect(
+      (screen.getByRole('button', { name: 'Q-space {B, C}' }) as HTMLButtonElement).disabled,
+    ).toBe(true)
+    expect(screen.getByText(/not these sets/)).toBeTruthy()
+  })
+})
+
 describe('Phase 9.3: router failure', () => {
   it('square, fail E: the node-protecting LFA survives; E itself is expected to be unreachable', async () => {
     const user = userEvent.setup()
