@@ -1,12 +1,17 @@
 import fc from 'fast-check'
 import type { Link, Topology } from '../src/engine/types'
+import { uniqueLinkId } from '../src/io/yaml'
 
 /**
  * Random connected topologies for property tests (docs/05-testing.md §3):
- * 4–30 routers, metrics 1–20, no self-loops or parallel links.
- * A random spanning tree keeps it connected; extra links add cycles and ECMP.
+ * 4–30 routers, metrics 1–20, no self-loops. A random spanning tree keeps it
+ * connected; extra links add cycles and ECMP. With `parallel`, extra links may
+ * join routers that are already linked (bundles, D29), with metrics 1–5 so equal
+ * links are common.
  */
-export function connectedTopology(opts: { symmetric?: boolean } = {}): fc.Arbitrary<Topology> {
+export function connectedTopology(
+  opts: { symmetric?: boolean; parallel?: boolean } = {},
+): fc.Arbitrary<Topology> {
   return fc.integer({ min: 4, max: 30 }).chain((n) =>
     fc
       .record({
@@ -26,17 +31,23 @@ export function connectedTopology(opts: { symmetric?: boolean } = {}): fc.Arbitr
         const id = (i: number) => `R${i}`
         const pairs: [number, number][] = parents.map((p, i) => [p % (i + 1), i + 1])
         const seen = new Set(pairs.map(([a, b]) => `${Math.min(a, b)}:${Math.max(a, b)}`))
-        for (const [a, b] of extra) {
+        for (const [k, [a0, b0]] of extra.entries()) {
+          // With `parallel`, every other extra link copies an existing pair, so bundles are common.
+          const [a, b] = opts.parallel && k % 2 === 0 ? pairs[a0 % pairs.length]! : [a0, b0]
           const key = `${Math.min(a, b)}:${Math.max(a, b)}`
-          if (a !== b && !seen.has(key)) {
+          if (a !== b && (opts.parallel || !seen.has(key))) {
             seen.add(key)
             pairs.push([a, b])
           }
         }
+        const ids = new Set<string>()
         const links: Link[] = pairs.map(([a, b], i) => {
-          const [ab, ba] = metrics[i] ?? [1, 1]
+          const [ab0, ba0] = metrics[i] ?? [1, 1]
+          const [ab, ba] = opts.parallel ? [1 + (ab0 % 5), 1 + (ba0 % 5)] : [ab0, ba0]
+          const linkId = uniqueLinkId(`${id(a)}-${id(b)}`, ids)
+          ids.add(linkId)
           return {
-            id: `${id(a)}-${id(b)}`,
+            id: linkId,
             a: id(a),
             b: id(b),
             metricAB: ab,

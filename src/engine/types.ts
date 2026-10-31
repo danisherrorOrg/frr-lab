@@ -33,16 +33,20 @@ export interface Topology {
   /** Default 16000. */
   srgbBase: number
   nodes: RouterNode[]
-  /** Point-to-point only, no parallel links in the MVP (D4). */
+  /** Point-to-point. Two routers may have several links (parallel links, D29); each has its own id. */
   links: Link[]
 }
 
 export type Segment =
   | { kind: 'prefix'; node: NodeId; label: number }
-  | { kind: 'adj'; from: NodeId; to: NodeId; label: number }
+  /** `link` names the exact link: with parallel links each one has its own Adj-SID (D29). */
+  | { kind: 'adj'; from: NodeId; to: NodeId; link: string; label: number }
 
+/** One alternate next hop: an (outgoing link, neighbor) pair, as in RFC 5286 §3.6. */
 export interface LfaCandidate {
   neighbor: NodeId
+  /** The link from S to the neighbor (D29: two links to one neighbor are two candidates). */
+  link: string
   loopFree: boolean
   downstream: boolean
   nodeProtecting: boolean
@@ -60,9 +64,11 @@ export interface ExplainStep {
 
 /** Protection for one (S, D, protected link S–E). */
 export interface Protection {
-  protectedLink: { from: NodeId; to: NodeId }
+  /** `id` names the link: with parallel links (D29) S–E may be one of several. */
+  protectedLink: { from: NodeId; to: NodeId; id: string }
   ecmpProtected: boolean
-  lfa: { candidates: LfaCandidate[]; best?: NodeId }
+  /** `best` is the chosen neighbor, `bestLink` the link S uses to reach it. */
+  lfa: { candidates: LfaCandidate[]; best?: NodeId; bestLink?: string }
   /** RFC 7490 link protection. S and E never appear in any space (D17). */
   rlfa: {
     pSpace: NodeId[]
@@ -80,6 +86,8 @@ export interface Protection {
   }
   tilfa: {
     path?: NodeId[]
+    /** The outgoing interface: S's link to path[1] (RFC 9855 §5). */
+    outLink?: string
     segments?: Segment[]
     labelStack?: number[]
     extraLabels?: number
@@ -90,7 +98,8 @@ export interface Protection {
 export interface DestinationResult {
   dest: NodeId
   cost: number
+  /** Primary next-hop routers, sorted. A router reached over 2 equal links is listed once. */
   nextHops: NodeId[]
-  /** One per primary next-hop link. */
+  /** One per primary next-hop link, sorted by neighbor, then link id. */
   protections: Protection[]
 }

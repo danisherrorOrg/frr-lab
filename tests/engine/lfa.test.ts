@@ -16,7 +16,7 @@ interface ExpectedLfa {
   results: {
     dest: string
     protections: {
-      protectedLink: { from: string; to: string }
+      protectedLink: { from: string; to: string; id: string }
       lfa: { candidates: LfaCandidate[]; best: string | null }
     }[]
   }[]
@@ -77,7 +77,16 @@ describe('computeLfa', () => {
   it('keeps the numbers behind each check for the explain steps', () => {
     const result = computeLfa(allPairs(loadFixture('01-square.yaml')), 'S', 'D', 'E')
     expect(result.checks).toEqual([
-      { neighbor: 'N', cSN: 15, distND: 10, distNS: 15, distSD: 20, distNE: 20, distED: 10 },
+      {
+        neighbor: 'N',
+        link: 'S-N',
+        cSN: 15,
+        distND: 10,
+        distNS: 15,
+        distSD: 20,
+        distNE: 20,
+        distED: 10,
+      },
     ])
   })
 
@@ -85,11 +94,25 @@ describe('computeLfa', () => {
     const t = allPairs(triangle(1, 1, 5))
     const result = computeLfa(t, 'S', 'E', 'E')
     expect(result.candidates).toEqual([
-      { neighbor: 'D', loopFree: true, downstream: false, nodeProtecting: false, cost: 6 },
+      {
+        neighbor: 'D',
+        link: 'S-D',
+        loopFree: true,
+        downstream: false,
+        nodeProtecting: false,
+        cost: 6,
+      },
     ])
     const toD = computeLfa(allPairs(triangle(1, 1, 1)), 'S', 'D', 'D')
     expect(toD.candidates).toEqual([
-      { neighbor: 'E', loopFree: true, downstream: false, nodeProtecting: false, cost: 2 },
+      {
+        neighbor: 'E',
+        link: 'S-E',
+        loopFree: true,
+        downstream: false,
+        nodeProtecting: false,
+        cost: 2,
+      },
     ])
   })
 
@@ -101,7 +124,7 @@ describe('computeLfa', () => {
     }
     const result = computeLfa(allPairs(capped), 'S', 'E', 'E')
     expect(result.candidates).toEqual([])
-    expect(result.skipped).toEqual([{ neighbor: 'D', reason: 'max-metric' }])
+    expect(result.skipped).toEqual([{ neighbor: 'D', link: 'S-D', reason: 'max-metric' }])
   })
 
   it('rejects an E that is not a primary next hop for D', () => {
@@ -115,6 +138,7 @@ describe('computeLfa', () => {
 describe('chooseBestLfa', () => {
   const lfa = (neighbor: string, flags: string, cost: number): LfaCandidate => ({
     neighbor,
+    link: `S-${neighbor}`,
     loopFree: flags.includes('L'),
     downstream: flags.includes('D'),
     nodeProtecting: flags.includes('N'),

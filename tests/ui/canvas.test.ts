@@ -141,3 +141,38 @@ describe('canvas: failed router (Phase 9.3)', () => {
     expect(cy.getElementById('S-E').hasClass('failed')).toBe(false)
   })
 })
+
+describe('canvas: parallel links (D29)', () => {
+  it('draws each link of a bundle as its own curved edge with its own metric', () => {
+    const { cy, t } = draw('07-parallel.yaml')
+    decorate(cy, t, { source: 'S' }, none)
+    expect(cy.edges().map((e) => e.id())).toEqual(['S-E', 'S-E#2', 'E-D', 'E-D#2', 'S-A', 'A-D'])
+    expect(cy.getElementById('S-E').data('label')).toBe('10')
+    expect(cy.getElementById('S-E#2').data('label')).toBe('20')
+  })
+
+  it('highlights the named link of a bundle, not just any link between the routers', () => {
+    const { cy, t } = draw('07-parallel.yaml')
+    decorate(
+      cy,
+      t,
+      {
+        source: 'S',
+        dest: 'E',
+        primary: ['S', 'E'],
+        primaryLinks: ['S-E'],
+        backup: ['S', 'E'],
+        backupLinks: ['S-E#2'],
+      },
+      { ...none, failed: ['S-E'] },
+    )
+    expect(cy.getElementById('S-E').classes()).toEqual(
+      expect.arrayContaining(['primary', 'failed']),
+    )
+    expect(cy.getElementById('S-E').hasClass('backup')).toBe(false)
+    expect(cy.getElementById('S-E#2').classes()).toEqual(
+      expect.arrayContaining(['backup', 'backup-fwd']),
+    )
+    expect(cy.getElementById('S-E#2').hasClass('failed')).toBe(false)
+  })
+})

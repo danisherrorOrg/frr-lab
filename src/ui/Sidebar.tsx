@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { freePosition } from '../state/edit'
 import { useStore, type Tool } from '../state/store'
+import { bundles, linkName as nameOf } from './format'
 import { PropertiesPanel } from './PropertiesPanel'
 
 /** Tools, with the one-key shortcut that picks each (App.tsx). */
@@ -42,9 +43,11 @@ function KeyboardTool({ tool }: { tool: Tool }) {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [error, setError] = useState<string | null>(null)
+  // "S–E", or "S–E (S-E#2)" for one link of a bundle (D29).
+  const b = bundles(topology)
   const linkName = (id: string) => {
     const l = topology.links.find((x) => x.id === id)
-    return l ? `${l.a}–${l.b}` : id
+    return l ? nameOf(b, l.a, l.b, l.id) : id
   }
 
   if (tool === 'select')

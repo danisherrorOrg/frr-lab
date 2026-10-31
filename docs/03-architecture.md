@@ -103,27 +103,29 @@ interface Topology {
   name: string;
   srgbBase: number;      // default 16000
   nodes: RouterNode[];
-  links: Link[];         // point-to-point only in MVP; no parallel links in MVP
+  links: Link[];         // point-to-point; parallel links allowed, each with its own id (D29)
 }
 
 type Segment =
   | { kind: "prefix"; node: NodeId; label: number }
-  | { kind: "adj"; from: NodeId; to: NodeId; label: number };
+  | { kind: "adj"; from: NodeId; to: NodeId; link: string; label: number };  // link: D29
 
-interface LfaCandidate {
+interface LfaCandidate {          // an (outgoing link, neighbor) pair, RFC 5286 §3.6
   neighbor: NodeId;
+  link: string;
   loopFree: boolean; downstream: boolean; nodeProtecting: boolean;
   cost: number;          // c(S,N) + dist(N,D)
 }
 
 interface Protection {          // for one (S, D, protected link S–E)
-  protectedLink: { from: NodeId; to: NodeId };
+  protectedLink: { from: NodeId; to: NodeId; id: string };  // id: which link of a bundle
   ecmpProtected: boolean;
-  lfa:   { candidates: LfaCandidate[]; best?: NodeId };
+  lfa:   { candidates: LfaCandidate[]; best?: NodeId; bestLink?: string };
   rlfa:  { pSpace: NodeId[]; extPSpace: NodeId[]; qSpace: NodeId[]; pq: NodeId[];
            exitVia: Record<NodeId, NodeId>;  // PQ node → neighbor to send through (D11)
            extended: boolean; needed: boolean; best?: NodeId };  // needed = false when an LFA exists
-  tilfa: { path?: NodeId[]; segments?: Segment[]; labelStack?: number[]; extraLabels?: number };
+  tilfa: { path?: NodeId[]; outLink?: string;  // outLink: outgoing interface, RFC 9855 §5
+           segments?: Segment[]; labelStack?: number[]; extraLabels?: number };
   explain: ExplainStep[];
 }
 
@@ -151,7 +153,7 @@ links:
 **Validation rules** (show clear errors in the UI):
 - Node ids are unique; SID indices are unique; links point to existing nodes.
 - Metrics are integers from 1 to 16,777,215 (the IS-IS wide-metric range).
-- No self-loops. In the MVP, no two links between the same pair.
+- No self-loops. Two routers may have several links (parallel links, D29): the second `S`–`E` link gets id `S-E#2`, the third `S-E#3`.
 - Warn (don't block) if the graph is disconnected.
 
 ## 6. UI layout

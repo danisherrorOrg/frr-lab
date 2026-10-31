@@ -1,4 +1,4 @@
-import { linkMetric } from './graph'
+import { cheapestEdge, edgeOf } from './graph'
 import { MAX_METRIC } from './lfa'
 import { dist, reverseSpf, type AllPairs } from './spf'
 import type { NodeId, Protection } from './types'
@@ -59,11 +59,15 @@ export interface PqCost {
 export interface RlfaOptions {
   /** Use extended P-space for PQ (default true, D5). False = plain P(S) only. */
   extended?: boolean
+  /** The protected link S→E, by id. Default: the cheapest link S→E (D29). */
+  link?: string
 }
 
 export interface RlfaResult {
   s: NodeId
   e: NodeId
+  /** The protected link's id. */
+  link: string
   cSE: number
   extended: boolean
   /** All spaces sorted by router id; S and E are never listed (D17). */
@@ -81,8 +85,8 @@ export interface RlfaResult {
   /** Neighbor N ≠ E × router outside P(S). Routers in P(S) are always in some P(N). */
   extChecks: ExtPCheck[]
   qChecks: QCheck[]
-  /** Neighbors never used as an exit, and why (RFC 7490 §5.4). */
-  skipped: { neighbor: NodeId; reason: 'max-metric' }[]
+  /** Links never used as an exit, and why (RFC 7490 §5.4). */
+  skipped: { neighbor: NodeId; link: string; reason: 'max-metric' }[]
 }
 
 /**
@@ -97,8 +101,15 @@ export function computeRlfa(
   options: RlfaOptions = {},
 ): RlfaResult {
   const extended = options.extended ?? true
-  const cSE = linkMetric(table.graph, s, e)
-  if (cSE === undefined) throw new Error(`There is no link ${s}→${e} to protect.`)
+  const protectedEdge =
+    options.link === undefined
+      ? cheapestEdge(table.graph, s, e)
+      : edgeOf(table.graph, s, options.link)
+  if (protectedEdge === undefined || protectedEdge.to !== e) {
+    const which = options.link === undefined ? '' : ` (${options.link})`
+    throw new Error(`There is no link ${s}→${e}${which} to protect.`)
+  }
+  const cSE = protectedEdge.metric
 
   const others = table.graph.nodes.filter((y) => y !== s && y !== e)
 
@@ -111,14 +122,21 @@ export function computeRlfa(
 
   const skipped: RlfaResult['skipped'] = []
   const extChecks: ExtPCheck[] = []
+  // One exit per neighbor: its cheapest usable link. Another link to E is never an
+  // exit: E would be an LFA (D17), so Remote LFA isn't used (D29).
+  const exitLinks = new Map<NodeId, { metric: number }>()
   for (const edge of table.graph.out.get(s) ?? []) {
     const n = edge.to
     if (n === e) continue
     // RFC 7490 §5.4 (and RFC 5286 §3.5): never repair over a max-metric first hop.
-    if (edge.metric === MAX_METRIC || linkMetric(table.graph, n, s) === MAX_METRIC) {
-      skipped.push({ neighbor: n, reason: 'max-metric' })
+    if (edge.metric === MAX_METRIC || edge.back === MAX_METRIC) {
+      skipped.push({ neighbor: n, link: edge.linkId, reason: 'max-metric' })
       continue
     }
+    const cur = exitLinks.get(n)
+    if (cur === undefined || edge.metric < cur.metric) exitLinks.set(n, edge)
+  }
+  for (const [n, edge] of exitLinks) {
     const distNS = dist(table, n, s)
     for (const node of others) {
       if (pSet.has(node)) continue
@@ -171,6 +189,7 @@ export function computeRlfa(
   const result: RlfaResult = {
     s,
     e,
+    link: protectedEdge.linkId,
     cSE,
     extended,
     pSpace,

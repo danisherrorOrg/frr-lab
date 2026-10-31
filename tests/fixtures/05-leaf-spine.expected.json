@@ -9,12 +9,13 @@
       "nextHops": ["SP1"],
       "protections": [
         {
-          "protectedLink": { "from": "L1", "to": "SP1" },
+          "protectedLink": { "from": "L1", "to": "SP1", "id": "L1-SP1" },
           "ecmpProtected": false,
           "lfa": {
             "candidates": [
               {
                 "neighbor": "SP2",
+                "link": "L1-SP2",
                 "loopFree": false,
                 "downstream": false,
                 "nodeProtecting": false,
@@ -50,12 +51,12 @@
       "nextHops": ["SP1", "SP2"],
       "protections": [
         {
-          "protectedLink": { "from": "L1", "to": "SP1" },
+          "protectedLink": { "from": "L1", "to": "SP1", "id": "L1-SP1" },
           "ecmpProtected": true,
           "lfa": { "best": "SP2" }
         },
         {
-          "protectedLink": { "from": "L1", "to": "SP2" },
+          "protectedLink": { "from": "L1", "to": "SP2", "id": "L1-SP2" },
           "ecmpProtected": true,
           "lfa": { "best": "SP1" }
         }

@@ -242,15 +242,15 @@ exists.
 
 ### 9.4 Parallel links between two routers
 Needs a rule change: the MVP bans parallel links (D4).
-- [ ] Re-read RFC 5286 on parallel links and how they act as alternates; log the result in `DECISIONS.md` (replaces D4)
-- [ ] Types: links already have their own id; drop the "no parallel links" check in `io/yaml.ts` and `state/edit.ts`
-- [ ] Tests first (engine):
+- [x] Re-read RFC 5286 on parallel links and how they act as alternates; log the result in `DECISIONS.md` (replaces D4) *(D29)*
+- [x] Types: links already have their own id; drop the "no parallel links" check in `io/yaml.ts` and `state/edit.ts`
+- [x] Tests first (engine):
       - SPF/ECMP: two equal links to E give ECMP; failing one is ECMP-protected
       - LFA: the other parallel link to E protects the link (not the node)
       - TI-LFA: each parallel link gets its own Adj-SID; `AdjSID(S→N)` must name the link, not just the neighbor
-- [ ] Canvas: draw parallel links as curved bundles (Cytoscape `curve-style: bezier`) with separate metric labels
-- [ ] Add-link tool lets you add a second link between the same pair
-- [ ] New example `07-parallel.yaml` + expected results
+- [x] Canvas: draw parallel links as curved bundles (Cytoscape `curve-style: bezier`) with separate metric labels
+- [x] Add-link tool lets you add a second link between the same pair
+- [x] New example `07-parallel.yaml` + expected results
 
 **Done when:** a 2-link bundle shows ECMP / link-protecting LFA correctly and each link can be failed on its own.
 

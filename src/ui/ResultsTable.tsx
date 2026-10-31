@@ -1,6 +1,15 @@
+import { useMemo } from 'react'
 import type { DestinationResult, NodeId, Protection } from '../engine/types'
-import type { RowKey } from '../state/store'
-import { METHOD_NAME, protectedBy, segmentsShort } from './format'
+import { isRow, useStore, type RowKey } from '../state/store'
+import {
+  bundles,
+  hopName,
+  isBundled,
+  METHOD_NAME,
+  protectedBy,
+  segmentsShort,
+  type Bundles,
+} from './format'
 import { rowKeys } from './keys'
 
 interface Props {
@@ -14,12 +23,12 @@ interface Props {
 
 const cell = 'px-2 py-1 align-top'
 
-function LfaCell({ p }: { p: Protection }) {
+function LfaCell({ p, b }: { p: Protection; b: Bundles }) {
   if (p.lfa.best === undefined) return <span className="text-slate-400">–</span>
-  const c = p.lfa.candidates.find((x) => x.neighbor === p.lfa.best)
+  const c = p.lfa.candidates.find((x) => x.link === p.lfa.bestLink)
   return (
     <span>
-      {p.lfa.best}
+      {hopName(b, p.protectedLink.from, p.lfa.best, p.lfa.bestLink)}
       {p.ecmpProtected ? (
         <span className="ml-1 text-xs text-slate-500">(ECMP)</span>
       ) : (
@@ -41,11 +50,18 @@ function RlfaCell({ p }: { p: Protection }) {
   )
 }
 
-function TilfaCell({ p }: { p: Protection }) {
+function TilfaCell({ p, b }: { p: Protection; b: Bundles }) {
   if (!p.tilfa.segments) return <span className="text-slate-400">none</span>
+  const out = p.tilfa.path?.[1]
   return (
     <span>
-      {segmentsShort(p.tilfa.segments)}
+      {segmentsShort(p.tilfa.segments, b)}
+      {/* With a bundle, the outgoing link is part of the repair (RFC 9855 §5, D29). */}
+      {out !== undefined && isBundled(b, p.protectedLink.from, out) && (
+        <span className="ml-1 text-xs text-slate-500">
+          (out {hopName(b, p.protectedLink.from, out, p.tilfa.outLink)})
+        </span>
+      )}
       <span className="block font-mono text-xs text-slate-500">
         {p.tilfa.labelStack?.join(' ')}
       </span>
@@ -64,6 +80,8 @@ function Status({ p }: { p: Protection }) {
 
 /** One row per (destination, primary next hop) for the chosen source (F4). */
 export function ResultsTable({ source, results, loading, error, row, onSelect }: Props) {
+  const topology = useStore((s) => s.topology)
+  const b = useMemo(() => bundles(topology), [topology])
   if (source === null) return <p className="p-3 text-sm">Add a router to see results.</p>
   if (error) return <p className="p-3 text-sm text-red-600">The engine failed: {error}</p>
   if (!results) return <p className="p-3 text-sm text-slate-500">{loading ? 'Computing…' : ''}</p>
@@ -78,14 +96,14 @@ export function ResultsTable({ source, results, loading, error, row, onSelect }:
       {/* Phone width: one card per row (docs/03-architecture.md §6). */}
       <ul aria-label={`Results for ${source}`} className="space-y-2 sm:hidden">
         {pairs.map(({ r, p }) => {
-          const via = p.protectedLink.to
-          const selected = row?.dest === r.dest && row.via === via
+          const { to: via, id: link } = p.protectedLink
+          const selected = isRow(row, r.dest, p)
           return (
-            <li key={`${r.dest}>${via}`}>
+            <li key={`${r.dest}>${link}`}>
               <button
                 type="button"
                 aria-pressed={selected}
-                onClick={() => onSelect({ dest: r.dest, via })}
+                onClick={() => onSelect({ dest: r.dest, via, link })}
                 className={`w-full rounded border p-2 text-left text-sm dark:border-slate-700 ${
                   selected
                     ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950'
@@ -94,7 +112,10 @@ export function ResultsTable({ source, results, loading, error, row, onSelect }:
               >
                 <span className="flex justify-between gap-2">
                   <strong>
-                    {r.dest} <span className="font-normal text-slate-500">via {via}</span>
+                    {r.dest}{' '}
+                    <span className="font-normal text-slate-500">
+                      via {hopName(b, source, via, link)}
+                    </span>
                   </strong>
                   <Status p={p} />
                 </span>
@@ -102,11 +123,11 @@ export function ResultsTable({ source, results, loading, error, row, onSelect }:
                   <span className="text-slate-500">Cost</span>
                   <span>{r.cost}</span>
                   <span className="text-slate-500">LFA</span>
-                  <LfaCell p={p} />
+                  <LfaCell p={p} b={b} />
                   <span className="text-slate-500">RLFA</span>
                   <RlfaCell p={p} />
                   <span className="text-slate-500">TI-LFA</span>
-                  <TilfaCell p={p} />
+                  <TilfaCell p={p} b={b} />
                 </span>
               </button>
             </li>
@@ -129,12 +150,12 @@ export function ResultsTable({ source, results, loading, error, row, onSelect }:
         </thead>
         <tbody>
           {pairs.map(({ r, p, i }) => {
-            const via = p.protectedLink.to
-            const selected = row?.dest === r.dest && row.via === via
-            const choose = () => onSelect({ dest: r.dest, via })
+            const { to: via, id: link } = p.protectedLink
+            const selected = isRow(row, r.dest, p)
+            const choose = () => onSelect({ dest: r.dest, via, link })
             return (
               <tr
-                key={`${r.dest}>${via}`}
+                key={`${r.dest}>${link}`}
                 tabIndex={0}
                 aria-selected={selected}
                 className={`cursor-pointer border-b border-slate-100 hover:bg-slate-50 focus:outline-2 focus:outline-indigo-500 dark:border-slate-800 dark:hover:bg-slate-800 ${
@@ -144,16 +165,16 @@ export function ResultsTable({ source, results, loading, error, row, onSelect }:
                 onKeyDown={(e) => rowKeys(e, choose)}
               >
                 <td className={`${cell} font-semibold`}>{i === 0 ? r.dest : ''}</td>
-                <td className={cell}>{via}</td>
+                <td className={cell}>{hopName(b, source, via, link)}</td>
                 <td className={cell}>{r.cost}</td>
                 <td className={cell}>
-                  <LfaCell p={p} />
+                  <LfaCell p={p} b={b} />
                 </td>
                 <td className={cell}>
                   <RlfaCell p={p} />
                 </td>
                 <td className={cell}>
-                  <TilfaCell p={p} />
+                  <TilfaCell p={p} b={b} />
                 </td>
                 <td className={cell}>
                   <Status p={p} />

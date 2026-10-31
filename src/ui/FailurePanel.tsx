@@ -1,7 +1,8 @@
+import { createContext, useContext, useMemo } from 'react'
 import type { FailureSimulation, Flow, RepairMethod, RepairMode } from '../engine/simulate'
 import type { NodeId } from '../engine/types'
 import { useStore } from '../state/store'
-import { drawnFlow, METHOD_NAME, throughText } from './format'
+import { bundles, drawnFlow, linkName, METHOD_NAME, throughText, type Bundles } from './format'
 import { rowKeys } from './keys'
 
 const MODES: { mode: RepairMode; label: string }[] = [
@@ -37,7 +38,14 @@ function Match({ f }: { f: Flow }) {
   return <span className="text-slate-400">–</span>
 }
 
-const dash = (a: NodeId, b: NodeId) => `${a}–${b}`
+/** Router pairs with parallel links, so text can name the failed link of a bundle (D29). */
+const BundleContext = createContext<Bundles>(new Set())
+
+/** "S–E", or "S–E (S-E#2)" for one link of a bundle. */
+function useDash() {
+  const b = useContext(BundleContext)
+  return (x: NodeId, y: NodeId, link?: string) => linkName(b, x, y, link)
+}
 
 /** The path text; a looping path gets "…" because traffic goes round again from there. */
 const pathText = (f: Flow) => `${arrow(f.repair!)}${f.loopAt !== undefined ? '…' : ''}`
@@ -47,6 +55,7 @@ const pathText = (f: Flow) => `${arrow(f.repair!)}${f.loopAt !== undefined ? '�
  * ends: "At C it finds C–E down too, and C switches to its own LFA backup."
  */
 function Chain({ f }: { f: Flow }) {
+  const dash = useDash()
   const more = (f.repairs ?? []).slice(1)
   const drop = f.drop
   // A packet can meet the same failed link twice (it came back with other labels).
@@ -65,22 +74,22 @@ function Chain({ f }: { f: Flow }) {
       {more.map((r, k) => (
         <span key={k}>
           {' '}
-          At {r.at} it finds <strong>{dash(r.at, r.next)}</strong> down {words[k]}, and {r.at}{' '}
-          switches to its own {METHOD[r.method]} backup.
+          At {r.at} it finds <strong>{dash(r.at, r.next, r.link)}</strong> down {words[k]}, and{' '}
+          {r.at} switches to its own {METHOD[r.method]} backup.
         </span>
       ))}
       {drop?.reason === 'no-backup' && (
         <>
           {' '}
-          At {drop.at} it finds <strong>{dash(drop.at, drop.next)}</strong> down {dropWord}, and{' '}
-          {drop.at} has no backup for it: traffic is <strong>dropped</strong>.
+          At {drop.at} it finds <strong>{dash(drop.at, drop.next, drop.link)}</strong> down{' '}
+          {dropWord}, and {drop.at} has no backup for it: traffic is <strong>dropped</strong>.
         </>
       )}
       {drop?.reason === 'backup-down' && (
         <>
           {' '}
-          But that backup leaves {drop.at} on <strong>{dash(drop.at, drop.next)}</strong>,{' '}
-          {backupMet ? 'a failed link the traffic already met' : 'which is down too'}: traffic is{' '}
+          But that backup leaves {drop.at} on <strong>{dash(drop.at, drop.next, drop.link)}</strong>
+          , {backupMet ? 'a failed link the traffic already met' : 'which is down too'}: traffic is{' '}
           <strong>dropped</strong>.
         </>
       )}
@@ -119,7 +128,8 @@ function Story({
   source: NodeId
   downNodes: NodeId[]
 }) {
-  const hitDown = `${f.plr}–${f.next} down${downNodes.includes(f.next!) ? ` (router ${f.next} is down)` : ''}`
+  const dash = useDash()
+  const hitDown = `${dash(f.plr!, f.next!, f.hitLink)} down${downNodes.includes(f.next!) ? ` (router ${f.next} is down)` : ''}`
   // Traffic from S doesn't "reach" S: it starts there.
   const reaches = f.plr === source ? `starts at ${source}` : `reaches ${f.plr}`
   const cutOff =
@@ -199,13 +209,14 @@ function Story({
 
 /** "Repair (FRR)" cell: who repairs, with what, and how it ends. */
 function RepairCell({ f }: { f: Flow }) {
+  const dash = useDash()
   const bad = 'text-red-700 dark:text-red-400'
   if (!f.method) return <span className={bad}>✗ no backup</span>
   const who = (f.repairs ?? []).map((r) => `${r.at} · ${METHOD[r.method]}`).join(', then ')
   if (f.drop)
     return (
       <span className={bad}>
-        {who} ✗ dropped at {f.drop.at}: {dash(f.drop.at, f.drop.next)} down
+        {who} ✗ dropped at {f.drop.at}: {dash(f.drop.at, f.drop.next, f.drop.link)} down
       </span>
     )
   if (f.loopAt !== undefined)
@@ -278,10 +289,11 @@ export function FailurePanel({ source, simulation: sim, error }: Props) {
   const failedLinks = useStore((s) => s.failedLinks)
   const failedNodes = useStore((s) => s.failedNodes)
   const topology = useStore((s) => s.topology)
+  const b = useMemo(() => bundles(topology), [topology])
 
   const down = failedLinks.map((id) => {
     const l = topology.links.find((x) => x.id === id)
-    return { id, name: l ? dash(l.a, l.b) : id }
+    return { id, name: l ? linkName(b, l.a, l.b, l.id) : id }
   })
   const routers = failedNodes
   const items = down.length + routers.length
@@ -312,193 +324,199 @@ export function FailurePanel({ source, simulation: sim, error }: Props) {
   const restoreLabel = many ? 'Restore all' : routers.length > 0 ? 'Restore router' : 'Restore link'
 
   return (
-    <section
-      aria-label="Failure simulation"
-      className="rounded border border-red-300 p-3 text-sm dark:border-red-800"
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="mr-auto text-base font-semibold">
-          <span aria-hidden="true">✕ </span>
-          {title}
-        </h2>
-        {many &&
-          routers.map((r) => (
-            <button
-              key={r}
-              type="button"
-              className={button}
-              aria-label={`Restore router ${r}`}
-              onClick={() => toggleFailedNode(r)}
-            >
-              ↺ {r}
-            </button>
+    <BundleContext.Provider value={b}>
+      <section
+        aria-label="Failure simulation"
+        className="rounded border border-red-300 p-3 text-sm dark:border-red-800"
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="mr-auto text-base font-semibold">
+            <span aria-hidden="true">✕ </span>
+            {title}
+          </h2>
+          {many &&
+            routers.map((r) => (
+              <button
+                key={r}
+                type="button"
+                className={button}
+                aria-label={`Restore router ${r}`}
+                onClick={() => toggleFailedNode(r)}
+              >
+                ↺ {r}
+              </button>
+            ))}
+          {many &&
+            down.map((l) => (
+              <button
+                key={l.id}
+                type="button"
+                className={button}
+                aria-label={`Restore ${l.name}`}
+                onClick={() => toggleFailedLink(l.id)}
+              >
+                ↺ {l.name}
+              </button>
+            ))}
+          <button type="button" className={button} onClick={restoreAll}>
+            {restoreLabel}
+          </button>
+        </div>
+        {routers.length > 0 && (
+          <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+            When a router fails, all its links go down at once. Its neighbors only see their own
+            link fail, so they use their <em>link-protecting</em> backups, and some of those still
+            go through the failed router. That is why node protection exists.
+          </p>
+        )}
+        {down.length > 1 && (
+          <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+            FRR backups are built for one failure at a time. With {down.length} links down, a backup
+            can run into another failed link. The router there then uses its own backup, so traffic
+            may still get through, or be dropped, or go round in a loop.
+          </p>
+        )}
+
+        <fieldset className="mt-2 flex flex-wrap items-center gap-3">
+          <legend className="sr-only">FRR method the routers run</legend>
+          <span className="text-xs text-slate-500">Routers run:</span>
+          {MODES.map((m) => (
+            <label key={m.mode} className="flex items-center gap-1">
+              <input
+                type="radio"
+                name="sim-mode"
+                checked={mode === m.mode}
+                onChange={() => setMode(m.mode)}
+              />
+              {m.label}
+            </label>
           ))}
-        {many &&
-          down.map((l) => (
-            <button
-              key={l.id}
-              type="button"
-              className={button}
-              aria-label={`Restore ${l.name}`}
-              onClick={() => toggleFailedLink(l.id)}
-            >
-              ↺ {l.name}
-            </button>
-          ))}
-        <button type="button" className={button} onClick={restoreAll}>
-          {restoreLabel}
-        </button>
-      </div>
-      {routers.length > 0 && (
-        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-          When a router fails, all its links go down at once. Its neighbors only see their own link
-          fail, so they use their <em>link-protecting</em> backups, and some of those still go
-          through the failed router. That is why node protection exists.
-        </p>
-      )}
-      {down.length > 1 && (
-        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-          FRR backups are built for one failure at a time. With {down.length} links down, a backup
-          can run into another failed link. The router there then uses its own backup, so traffic
-          may still get through, or be dropped, or go round in a loop.
-        </p>
-      )}
+        </fieldset>
 
-      <fieldset className="mt-2 flex flex-wrap items-center gap-3">
-        <legend className="sr-only">FRR method the routers run</legend>
-        <span className="text-xs text-slate-500">Routers run:</span>
-        {MODES.map((m) => (
-          <label key={m.mode} className="flex items-center gap-1">
-            <input
-              type="radio"
-              name="sim-mode"
-              checked={mode === m.mode}
-              onChange={() => setMode(m.mode)}
-            />
-            {m.label}
-          </label>
-        ))}
-      </fieldset>
+        <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Simulation step">
+          <button
+            type="button"
+            aria-pressed={!converged}
+            className={`${button} ${converged ? '' : active}`}
+            onClick={() => setConverged(false)}
+          >
+            1. Repair (FRR)
+          </button>
+          <button
+            type="button"
+            aria-pressed={converged}
+            className={`${button} ${converged ? active : ''}`}
+            onClick={() => setConverged(true)}
+            title="Shortcut: C"
+          >
+            2. Converge ▶
+          </button>
+        </div>
 
-      <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Simulation step">
-        <button
-          type="button"
-          aria-pressed={!converged}
-          className={`${button} ${converged ? '' : active}`}
-          onClick={() => setConverged(false)}
-        >
-          1. Repair (FRR)
-        </button>
-        <button
-          type="button"
-          aria-pressed={converged}
-          className={`${button} ${converged ? active : ''}`}
-          onClick={() => setConverged(true)}
-          title="Shortcut: C"
-        >
-          2. Converge ▶
-        </button>
-      </div>
-
-      {sourceDown && (
-        <p className="mt-2">
-          The source router {source} is down, so it sends no traffic. Pick another source router to
-          see how its traffic is repaired.
-        </p>
-      )}
-      {error && <p className="mt-2 text-red-600">The engine failed: {error}</p>}
-      {!sim && !error && !sourceDown && <p className="mt-2 text-slate-500">Simulating…</p>}
-      {sim && !sourceDown && (
-        <>
+        {sourceDown && (
           <p className="mt-2">
-            From {source}: {affected.length} of {sim.flows.length - deadEnds.length} destination
-            {sim.flows.length - deadEnds.length === 1 ? '' : 's'} cross {crossWhat}.
-            {affected.length > 0 && ` ${counts(affected)}.`}
+            The source router {source} is down, so it sends no traffic. Pick another source router
+            to see how its traffic is repaired.
           </p>
-          {routers.length > 0 && (
-            <p className="mt-1 font-medium">{routerSummary(affected, routers)}</p>
-          )}
-          {deadEnds.length > 0 && (
-            <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-              {deadEnds.join(', ')} can&apos;t be reached:{' '}
-              {deadEnds.length > 1 ? 'they are' : 'it is'} the failed router
-              {deadEnds.length > 1 ? 's' : ''} itself. That is expected, not a protection failure.
+        )}
+        {error && <p className="mt-2 text-red-600">The engine failed: {error}</p>}
+        {!sim && !error && !sourceDown && <p className="mt-2 text-slate-500">Simulating…</p>}
+        {sim && !sourceDown && (
+          <>
+            <p className="mt-2">
+              From {source}: {affected.length} of {sim.flows.length - deadEnds.length} destination
+              {sim.flows.length - deadEnds.length === 1 ? '' : 's'} cross {crossWhat}.
+              {affected.length > 0 && ` ${counts(affected)}.`}
             </p>
-          )}
-          {shown && (
-            <div className="mt-2 rounded bg-slate-50 p-2 dark:bg-slate-800" aria-live="polite">
-              <Story f={shown} converged={converged} source={source} downNodes={routers} />
-            </div>
-          )}
-          {affected.length > 0 && (
-            <div className="mt-2 overflow-x-auto">
-              <table className="w-full text-left">
-                <caption className="sr-only">Destinations that cross a failed link</caption>
-                <thead className="border-b border-slate-300 text-xs text-slate-600 dark:border-slate-600 dark:text-slate-300">
-                  <tr>
-                    <th className={cell}>Dest</th>
-                    <th className={cell}>Repair (FRR)</th>
-                    {routers.length > 0 && <th className={cell}>Backup vs down router</th>}
-                    <th className={cell}>Repair path</th>
-                    <th className={cell}>After convergence</th>
-                    <th className={cell}>Repair = final?</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {affected.map((f) => {
-                    const selected = f.dest === shown?.dest
-                    const choose = () => setSimDest(f.dest)
-                    return (
-                      <tr
-                        key={f.dest}
-                        tabIndex={0}
-                        aria-selected={selected}
-                        className={`cursor-pointer border-b border-slate-100 hover:bg-slate-50 focus:outline-2 focus:outline-indigo-500 dark:border-slate-800 dark:hover:bg-slate-800 ${
-                          selected ? 'bg-indigo-50 dark:bg-indigo-950' : ''
-                        }`}
-                        onClick={choose}
-                        onKeyDown={(e) => rowKeys(e, choose)}
-                      >
-                        <td className={`${cell} font-semibold`}>{f.dest}</td>
-                        <td className={cell}>
-                          <RepairCell f={f} />
-                        </td>
-                        {routers.length > 0 && (
+            {routers.length > 0 && (
+              <p className="mt-1 font-medium">{routerSummary(affected, routers)}</p>
+            )}
+            {deadEnds.length > 0 && (
+              <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                {deadEnds.join(', ')} can&apos;t be reached:{' '}
+                {deadEnds.length > 1 ? 'they are' : 'it is'} the failed router
+                {deadEnds.length > 1 ? 's' : ''} itself. That is expected, not a protection failure.
+              </p>
+            )}
+            {shown && (
+              <div className="mt-2 rounded bg-slate-50 p-2 dark:bg-slate-800" aria-live="polite">
+                <Story f={shown} converged={converged} source={source} downNodes={routers} />
+              </div>
+            )}
+            {affected.length > 0 && (
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full text-left">
+                  <caption className="sr-only">Destinations that cross a failed link</caption>
+                  <thead className="border-b border-slate-300 text-xs text-slate-600 dark:border-slate-600 dark:text-slate-300">
+                    <tr>
+                      <th className={cell}>Dest</th>
+                      <th className={cell}>Repair (FRR)</th>
+                      {routers.length > 0 && <th className={cell}>Backup vs down router</th>}
+                      <th className={cell}>Repair path</th>
+                      <th className={cell}>After convergence</th>
+                      <th className={cell}>Repair = final?</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {affected.map((f) => {
+                      const selected = f.dest === shown?.dest
+                      const choose = () => setSimDest(f.dest)
+                      return (
+                        <tr
+                          key={f.dest}
+                          tabIndex={0}
+                          aria-selected={selected}
+                          className={`cursor-pointer border-b border-slate-100 hover:bg-slate-50 focus:outline-2 focus:outline-indigo-500 dark:border-slate-800 dark:hover:bg-slate-800 ${
+                            selected ? 'bg-indigo-50 dark:bg-indigo-950' : ''
+                          }`}
+                          onClick={choose}
+                          onKeyDown={(e) => rowKeys(e, choose)}
+                        >
+                          <td className={`${cell} font-semibold`}>{f.dest}</td>
                           <td className={cell}>
-                            <ThroughCell f={f} />
+                            <RepairCell f={f} />
                           </td>
-                        )}
-                        <td className={`${cell} font-mono text-xs`}>
-                          {f.repair ? `${pathText(f)} (${f.repairCost})` : '–'}
-                        </td>
-                        <td className={`${cell} font-mono text-xs`}>
-                          {f.after ? `${arrow(f.after)} (${f.afterCost})` : 'unreachable'}
-                        </td>
-                        <td className={cell}>
-                          <Match f={f} />
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {unaffected.length > 0 && (
-            <p className="mt-2 text-xs text-slate-500">
-              Not affected (their path avoids{' '}
-              {routers.length > 0 ? 'everything that is down' : many ? 'every failed link' : names}
-              ): {unaffected.join(', ')}.
+                          {routers.length > 0 && (
+                            <td className={cell}>
+                              <ThroughCell f={f} />
+                            </td>
+                          )}
+                          <td className={`${cell} font-mono text-xs`}>
+                            {f.repair ? `${pathText(f)} (${f.repairCost})` : '–'}
+                          </td>
+                          <td className={`${cell} font-mono text-xs`}>
+                            {f.after ? `${arrow(f.after)} (${f.afterCost})` : 'unreachable'}
+                          </td>
+                          <td className={cell}>
+                            <Match f={f} />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {unaffected.length > 0 && (
+              <p className="mt-2 text-xs text-slate-500">
+                Not affected (their path avoids{' '}
+                {routers.length > 0
+                  ? 'everything that is down'
+                  : many
+                    ? 'every failed link'
+                    : names}
+                ): {unaffected.join(', ')}.
+              </p>
+            )}
+            <p className="mt-1 text-xs text-slate-500">
+              &quot;Repair = final?&quot; compares the path from the first router that repairs with
+              that router&apos;s own path after convergence, for traffic that gets through. With one
+              failed link TI-LFA always matches (RFC 9855 §3); LFA and Remote LFA may not. With
+              several, a repair passed on by more than one router may not match either.
             </p>
-          )}
-          <p className="mt-1 text-xs text-slate-500">
-            &quot;Repair = final?&quot; compares the path from the first router that repairs with
-            that router&apos;s own path after convergence, for traffic that gets through. With one
-            failed link TI-LFA always matches (RFC 9855 §3); LFA and Remote LFA may not. With
-            several, a repair passed on by more than one router may not match either.
-          </p>
-        </>
-      )}
-    </section>
+          </>
+        )}
+      </section>
+    </BundleContext.Provider>
   )
 }

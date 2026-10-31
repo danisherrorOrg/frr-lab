@@ -26,18 +26,18 @@ describe('buildGraph', () => {
   it('turns each link into two directed edges with their own metric', () => {
     const g = buildGraph(asymmetric)
     expect(g.out.get('S')).toEqual([
-      { from: 'S', to: 'C', metric: 7, linkId: 'C-S' },
-      { from: 'S', to: 'E', metric: 10, linkId: 'S-E' },
+      { from: 'S', to: 'C', metric: 7, back: 5, linkId: 'C-S' },
+      { from: 'S', to: 'E', metric: 10, back: 20, linkId: 'S-E' },
     ])
-    expect(g.out.get('E')).toEqual([{ from: 'E', to: 'S', metric: 20, linkId: 'S-E' }])
+    expect(g.out.get('E')).toEqual([{ from: 'E', to: 'S', metric: 20, back: 10, linkId: 'S-E' }])
   })
 
   it('keeps incoming edges for reverse SPF', () => {
     const g = buildGraph(asymmetric)
     // Edges that end at S: E→S (20) and C→S (5), sorted by the far end.
     expect(g.in.get('S')).toEqual([
-      { from: 'C', to: 'S', metric: 5, linkId: 'C-S' },
-      { from: 'E', to: 'S', metric: 20, linkId: 'S-E' },
+      { from: 'C', to: 'S', metric: 5, back: 7, linkId: 'C-S' },
+      { from: 'E', to: 'S', metric: 20, back: 10, linkId: 'S-E' },
     ])
   })
 

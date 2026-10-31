@@ -1,7 +1,8 @@
 import type { ProtectionPaths } from '../engine/paths'
 import type { DestinationResult, NodeId, Protection } from '../engine/types'
-import type { BackupKind } from '../state/store'
-import { lfaTags, METHOD_NAME, segmentText } from './format'
+import { useMemo } from 'react'
+import { useStore, type BackupKind } from '../state/store'
+import { bundles, hopName, isBundled, lfaTags, linkName, METHOD_NAME, segmentText } from './format'
 
 interface Props {
   source: NodeId
@@ -31,6 +32,11 @@ export function DetailPanel({
 }: Props) {
   const e = p.protectedLink.to
   const kinds = ['lfa', 'rlfa', 'tilfa'] as const
+  const topology = useStore((s) => s.topology)
+  const b = useMemo(() => bundles(topology), [topology])
+  // "S–E", or "S–E (S-E#2)" when S and E have parallel links (D29).
+  const sE = linkName(b, source, e, p.protectedLink.id)
+  const out = p.tilfa.path?.[1]
 
   return (
     <section
@@ -44,7 +50,7 @@ export function DetailPanel({
     >
       <div className="flex items-start justify-between gap-2">
         <h2 className="text-base font-semibold">
-          {source} → {result.dest}, protecting link {source}–{e}
+          {source} → {result.dest}, protecting link {sE}
         </h2>
         <button
           type="button"
@@ -92,7 +98,7 @@ export function DetailPanel({
       <h3 className={h3}>LFA (RFC 5286)</h3>
       {p.ecmpProtected && (
         <p className="text-green-700 dark:text-green-400">
-          ECMP-protected: another primary next hop avoids link {source}–{e}.
+          ECMP-protected: another primary next hop avoids link {sE}.
         </p>
       )}
       {p.lfa.candidates.length === 0 ? (
@@ -108,10 +114,10 @@ export function DetailPanel({
           </thead>
           <tbody>
             {p.lfa.candidates.map((c) => (
-              <tr key={c.neighbor}>
+              <tr key={c.link}>
                 <td className="pr-3">
-                  {c.neighbor === p.lfa.best ? '★ ' : ''}
-                  {c.neighbor}
+                  {c.link === p.lfa.bestLink ? '★ ' : ''}
+                  {hopName(b, source, c.neighbor, c.link)}
                 </td>
                 <td className="pr-3">{c.cost}</td>
                 <td className="pr-3">
@@ -151,7 +157,13 @@ export function DetailPanel({
             <Path ids={p.tilfa.path} />
           </dd>
           <dt className="text-slate-500">Segment list</dt>
-          <dd>[{p.tilfa.segments.map(segmentText).join(', ')}]</dd>
+          <dd>[{p.tilfa.segments.map((x) => segmentText(x, b)).join(', ')}]</dd>
+          {out !== undefined && isBundled(b, source, out) && (
+            <>
+              <dt className="text-slate-500">Sent out on</dt>
+              <dd>link {p.tilfa.outLink}</dd>
+            </>
+          )}
           <dt className="text-slate-500">Label stack (top first)</dt>
           <dd className="font-mono">{p.tilfa.labelStack.join(', ')}</dd>
           <dt className="text-slate-500">Extra labels</dt>
@@ -159,7 +171,7 @@ export function DetailPanel({
         </dl>
       ) : (
         <p className="text-red-700 dark:text-red-400">
-          No path: {result.dest} can&apos;t be reached once link {source}–{e} fails.
+          No path: {result.dest} can&apos;t be reached once link {sE} fails.
         </p>
       )}
 

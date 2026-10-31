@@ -117,7 +117,7 @@ describe('explainRlfa', () => {
     const steps = explainRlfa(
       {
         ...computeRlfa(allPairs(loadFixture('02-ring5.yaml')), 'S', 'E'),
-        skipped: [{ neighbor: 'X', reason: 'max-metric' }],
+        skipped: [{ neighbor: 'X', link: 'S-X', reason: 'max-metric' }],
       },
       { d: 'E' },
     )

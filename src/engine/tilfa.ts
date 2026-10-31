@@ -1,34 +1,53 @@
-import { buildGraph, linkMetric } from './graph'
+import { cheapestEdge, edgeOf, linkMetric, withoutLink, type Edge, type Graph } from './graph'
 import { adjLabel, prefixLabel } from './labels'
 import { allPairs, avoidsLink, dist, spf } from './spf'
 import type { NodeId, Protection, Segment, Topology } from './types'
 
 /** SPF from S with link S–E removed (both directions): docs/02-algorithms.md §4.1. */
 export interface PostConvergence {
+  /** The graph without the failed link. Its cheapest links are the ones the repair uses. */
+  graph: Graph
   /** dist_new(S, Y). Routers cut off by the failure have no entry. */
   dist: Map<NodeId, number>
   /** One shortest path S → Y per reachable Y, ties broken by lowest router IDs (§4.1). */
   path: Map<NodeId, NodeId[]>
 }
 
-// Keyed by topology object (D15), then by "S>E". Coverage asks for the same link many times.
+// Keyed by topology object (D15), then by "S>link". Coverage asks for the same link many times.
 const cache = new WeakMap<Topology, Map<string, PostConvergence>>()
+
+/** The link S→E named `linkId`, or the cheapest link S→E when it is left out (D29). */
+function protectedEdge(graph: Graph, s: NodeId, e: NodeId, linkId?: string): Edge {
+  const edge = linkId === undefined ? cheapestEdge(graph, s, e) : edgeOf(graph, s, linkId)
+  if (edge === undefined || edge.to !== e) {
+    const which = linkId === undefined ? '' : ` (${linkId})`
+    throw new Error(`There is no link ${s}→${e}${which} to protect.`)
+  }
+  return edge
+}
 
 /**
  * Post-convergence SPF from S after link S–E fails (RFC 9855 §3: SPT_new(S, X)).
+ * Only that one link is removed: another link of a bundle stays up (D29).
  * Equal-cost paths are compared router by router from S; the lowest ID at the
  * first difference wins. Built in settle order, since every predecessor of Y
  * is settled before Y.
  */
-export function postConvergence(topology: Topology, s: NodeId, e: NodeId): PostConvergence {
-  const key = `${s}>${e}`
+export function postConvergence(
+  topology: Topology,
+  s: NodeId,
+  e: NodeId,
+  linkId?: string,
+): PostConvergence {
+  const full = allPairs(topology).graph
+  const link = protectedEdge(full, s, e, linkId).linkId
+  const key = `${s}>${link}`
   const forTopo = cache.get(topology) ?? new Map<string, PostConvergence>()
   cache.set(topology, forTopo)
   const cached = forTopo.get(key)
   if (cached !== undefined) return cached
 
-  const failed = (a: NodeId, b: NodeId) => (a === s && b === e) || (a === e && b === s)
-  const graph = buildGraph({ ...topology, links: topology.links.filter((l) => !failed(l.a, l.b)) })
+  const graph = withoutLink(full, link)
   const tree = spf(graph, s)
 
   const settleOrder = [...tree.dist.keys()].sort((x, y) => {
@@ -47,7 +66,7 @@ export function postConvergence(topology: Topology, s: NodeId, e: NodeId): PostC
     path.set(y, best!)
   }
 
-  const result = { dist: tree.dist, path }
+  const result = { graph, dist: tree.dist, path }
   forTopo.set(key, result)
   return result
 }
@@ -90,10 +109,14 @@ export interface TilfaResult {
   s: NodeId
   d: NodeId
   e: NodeId
+  /** The protected link's id. */
+  link: string
   cSE: number
   /** D can't be reached once S–E is removed: unprotected. */
   partitioned: boolean
   path?: NodeId[]
+  /** The outgoing interface: S's cheapest remaining link to path[1] (RFC 9855 §5). */
+  outLink?: string
   /** Post-convergence cost of `path`. */
   cost?: number
   walk: WalkStep[]
@@ -113,22 +136,30 @@ export interface TilfaResult {
  * TI-LFA link protection for source S, destination D and link S–E
  * (docs/02-algorithms.md §4, RFC 9855 §5, D8). Only S has switched to the repair;
  * every other router forwards with its normal table, so each prefix-SID must
- * follow normal shortest paths that avoid S–E.
+ * follow normal shortest paths that avoid S–E. `linkId` picks one link of a
+ * bundle (default: the cheapest, D29).
  */
-export function computeTilfa(topology: Topology, s: NodeId, d: NodeId, e: NodeId): TilfaResult {
+export function computeTilfa(
+  topology: Topology,
+  s: NodeId,
+  d: NodeId,
+  e: NodeId,
+  linkId?: string,
+): TilfaResult {
   if (s === d) throw new Error(`Source ${s} can't be its own destination.`)
   const table = allPairs(topology)
-  const cSE = linkMetric(table.graph, s, e)
-  if (cSE === undefined) throw new Error(`There is no link ${s}→${e} to protect.`)
+  const failed = protectedEdge(table.graph, s, e, linkId)
+  const link = failed.linkId
+  const cSE = failed.metric
 
-  const pc = postConvergence(topology, s, e)
+  const pc = postConvergence(topology, s, e, link)
   const path = pc.path.get(d)
-  if (path === undefined) return { s, d, e, cSE, partitioned: true, walk: [] }
+  if (path === undefined) return { s, d, e, link, cSE, partitioned: true, walk: [] }
 
-  // Cost along the path from S to each position.
+  // Cost along the path from S to each position, over the cheapest links still up.
   const at = [0]
   for (let i = 1; i < path.length; i++) {
-    at.push(at[i - 1]! + linkMetric(table.graph, path[i - 1]!, path[i]!)!)
+    at.push(at[i - 1]! + linkMetric(pc.graph, path[i - 1]!, path[i]!)!)
   }
 
   const check = (i: number, j: number): SegmentCheck => {
@@ -144,7 +175,7 @@ export function computeTilfa(topology: Topology, s: NodeId, d: NodeId, e: NodeId
       onPath: distXY === pathCost,
       distXS: dist(table, from, s),
       distEY: dist(table, e, node),
-      avoids: avoidsLink(table, from, node, s, e),
+      avoids: avoidsLink(table, from, node, s, e, cSE),
     }
   }
 
@@ -178,9 +209,11 @@ export function computeTilfa(topology: Topology, s: NodeId, d: NodeId, e: NodeId
     } else {
       const from = path[i]!
       const to = path[i + 1]!
+      // The Adj-SID of the exact link the path takes (D29): a bundle has one per link.
+      const hop = cheapestEdge(pc.graph, from, to)!.linkId
       walk.push({
         from,
-        segment: { kind: 'adj', from, to, label: adjLabel(topology, from, to) },
+        segment: { kind: 'adj', from, to, link: hop, label: adjLabel(topology, from, to, hop) },
         rejected: check(i, i + 1),
       })
       i += 1
@@ -212,9 +245,11 @@ export function computeTilfa(topology: Topology, s: NodeId, d: NodeId, e: NodeId
     s,
     d,
     e,
+    link,
     cSE,
     partitioned: false,
     path,
+    outLink: cheapestEdge(pc.graph, s, n1)!.linkId,
     cost: pc.dist.get(d)!,
     walk,
     rawSegments,
@@ -227,9 +262,16 @@ export function computeTilfa(topology: Topology, s: NodeId, d: NodeId, e: NodeId
 
 /** The TI-LFA part of a Protection. Empty when the network is partitioned. */
 export function tilfaForProtection(result: TilfaResult): Protection['tilfa'] {
-  const { path, segments, labelStack, extraLabels } = result
-  if (result.partitioned || !path || !segments || !labelStack || extraLabels === undefined) {
+  const { path, outLink, segments, labelStack, extraLabels } = result
+  if (
+    result.partitioned ||
+    !path ||
+    !outLink ||
+    !segments ||
+    !labelStack ||
+    extraLabels === undefined
+  ) {
     return {}
   }
-  return { path, segments, labelStack, extraLabels }
+  return { path, outLink, segments, labelStack, extraLabels }
 }

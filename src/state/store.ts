@@ -15,7 +15,20 @@ export type Selection = { kind: 'node'; id: NodeId } | { kind: 'link'; id: strin
 export interface RowKey {
   dest: NodeId
   via: NodeId
+  /** The protected link's id: a bundle gives one row per link (D29). Absent = the first. */
+  link?: string
 }
+
+/** Is this the row of protection `p` for `dest`? */
+export const isRow = (
+  row: RowKey | null,
+  dest: NodeId,
+  p: { protectedLink: { to: NodeId; id: string } },
+) =>
+  row !== null &&
+  row.dest === dest &&
+  row.via === p.protectedLink.to &&
+  (row.link === undefined || row.link === p.protectedLink.id)
 
 /** Which backup path to draw for the selected row. 'auto' = the first that exists. */
 export type BackupKind = 'auto' | 'lfa' | 'rlfa' | 'tilfa'
@@ -230,7 +243,8 @@ export const useStore = create<AppState>()((set, get) => {
       if (!r.ok) return r.error
       commit(r.topology, {
         linkStart: null,
-        selection: { kind: 'link', id: edit.linkId(a, b) },
+        // The new link is last; a parallel link's id has a number (D29).
+        selection: { kind: 'link', id: r.topology.links.at(-1)!.id },
         notice: null,
       })
       return null
@@ -295,7 +309,9 @@ export const useStore = create<AppState>()((set, get) => {
     selectRow: (row) => set({ row, backup: 'auto' }),
     toggleRow: (row) => {
       const open = get().row
-      get().selectRow(open?.dest === row.dest && open.via === row.via ? null : row)
+      const same =
+        open?.dest === row.dest && open.via === row.via && (open.link ?? '') === (row.link ?? '')
+      get().selectRow(same ? null : row)
     },
     tapBackground: (pos) => {
       const s = get()

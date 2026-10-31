@@ -2,7 +2,7 @@
 // they only read what the engine returned.
 import type { ProtectionPaths } from '../engine/paths'
 import type { FailureSimulation, Flow, Through } from '../engine/simulate'
-import type { NodeId, Protection, Segment } from '../engine/types'
+import type { NodeId, Protection, Segment, Topology } from '../engine/types'
 import type { BackupKind } from '../state/store'
 
 export type Method = 'ecmp' | 'lfa' | 'rlfa' | 'tilfa'
@@ -26,12 +26,42 @@ export function protectedBy(p: Protection): Method | null {
   return null
 }
 
-export const segmentText = (s: Segment): string =>
-  s.kind === 'prefix' ? `Prefix ${s.node}` : `Adj ${s.from}→${s.to}`
+/** Router pairs joined by more than one link (parallel links, D29), as "a|b" with a < b. */
+export type Bundles = ReadonlySet<string>
+
+const pairKey = (a: NodeId, b: NodeId) => (a < b ? `${a}|${b}` : `${b}|${a}`)
+
+/** Every router pair with parallel links: only then does text need to name the link. */
+export function bundles(t: Topology): Bundles {
+  const seen = new Set<string>()
+  const many = new Set<string>()
+  for (const l of t.links) {
+    const k = pairKey(l.a, l.b)
+    if (seen.has(k)) many.add(k)
+    seen.add(k)
+  }
+  return many
+}
+
+export const isBundled = (b: Bundles | undefined, x: NodeId, y: NodeId) =>
+  b !== undefined && b.has(pairKey(x, y))
+
+/** "E", or "E (S-E#2)" when S and E have parallel links, so the link is clear (D29). */
+export const hopName = (b: Bundles | undefined, s: NodeId, n: NodeId, link: string | undefined) =>
+  link !== undefined && isBundled(b, s, n) ? `${n} (${link})` : n
+
+/** "S–E", or "S–E (S-E#2)" for one link of a bundle. */
+export const linkName = (b: Bundles | undefined, x: NodeId, y: NodeId, link: string | undefined) =>
+  link !== undefined && isBundled(b, x, y) ? `${x}–${y} (${link})` : `${x}–${y}`
+
+export const segmentText = (s: Segment, b?: Bundles): string =>
+  s.kind === 'prefix' ? `Prefix ${s.node}` : `Adj ${s.from}→${hopName(b, s.from, s.to, s.link)}`
 
 /** "B · B→C · E": short form for the table. */
-export const segmentsShort = (segs: Segment[]): string =>
-  segs.map((s) => (s.kind === 'prefix' ? s.node : `${s.from}→${s.to}`)).join(' · ')
+export const segmentsShort = (segs: Segment[], b?: Bundles): string =>
+  segs
+    .map((s) => (s.kind === 'prefix' ? s.node : `${s.from}→${hopName(b, s.from, s.to, s.link)}`))
+    .join(' · ')
 
 /** Tags for one LFA candidate, e.g. "node-protecting, downstream". */
 export function lfaTags(c: {

@@ -9,12 +9,13 @@
       "nextHops": ["E"],
       "protections": [
         {
-          "protectedLink": { "from": "S", "to": "E" },
+          "protectedLink": { "from": "S", "to": "E", "id": "S-E" },
           "ecmpProtected": false,
           "lfa": {
             "candidates": [
               {
                 "neighbor": "A",
+                "link": "A-S",
                 "loopFree": false,
                 "downstream": false,
                 "nodeProtecting": false,
@@ -34,7 +35,7 @@
             "path": ["S", "A", "B", "C", "E"],
             "segments": [
               { "kind": "prefix", "node": "B", "label": 16004 },
-              { "kind": "adj", "from": "B", "to": "C", "label": 24005 },
+              { "kind": "adj", "from": "B", "to": "C", "link": "C-B", "label": 24005 },
               { "kind": "prefix", "node": "E", "label": 16002 }
             ],
             "labelStack": [16004, 24005, 16002],

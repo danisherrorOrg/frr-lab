@@ -15,6 +15,14 @@ export interface Highlight {
   pq?: NodeId
   /** Path after the network reconverges (failure simulation, F5): green line with a halo. */
   final?: NodeId[]
+  /**
+   * The link of each hop of `primary`, `backup` and `final`, from the engine
+   * (hopLinks, Flow.repairLinks). With parallel links they say which link of a
+   * bundle to draw (D29); without them the first link between the routers is used.
+   */
+  primaryLinks?: (string | undefined)[]
+  backupLinks?: (string | undefined)[]
+  finalLinks?: (string | undefined)[]
   /** Animate traffic along the backup path (marching dashes). */
   flowing?: boolean
 }
@@ -217,21 +225,29 @@ export function decorate(
     if (extra.linkStart) cy.getElementById(extra.linkStart).addClass('link-start')
     if (extra.selection) cy.getElementById(extra.selection).addClass('sel')
 
-    const drawPath = (path: NodeId[] | undefined, kind: keyof typeof COLORS) => {
+    const drawPath = (
+      path: NodeId[] | undefined,
+      links: (string | undefined)[] | undefined,
+      kind: keyof typeof COLORS,
+    ) => {
       const color = COLORS[kind]
       if (!path) return
       for (let i = 0; i + 1 < path.length; i++) {
         const [x, y] = [path[i]!, path[i + 1]!]
-        const link = t.links.find((l) => (l.a === x && l.b === y) || (l.a === y && l.b === x))
+        const joins = (l: Topology['links'][number]) =>
+          (l.a === x && l.b === y) || (l.a === y && l.b === x)
+        const named = links?.[i]
+        const link =
+          t.links.find((l) => l.id === named && joins(l)) ?? t.links.find((l) => joins(l))
         if (!link) continue
         const e = cy.getElementById(link.id)
         e.addClass(kind).addClass(link.a === x ? `${kind}-fwd` : `${kind}-rev`)
         e.data('arrow', color)
       }
     }
-    drawPath(h.primary, 'primary')
-    drawPath(h.backup, 'backup')
-    drawPath(h.final, 'final')
+    drawPath(h.primary, h.primaryLinks, 'primary')
+    drawPath(h.backup, h.backupLinks, 'backup')
+    drawPath(h.final, h.finalLinks, 'final')
     if (h.flowing) cy.edges('.backup').addClass('flowing')
   })
 }

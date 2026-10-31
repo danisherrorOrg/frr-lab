@@ -182,13 +182,28 @@ nodes:
     )
   })
 
-  it('rejects parallel links, in either direction', () => {
-    const errors = errorsOf(
-      twoNodes('  - { a: S, b: E, metric: 1 }\n  - { a: E, b: S, metric: 2 }'),
+  it('loads parallel links, each with its own id (D29)', () => {
+    const r = parseTopology(
+      twoNodes(
+        '  - { a: S, b: E, metric: 1 }\n  - { a: S, b: E, metric: 2 }\n  - { a: E, b: S, metric: 3 }\n  - { a: S, b: E, metric: 4 }',
+      ),
     )
-    expect(errors).toContainEqual(
-      expect.stringMatching(/Link #2 \(E–S\): E and S are already linked by link #1/),
+    if (!r.ok) throw new Error(r.errors.join('; '))
+    expect(r.topology.links.map((l) => [l.id, l.metricAB])).toEqual([
+      ['S-E', 1],
+      ['S-E#2', 2],
+      ['E-S', 3],
+      ['S-E#3', 4],
+    ])
+  })
+
+  it('saves and reloads parallel links with the same ids', () => {
+    const r = parseTopology(
+      twoNodes('  - { a: S, b: E, metric: 1 }\n  - { a: S, b: E, metric: 2 }'),
     )
+    if (!r.ok) throw new Error(r.errors.join('; '))
+    const again = parseTopology(serializeTopology(r.topology))
+    expect(again.ok && again.topology.links).toEqual(r.topology.links)
   })
 
   it('rejects a bad Adj-SID label', () => {

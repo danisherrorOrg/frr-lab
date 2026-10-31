@@ -29,6 +29,7 @@ Y has ECMP from S if there are 2+ first hops. A destination is "ECMP-protected" 
 dist(X,Y) < dist(X,S) + c(S,E) + dist(E,Y)
 ```
 If it's `=`, some ECMP path uses the link, so treat it as **not** avoiding it (safe choice).
+With parallel links (§9), `c(S,E)` is the metric of the one link meant, not of the bundle.
 
 ---
 
@@ -41,7 +42,7 @@ For S, destination D, primary next hop E, and every other neighbor N of S (other
 | **Downstream** (Inequality 2) | `dist(N,D) < dist(S,D)` | N is closer to D than S. Stronger: also prevents microloops between alternates. |
 | **Node-protecting** (Inequality 3) | `dist(N,D) < dist(N,E) + dist(E,D)` | N's path to D avoids router E, so it survives E failing. |
 
-**Link-protecting:** In the MVP, all links are point-to-point, so a loop-free N with N ≠ E never uses link S–E for its first hop. The check in §1.5 confirms N's path to D doesn't come back over S–E (Inequality 1 already implies this).
+**Link-protecting:** all links are point-to-point, so a loop-free N never uses link S–E for its first hop. The check in §1.5 confirms N's path to D doesn't come back over S–E (Inequality 1 already implies this). A candidate is an (outgoing link, neighbor) pair (RFC 5286 §3.6): with parallel links, another link to E itself is a candidate (§9).
 
 **Excluded neighbors:** skip N if the link S→N or N→S has the IS-IS maximum metric 16,777,215 (RFC 5286 §3.5).
 
@@ -52,6 +53,7 @@ For S, destination D, primary next hop E, and every other neighbor N of S (other
 2. then downstream before not-downstream
 3. then lowest `c(S,N) + dist(N,D)`
 4. then lowest router ID
+5. then lowest link id (only matters for parallel links, §9)
 
 ---
 
@@ -126,7 +128,7 @@ while current != D:
 
 ### 4.3 Label stack
 - Prefix-SID label = SRGB base (default 16000) + router's SID index. The MVP assumes **every router uses the same SRGB**.
-- Adj-SID label = value from the topology file, or auto-assigned: Adj-SIDs are local to each router (RFC 8402 §3.4), so each router numbers its own links from 24000 in neighbor-ID order, skipping labels it already uses (D18).
+- Adj-SID label = value from the topology file, or auto-assigned: Adj-SIDs are local to each router (RFC 8402 §3.4), so each router numbers its own links from 24000 in neighbor-ID order (then link-id order for parallel links), skipping labels it already uses (D18). Each link of a bundle has its own Adj-SID, so an Adj-SID segment names its link (§9).
 - Show the stack top-first, before any penultimate-hop popping (state this in the UI). So RFC 9855 §7.1 rule 1 (pop the destination label when PHP is on and the list ends at the penultimate hop) is not shown.
 
 ### 4.4 Node protection (v0.2)
@@ -273,3 +275,41 @@ Worked check (Example 6, `06-link-protecting.yaml`, fail E): S's only alternate 
 Worked check (ring S–E–C–B–A–S all 1, plus D on E (1) and C (4), fail E): Remote LFA tunnels to PQ node B, whose path to D is B→C→E→D: broken at C. C uses its LFA D, so traffic gets through on S→A→B→C→D (cost 7).
 
 With a single failed link at most one router repairs and traffic never loops, and a TI-LFA repair that survives is always the PLR's final path: it is a shortest path without the first link, and it is still there with the others removed (property tests check both).
+
+---
+
+## 9. Parallel links (Phase 9.4, D29)
+Two routers may be joined by several links (a bundle). Each link has its own id (`S-E`, `S-E#2`, …), metrics and Adj-SIDs. Checked against RFC 5286 §3.4–3.6 on 2026-10-31.
+
+- **SPF:** distances don't change; the cheapest link of a bundle counts. A link X→N is a **primary next-hop link** for D when N is a first hop and the link costs `dist(X,N)`. Two equal links give two primary links (ECMP); the costlier link of an unequal bundle is not primary.
+- **One protection per primary link.** Every check about "link S–E" uses that link's own metric (§1.5).
+- **LFA:** a candidate is an (outgoing link, neighbor) pair (RFC 5286 §3.6), so each link out of S except the protected one is a candidate. Another link L2 to E itself:
+  - loop-free: `dist(E,D) < dist(E,S) + dist(S,D)`, always ✓ (E is on S's shortest path to D);
+  - downstream: `dist(E,D) < dist(S,D)` ✓;
+  - node-protecting: `dist(E,D) < dist(E,E) + dist(E,D)` ✗ always.
+  So it protects the **link, not the node** (§3.6 steps 7–8). A node-protecting LFA through another router still wins (§2 order).
+- **ECMP:** another equal link to E is another primary next hop, so an equal bundle is ECMP-protected.
+- **Remote LFA:** P- and Q-space use the protected link's metric. A tunnel exit uses the neighbor's cheapest link; another link to E is never an exit (E would be an LFA, D17).
+- **TI-LFA:** only the failed link is removed, so another link of the bundle stays in the post-convergence path. Path costs use the cheapest link still up. Every link direction has its own Adj-SID, so `AdjSID(B→C)` must name the link. The repair's outgoing interface (RFC 9855 §5) is S's cheapest remaining link to the first hop; with a bundle that is "the other link".
+- **Forwarding (drawings and the simulation):** normal forwarding, Remote LFA exits and TI-LFA hops use the cheapest link, then the lowest link id. An LFA uses its own link, an ECMP member its link, an Adj-SID its link. One flow per destination (D22): if a bundle has two equal links, the flow uses the lowest-id one, and failing the other doesn't affect it.
+- **Not modelled:** an Adj-SID for the whole bundle (RFC 8402 §3.4.1 adjacency sets), LAG members under one adjacency, hashing over equal links.
+
+### Example 7 (`examples/07-parallel.yaml`)
+S–E: two links, `S-E` (10) and `S-E#2` (20). E–D: two links, `E-D` and `E-D#2` (10 each). S–A 15, A–D 10.
+Distances from S: E 10, A 15, D 20. `dist(A,E) = 20` (A-D-E), `dist(E,D) = 10`.
+
+- **S → E, protect `S-E`:**
+  - A over `S-A`: `dist(A,E)=20 < dist(A,S)+dist(S,E) = 15+10 = 25` ✓; downstream `20 < 10` ✗; cost 15+20 = 35.
+  - E over `S-E#2`: `0 < 10+10` ✓; downstream `0 < 10` ✓; node-protecting ✗; cost 20+0 = 20.
+  - **Best LFA: E over `S-E#2`** (link-protecting, downstream).
+  - TI-LFA: post-convergence path S→E over `S-E#2` (20; S-A-D-E costs 35). The walk forces `AdjSID(S→E over S-E#2)` (label 24002); the clean-up drops it (first hop) → `[PrefixSID(E)]`, sent out on `S-E#2`.
+- **S → D, protect `S-E`:** A: `10 < 15+20` ✓, downstream ✓, node-protecting `10 < 20+10` ✓, cost 25. E over `S-E#2`: ✓, ✓, ✗, cost 30. **Best LFA: A** (node-protecting beats the parallel link). TI-LFA S-A-D → `[PrefixSID(D)]`.
+- **S → A, protect `S-A`:** E over `S-E` (cost 10+20 = 30) and E over `S-E#2` (cost 40) are two candidates, both loop-free, not downstream: **best E over `S-E`**. TI-LFA path S-E-D-A (30) → `[PrefixSID(D), PrefixSID(A)]`, 1 extra label.
+- **E → D:** two primary links, `E-D` and `E-D#2`; each is ECMP-protected by the other.
+- **Adj-SIDs of S:** A 24000, `S-E` 24001, `S-E#2` 24002. **Of E:** `E-D` 24000, `E-D#2` 24001, `S-E` 24002, `S-E#2` 24003.
+
+Worked checks (failure simulation):
+- Fail `S-E`, LFA only: E is repaired on S→E over `S-E#2` (cost 20), also the final path. D is repaired via A (S→A→D, 25).
+- Source E, fail `E-D`: D is repaired by ECMP on `E-D#2` (cost 10). Fail `E-D#2` instead: D is not affected (its flow uses `E-D`). Fail both: dropped at E (the members are each other's backup, D25); after convergence E→S→A→D.
+- Fail router E (from S, LFA only): E unreachable (expected); D's LFA A is node-protecting and survives.
+- Ring of Example 3 with B–C as a bundle 12 (`B-C`) and 10 (`B-C#2`), fail S–E, D = E: post-convergence path S-A-B-C-E (13), segments `[PrefixSID(B), AdjSID(B→C over B-C#2), PrefixSID(E)]` = `16004, 24002, 16002`.

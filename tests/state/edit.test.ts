@@ -69,10 +69,26 @@ describe('links', () => {
     expect(t.links.at(-1)).toEqual({ id: 'S-D', a: 'S', b: 'D', metricAB: 7, metricBA: 7 })
   })
 
-  it('refuses self-loops and parallel links in either direction (D4)', () => {
+  it('refuses self-loops and unknown routers', () => {
     expect(addLink(square(), 'S', 'S')).toMatchObject({ ok: false, error: /itself/ })
-    expect(addLink(square(), 'E', 'S')).toMatchObject({ ok: false, error: /already linked/ })
     expect(addLink(square(), 'S', 'Z')).toMatchObject({ ok: false })
+  })
+
+  it('adds a parallel link with the next free id, in either direction (D29)', () => {
+    const once = ok(addLink(square(), 'S', 'E', 20))
+    expect(once.links.at(-1)).toEqual({ id: 'S-E#2', a: 'S', b: 'E', metricAB: 20, metricBA: 20 })
+    const twice = ok(addLink(once, 'E', 'S'))
+    expect(twice.links.at(-1)?.id).toBe('E-S')
+    expect(ok(addLink(twice, 'S', 'E')).links.at(-1)?.id).toBe('S-E#3')
+  })
+
+  it('renaming a router keeps parallel link ids unique', () => {
+    const t = ok(addLink(square(), 'S', 'E', 20))
+    const renamed = ok(updateRouter(t, 'S', { id: 'X' }))
+    expect(renamed.links.filter((l) => l.a === 'X' && l.b === 'E').map((l) => l.id)).toEqual([
+      'X-E',
+      'X-E#2',
+    ])
   })
 
   it('deletes a link by id', () => {

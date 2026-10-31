@@ -34,6 +34,7 @@
 - Add / move / delete routers; add / delete links.
 - Each router: name, prefix-SID index.
 - Each link: metric (same both ways by default, with the option of a different metric per direction), optional Adj-SID label per direction.
+- (v0.2, Phase 9.4) Two routers may have several links (parallel links); each link is protected, drawn and failed on its own.
 - Undo / redo.
 
 **F2 – Import / export**

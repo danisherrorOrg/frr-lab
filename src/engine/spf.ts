@@ -1,4 +1,4 @@
-import { buildGraph, linkMetric, type Graph } from './graph'
+import { buildGraph, linkMetric, type Edge, type Graph } from './graph'
 import type { NodeId, Topology } from './types'
 
 /** Shortest paths from one root. Routers that can't be reached have no entries. */
@@ -85,12 +85,44 @@ export function dist(table: AllPairs, x: NodeId, y: NodeId): number {
  *   dist(X,Y) < dist(X,S) + c(S,E) + dist(E,Y)
  * A tie means some equal-cost path may use the link, so it counts as "uses it"
  * (docs/02-algorithms.md §1.5, D6). Unreachable Y gives Infinity < …, so false.
+ * With parallel links pass `cSE`, the metric of the one link meant (D29); the
+ * default is the cheapest link S→E, the strictest test.
  */
-export function avoidsLink(table: AllPairs, x: NodeId, y: NodeId, s: NodeId, e: NodeId): boolean {
-  const cSE = linkMetric(table.graph, s, e)
+export function avoidsLink(
+  table: AllPairs,
+  x: NodeId,
+  y: NodeId,
+  s: NodeId,
+  e: NodeId,
+  cSE: number | undefined = linkMetric(table.graph, s, e),
+): boolean {
   if (cSE === undefined) throw new Error(`There is no link ${s}→${e}.`)
   return dist(table, x, y) < dist(table, x, s) + cSE + dist(table, e, y)
 }
+
+/**
+ * The links out of X that start some shortest path to Y (X's primary next-hop
+ * links), sorted by neighbor, then link id. A link X→N is one when N is a first
+ * hop and the link is as cheap as dist(X,N): the costlier link of a bundle isn't (D29).
+ */
+export function firstLinks(table: AllPairs, x: NodeId, y: NodeId): Edge[] {
+  // LFA, ECMP and TI-LFA all ask for the same pair, so keep the answer with the table.
+  let byPair = firstLinkCache.get(table)
+  if (byPair === undefined) firstLinkCache.set(table, (byPair = new Map()))
+  const key = `${x}>${y}`
+  const cached = byPair.get(key)
+  if (cached !== undefined) return cached
+  const fromX = table.from.get(x)
+  if (fromX === undefined) throw new Error(`Unknown router "${x}".`)
+  const hops = fromX.firstHops.get(y) ?? []
+  const links = (table.graph.out.get(x) ?? []).filter(
+    (e) => hops.includes(e.to) && e.metric === fromX.dist.get(e.to),
+  )
+  byPair.set(key, links)
+  return links
+}
+
+const firstLinkCache = new WeakMap<AllPairs, Map<string, Edge[]>>()
 
 /**
  * Shared Dijkstra. Forward follows edges leaving each router; reverse follows

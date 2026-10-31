@@ -1,7 +1,7 @@
 // Topology edits for the canvas and properties panel (F1). Every function returns
 // a NEW topology and never changes its input: the engine caches by object (D15).
 import type { Link, NodeId, RouterNode, Topology } from '../engine/types'
-import { MAX_LABEL, MAX_METRIC } from '../io/yaml'
+import { MAX_LABEL, MAX_METRIC, uniqueLinkId } from '../io/yaml'
 
 export type EditResult = { ok: true; topology: Topology } | { ok: false; error: string }
 
@@ -16,6 +16,10 @@ const isWhole = (n: number, min: number, max: number) => Number.isInteger(n) && 
 
 /** Same id format as the YAML loader, so saved files keep their link ids. */
 export const linkId = (a: NodeId, b: NodeId) => `${a}-${b}`
+
+/** A free id for a new link a–b: "a-b", or "a-b#2"… for a parallel link (D29). */
+export const newLinkId = (t: Topology, a: NodeId, b: NodeId) =>
+  uniqueLinkId(linkId(a, b), new Set(t.links.map((l) => l.id)))
 
 /** First free "R<n>" id. */
 export function nextRouterId(t: Topology): NodeId {
@@ -65,18 +69,17 @@ export function deleteLink(t: Topology, id: string): Topology {
   return { ...t, links: t.links.filter((l) => l.id !== id) }
 }
 
-/** New link with the same metric both ways. MVP rules: no self-loops, no parallel links (D4). */
+/**
+ * New link with the same metric both ways. No self-loops. A second link between
+ * the same routers is a parallel link with its own id, e.g. "S-E#2" (D29).
+ */
 export function addLink(t: Topology, a: NodeId, b: NodeId, metric = 10): EditResult {
   if (a === b) return { ok: false, error: "A link can't connect a router to itself." }
   if (!t.nodes.some((n) => n.id === a) || !t.nodes.some((n) => n.id === b))
     return { ok: false, error: 'Both ends must be existing routers.' }
-  if (findLink(t, a, b)) return { ok: false, error: `${a} and ${b} are already linked.` }
-  const link: Link = { id: linkId(a, b), a, b, metricAB: metric, metricBA: metric }
+  const link: Link = { id: newLinkId(t, a, b), a, b, metricAB: metric, metricBA: metric }
   return { ok: true, topology: { ...t, links: [...t.links, link] } }
 }
-
-export const findLink = (t: Topology, x: NodeId, y: NodeId): Link | undefined =>
-  t.links.find((l) => (l.a === x && l.b === y) || (l.a === y && l.b === x))
 
 export interface RouterPatch {
   id?: string
@@ -113,21 +116,22 @@ export function updateRouter(t: Topology, id: NodeId, patch: RouterPatch): EditR
   }
 
   const rename = (x: NodeId) => (x === id ? next.id : x)
+  // Renamed links get new ids; parallel ones are numbered again in file order (D29).
+  const taken = new Set(t.links.filter((l) => l.a !== id && l.b !== id).map((l) => l.id))
+  const links =
+    next.id === id
+      ? t.links
+      : t.links.map((l) => {
+          if (l.a !== id && l.b !== id) return l
+          const a = rename(l.a)
+          const b = rename(l.b)
+          const newId = uniqueLinkId(linkId(a, b), taken)
+          taken.add(newId)
+          return { ...l, a, b, id: newId }
+        })
   return {
     ok: true,
-    topology: {
-      ...t,
-      nodes: t.nodes.map((n) => (n.id === id ? next : n)),
-      links:
-        next.id === id
-          ? t.links
-          : t.links.map((l) => {
-              if (l.a !== id && l.b !== id) return l
-              const a = rename(l.a)
-              const b = rename(l.b)
-              return { ...l, a, b, id: linkId(a, b) }
-            }),
-    },
+    topology: { ...t, nodes: t.nodes.map((n) => (n.id === id ? next : n)), links },
   }
 }
 

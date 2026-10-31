@@ -65,7 +65,11 @@ describe('explainLfa', () => {
 
   it('names skipped max-metric neighbors', () => {
     const steps = explainLfa(
-      { candidates: [], checks: [], skipped: [{ neighbor: 'X', reason: 'max-metric' }] },
+      {
+        candidates: [],
+        checks: [],
+        skipped: [{ neighbor: 'X', link: 'S-X', reason: 'max-metric' }],
+      },
       { s: 'S', d: 'D', e: 'E', ecmpProtectors: [] },
     )
     expect(steps[0]).toEqual({

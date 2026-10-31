@@ -30,7 +30,14 @@ describe('ecmpProtectors', () => {
     const result = computeLfa(allPairs(square), 'S', 'D', 'E')
     // dist(A,D)=1 < dist(S,D)=2 downstream; 1 < dist(A,E)+dist(E,D) = 2+1 node-protecting.
     expect(result.candidates).toEqual([
-      { neighbor: 'A', loopFree: true, downstream: true, nodeProtecting: true, cost: 2 },
+      {
+        neighbor: 'A',
+        link: 'S-A',
+        loopFree: true,
+        downstream: true,
+        nodeProtecting: true,
+        cost: 2,
+      },
     ])
     expect(result.best).toBe('A')
   })

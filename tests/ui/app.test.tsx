@@ -472,3 +472,45 @@ describe('Phase 9.3: router failure', () => {
     expect(panel.textContent).toContain('The source router S is down, so it sends no traffic.')
   })
 })
+
+// Phase 9.4 (D29): a bundle of two links between routers.
+describe('App: parallel links', () => {
+  it('Example 7: names the bundle link, draws it, and fails each link on its own', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'parallel')
+
+    // From S to E the LFA is the other link of the bundle.
+    const e = await rowFor('E')
+    expect(e.textContent).toContain('E (S-E#2)')
+    expect(e.textContent).toContain('✓ LFA')
+    await user.click(e)
+    const details = screen.getByRole('region', { name: 'Details' })
+    expect(details.textContent).toContain('protecting link S–E (S-E)')
+    expect(details.textContent).toContain('link-protecting, downstream')
+    expect(details.textContent).toContain('Via E over S-E#2')
+    expect(canvas.highlight).toMatchObject({ primaryLinks: ['S-E'], backupLinks: ['S-E#2'] })
+
+    // Source E: the equal bundle E–D gives two rows for each destination behind it
+    // (A and D), and each link protects the other (ECMP).
+    await user.selectOptions(screen.getByLabelText('Source router (S)'), 'E')
+    const table = await screen.findByRole('table', { name: 'Results for E' })
+    const dRows = within(table)
+      .getAllByRole('row')
+      .filter((r) => /^D \(E-D(#2)?\)$/.test(r.querySelectorAll('td')[1]?.textContent ?? ''))
+    expect(dRows.map((r) => r.querySelectorAll('td')[1]?.textContent)).toEqual([
+      'D (E-D)',
+      'D (E-D#2)',
+      'D (E-D)',
+      'D (E-D#2)',
+    ])
+    for (const r of dRows) expect(r.textContent).toContain('✓ ECMP')
+
+    // Fail one link of the bundle: E repairs onto the other one.
+    useStore.getState().toggleFailedLink('E-D')
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    expect(await within(panel).findByText(/E–D \(E-D\) failed/)).toBeTruthy()
+    // The first affected flow (to A) is drawn: E→D on the other link, then D→A.
+    expect(canvas.highlight).toMatchObject({ dest: 'A', backupLinks: ['E-D#2', 'A-D'] })
+  })
+})

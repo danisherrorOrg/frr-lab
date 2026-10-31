@@ -1,6 +1,7 @@
 // Failure simulation (F5, docs/02-algorithms.md §8): fail links and routers and
 // follow the traffic from S to every destination, first on the FRR repair path,
 // then on the path the network uses once it has reconverged.
+import { cheapestEdge, type Edge } from './graph'
 import { computeForSource } from './index'
 import { shortestPath } from './paths'
 import { allPairs, type AllPairs } from './spf'
@@ -120,6 +121,8 @@ export interface Flow {
    * loop closes (that router is then listed twice). Undefined when the PLR has no backup.
    */
   repair?: NodeId[]
+  /** The link of each hop of `repair`: with parallel links, which one carried it (D29). */
+  repairLinks?: string[]
   repairCost?: number
   /** Every router that switched to a backup, in order. The first one is the PLR. */
   repairs?: RepairStep[]
@@ -162,10 +165,11 @@ export interface SimulateOptions {
 
 /**
  * What a packet carries, top first: `hop` = send straight to this neighbor (an LFA
- * next hop, an Adj-SID, a tunnel's exit neighbor); `to` = forward on normal
- * tables until this router (D, a PQ node, a Prefix-SID).
+ * next hop, an Adj-SID, a tunnel's exit neighbor), over `link` when the backup
+ * names one (D29), else the cheapest link; `to` = forward on normal tables until
+ * this router (D, a PQ node, a Prefix-SID).
  */
-type Instr = { hop: NodeId } | { to: NodeId }
+type Instr = { hop: NodeId; link?: string } | { to: NodeId }
 
 /** IP TTL limit: a packet that keeps going this long is looping. */
 const MAX_HOPS = 255
@@ -186,18 +190,6 @@ function withoutLinks(topology: Topology, ids: Set<string>): Topology {
   return t
 }
 
-/** Sum of directed metrics along a path. */
-function pathCost(topology: Topology, path: NodeId[]): number {
-  let cost = 0
-  for (let i = 0; i + 1 < path.length; i++) {
-    const [x, y] = [path[i]!, path[i + 1]!]
-    const l = topology.links.find((k) => (k.a === x && k.b === y) || (k.a === y && k.b === x))
-    if (l === undefined) throw new Error(`No link ${x}–${y} on the path.`)
-    cost += l.a === x ? l.metricAB : l.metricBA
-  }
-  return cost
-}
-
 const samePath = (x: NodeId[], y: NodeId[]) =>
   x.length === y.length && x.every((n, i) => n === y[i])
 
@@ -210,7 +202,9 @@ interface Backup {
 
 const isLinkList = (f: readonly string[] | Failures): f is readonly string[] => Array.isArray(f)
 
-const instrKey = (k: Instr) => ('hop' in k ? `>${k.hop}` : k.to)
+const instrKey = (k: Instr) => ('hop' in k ? `>${k.hop}@${k.link ?? ''}` : k.to)
+
+const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
 
 /**
  * Fail links and routers and follow traffic from `source` to every destination.
@@ -259,9 +253,9 @@ export function simulateFailure(
 
   // A failed router with no links left is unreachable in the reduced SPF.
   const after = allPairs(withoutLinks(topology, downIds))
-  /** The down link between x and y, if any. */
-  const downBetween = (x: NodeId, y: NodeId) =>
-    down.find((l) => (x === l.a && y === l.b) || (x === l.b && y === l.a))
+  const isUp = (linkId: string) => !downIds.has(linkId)
+  /** The link normal forwarding uses from x to neighbor y: the cheapest, lowest id (D29). */
+  const normalLink = (x: NodeId, y: NodeId) => cheapestEdge(table.graph, x, y)!
 
   // Each router's results, computed once: every flow repaired there shares them.
   const atRouter = new Map<NodeId, DestinationResult[]>()
@@ -282,14 +276,18 @@ export function simulateFailure(
     if (d === source || !fromS.dist.has(d)) continue
     const before = shortestPath(table, source, d)!
     const flow: Flow = { dest: d, before, beforeCost: fromS.dist.get(d)!, affected: false }
-    const i = before.findIndex((x, k) => k + 1 < before.length && downBetween(x, before[k + 1]!))
+    // Only the link the flow really takes counts: one link of a bundle may be down
+    // while the flow uses another (D29).
+    const i = before.findIndex(
+      (x, k) => k + 1 < before.length && !isUp(normalLink(x, before[k + 1]!).linkId),
+    )
 
     if (i >= 0) {
       const plr = before[i]!
       flow.affected = true
       flow.plr = plr
       flow.next = before[i + 1]!
-      flow.hitLink = downBetween(plr, flow.next)!.id
+      flow.hitLink = normalLink(plr, flow.next).linkId
 
       if (downNodes.has(d)) {
         // D itself is down: nothing can reach it, and that is expected, not a
@@ -300,23 +298,24 @@ export function simulateFailure(
         continue
       }
 
-      const walk = forward(table, source, d, mode, downBetween, resultsAt)
+      const walk = forward(table, source, d, mode, isUp, normalLink, resultsAt)
       flow.repairs = walk.repairs
       if (walk.repairs.length > 0) {
         flow.method = walk.repairs[0]!.method
         flow.repair = walk.path
-        flow.repairCost = pathCost(topology, walk.path)
+        flow.repairLinks = walk.links
+        flow.repairCost = sum(walk.costs)
         // Up to the PLR the walk is the normal path, so the PLR sits at index i.
-        flow.plrRepairCost = pathCost(topology, walk.path.slice(i))
+        flow.plrRepairCost = sum(walk.costs.slice(i))
       }
       if (walk.drop) flow.drop = walk.drop
       if (walk.loopAt !== undefined) flow.loopAt = walk.loopAt
       if (downNodes.size > 0 && walk.repairs.length > 0) {
-        const isUp = (n: NodeId) => downBetween(plr, n) === undefined
         const through = backupThrough(
           table,
           resultsAt(plr),
           plr,
+          flow.hitLink,
           flow.next,
           d,
           mode,
@@ -326,23 +325,26 @@ export function simulateFailure(
         if (through) flow.through = through
       }
 
+      // Costs after convergence come from the reduced SPF: with a bundle, the
+      // cheapest link left may cost more than the one that failed (D29).
       const plrAfter = shortestPath(after, plr, d)
       if (plrAfter) {
         flow.plrAfter = plrAfter
-        flow.plrAfterCost = pathCost(topology, plrAfter)
+        flow.plrAfterCost = after.from.get(plr)!.dist.get(d)!
         if (walk.delivered) {
-          flow.match = samePath(walk.path.slice(i), plrAfter)
-            ? 'same'
-            : flow.plrRepairCost === flow.plrAfterCost
-              ? 'same-cost'
-              : 'longer'
+          flow.match =
+            samePath(walk.path.slice(i), plrAfter) && flow.plrRepairCost === flow.plrAfterCost
+              ? 'same'
+              : flow.plrRepairCost === flow.plrAfterCost
+                ? 'same-cost'
+                : 'longer'
         }
       }
 
       const sAfter = shortestPath(after, source, d)
       if (sAfter) {
         flow.after = sAfter
-        flow.afterCost = pathCost(topology, sAfter)
+        flow.afterCost = after.from.get(source)!.dist.get(d)!
       }
       flow.status = !flow.after
         ? 'unreachable'
@@ -363,6 +365,9 @@ export function simulateFailure(
 
 interface Walk {
   path: NodeId[]
+  /** The link and its metric for each hop of `path`. */
+  links: string[]
+  costs: number[]
   repairs: RepairStep[]
   delivered: boolean
   drop?: Drop
@@ -380,10 +385,13 @@ function forward(
   source: NodeId,
   d: NodeId,
   mode: RepairMode,
-  downBetween: (x: NodeId, y: NodeId) => FailedLink | undefined,
+  isUp: (linkId: string) => boolean,
+  normalLink: (x: NodeId, y: NodeId) => Edge,
   resultsAt: (x: NodeId) => DestinationResult[],
 ): Walk {
   const path = [source]
+  const links: string[] = []
+  const costs: number[] = []
   const repairs: RepairStep[] = []
   /** Index in `path` of each repair's router. */
   const repairIdx: number[] = []
@@ -395,55 +403,67 @@ function forward(
   for (;;) {
     while (stack[0] !== undefined && 'to' in stack[0] && stack[0].to === at) stack.shift()
     const top = stack[0]
-    if (top === undefined) return { path, repairs, delivered: true }
+    if (top === undefined) return { path, links, costs, repairs, delivered: true }
 
     if (!repairedHere) {
       const key = `${at}|${stack.map(instrKey).join(',')}`
       // Back at a router with the same labels: the exact loop, shown up to here.
-      if (seen.has(key)) return { path, repairs, delivered: false, loopAt: at }
-      if (path.length > MAX_HOPS) return ttlLoop(path, repairs, repairIdx)
+      if (seen.has(key)) return { path, links, costs, repairs, delivered: false, loopAt: at }
+      if (path.length > MAX_HOPS) return ttlLoop({ path, links, costs, repairs }, repairIdx)
       seen.add(key)
     }
 
     // firstHops are sorted: [0] is the lowest-id hop, the tie-break of the drawings.
     const next = 'hop' in top ? top.hop : table.from.get(at)!.firstHops.get(top.to)![0]!
-    const down = downBetween(at, next)
-    if (down === undefined) {
+    // A backup may name the link (an LFA over one link of a bundle, an Adj-SID: D29).
+    const edge =
+      'hop' in top && top.link !== undefined
+        ? table.graph.out.get(at)!.find((x) => x.linkId === top.link)!
+        : normalLink(at, next)
+    if (isUp(edge.linkId)) {
       if ('hop' in top) stack.shift()
       at = next
       path.push(at)
+      links.push(edge.linkId)
+      costs.push(edge.metric)
       repairedHere = false
       continue
     }
+    const down = edge.linkId
     if (repairedHere) {
       return {
         path,
+        links,
+        costs,
         repairs,
         delivered: false,
-        drop: { at, link: down.id, next, reason: 'backup-down' },
+        drop: { at, link: down, next, reason: 'backup-down' },
       }
     }
     // A failed Adj-SID hop is repaired towards its far end (RFC 9855 §6.2, §9; Adj-SID
     // B-flag, RFC 8667 §2.2.1).
     // Only TI-LFA stacks carry Adj-SIDs mid-path, and a fresh backup's own first hop
     // was handled above. When the router's normal path to that neighbor doesn't use
-    // the link (the Adj-SID forced a costlier link), that normal path is the backup.
+    // the link (the Adj-SID forced a costlier link, or another link of a bundle:
+    // D29), that normal path is the backup.
     const target = 'hop' in top ? top.hop : top.to
+    const normalHop = table.from.get(at)!.firstHops.get(target)![0]!
     const viaNormal =
-      'hop' in top && table.from.get(at)!.firstHops.get(target)![0] !== target
+      'hop' in top && (normalHop !== target || normalLink(at, target).linkId !== down)
         ? { method: 'tilfa' as const, instrs: [{ to: target }] }
         : undefined
-    const isUp = (n: NodeId) => downBetween(at, n) === undefined
-    const r = viaNormal ?? repairAt(table, resultsAt(at), next, target, mode, isUp)
+    const r = viaNormal ?? repairAt(table, resultsAt(at), down, target, mode, isUp)
     if (r === undefined) {
       return {
         path,
+        links,
+        costs,
         repairs,
         delivered: false,
-        drop: { at, link: down.id, next, reason: 'no-backup' },
+        drop: { at, link: down, next, reason: 'no-backup' },
       }
     }
-    repairs.push({ at, link: down.id, next, target, method: r.method })
+    repairs.push({ at, link: down, next, target, method: r.method })
     repairIdx.push(path.length - 1)
     stack = [...r.instrs, ...stack.slice(1)]
     repairedHere = true
@@ -454,57 +474,69 @@ function forward(
  * Out of hops (labels keep piling up, so no state repeats exactly): cut the path
  * where traffic first comes back to a router, so the drawing stays readable.
  */
-function ttlLoop(path: NodeId[], repairs: RepairStep[], repairIdx: number[]): Walk {
+function ttlLoop(
+  w: { path: NodeId[]; links: string[]; costs: number[]; repairs: RepairStep[] },
+  repairIdx: number[],
+): Walk {
+  const { path } = w
   const k = path.findIndex((x, j) => path.indexOf(x) < j)
-  if (k < 0) return { path, repairs, delivered: false, loopAt: path.at(-1)! }
+  if (k < 0) return { ...w, delivered: false, loopAt: path.at(-1)! }
   return {
     path: path.slice(0, k + 1),
-    repairs: repairs.filter((_, j) => repairIdx[j]! < k),
+    links: w.links.slice(0, k),
+    costs: w.costs.slice(0, k),
+    repairs: w.repairs.filter((_, j) => repairIdx[j]! < k),
     delivered: false,
     loopAt: path[k]!,
   }
 }
 
 /**
- * The PLR's backup for target `t` when its next hop `next` is unreachable, by the
- * routers' FRR mode, as what it puts on the packet. Built on the full topology:
- * a backup protects one link (RFC 5286 §1, RFC 9855 §3). `isUp` says which of the
- * PLR's links still work; only the ECMP choice uses it, since a forwarding entry
- * holds one backup and the other methods have no second one to try.
+ * The PLR's backup for target `t` when its link `failed` is down, by the routers'
+ * FRR mode, as what it puts on the packet. Built on the full topology: a backup
+ * protects one link (RFC 5286 §1, RFC 9855 §3), so a bundle has one backup per
+ * link (D29). `isUp` says which of the PLR's links still work; only the ECMP choice
+ * uses it, since a forwarding entry holds one backup and the other methods have no
+ * second one to try.
  */
 function repairAt(
   table: AllPairs,
   results: DestinationResult[],
-  next: NodeId,
+  failed: string,
   t: NodeId,
   mode: RepairMode,
-  isUp: (neighbor: NodeId) => boolean,
+  isUp: (linkId: string) => boolean,
 ): Backup | undefined {
   const r = results.find((x) => x.dest === t)
-  const p = r?.protections.find((x) => x.protectedLink.to === next)
+  const p = r?.protections.find((x) => x.protectedLink.id === failed)
   if (r === undefined || p === undefined) return undefined
 
-  // Another primary next hop is always loop-free and avoids the link (D16). It comes
-  // first in every mode: the router just stops using the failed member (D22), and
-  // every other failed member too, so it picks one that is still up (D25). If none
-  // is, it keeps the lowest-id one and the packet is dropped there: the members are
-  // each other's backups, so the entry has nothing left.
-  const others = r.nextHops.filter((n) => n !== next)
-  const other = others.find(isUp) ?? others[0]
+  // Another primary next-hop link is always loop-free and avoids the link (D16). It
+  // comes first in every mode: the router just stops using the failed member (D22),
+  // and every other failed member too, so it picks one that is still up (D25). If
+  // none is, it keeps the lowest-id one and the packet is dropped there: the members
+  // are each other's backups, so the entry has nothing left. Members are links, so
+  // another link of a bundle is one too (D29).
+  const others = r.protections.map((x) => x.protectedLink).filter((x) => x.id !== failed)
+  const other = others.find((x) => isUp(x.id)) ?? others[0]
   if (p.ecmpProtected && other !== undefined) {
-    return { method: 'ecmp', instrs: [{ hop: other }, { to: t }] }
+    return { method: 'ecmp', instrs: [{ hop: other.to, link: other.id }, { to: t }] }
   }
 
   if (mode === 'tilfa') {
-    const { path, segments } = p.tilfa
-    if (!path || !segments) return undefined
+    const { path, outLink, segments } = p.tilfa
+    if (!path || !outLink || !segments) return undefined
     // Out of the post-convergence first-hop interface, then the segment list (RFC 9855 §5.1).
-    const segs = segments.map((s): Instr => (s.kind === 'prefix' ? { to: s.node } : { hop: s.to }))
-    return { method: 'tilfa', instrs: [{ hop: path[1]! }, ...segs], segments }
+    const segs = segments.map((s): Instr =>
+      s.kind === 'prefix' ? { to: s.node } : { hop: s.to, link: s.link },
+    )
+    return { method: 'tilfa', instrs: [{ hop: path[1]!, link: outLink }, ...segs], segments }
   }
 
   if (p.lfa.best !== undefined) {
-    return { method: 'lfa', instrs: [{ hop: p.lfa.best }, { to: t }] }
+    const hop: Instr =
+      p.lfa.bestLink === undefined ? { hop: p.lfa.best } : { hop: p.lfa.best, link: p.lfa.bestLink }
+    return { method: 'lfa', instrs: [hop, { to: t }] }
   }
   const pq = p.rlfa.needed ? p.rlfa.best : undefined
   if (mode === 'rlfa' && pq !== undefined && shortestPath(table, pq, t)) {
@@ -528,13 +560,14 @@ function backupThrough(
   table: AllPairs,
   results: DestinationResult[],
   plr: NodeId,
+  failed: string,
   next: NodeId,
   d: NodeId,
   mode: RepairMode,
   downNodes: Set<NodeId>,
-  isUp: (neighbor: NodeId) => boolean,
+  isUp: (linkId: string) => boolean,
 ): Through | undefined {
-  const plan = repairAt(table, results, next, d, mode, isUp)
+  const plan = repairAt(table, results, failed, d, mode, isUp)
   if (plan === undefined) return undefined
   let at = plr
   for (const [k, ins] of plan.instrs.entries()) {

@@ -59,9 +59,10 @@ describe('store', () => {
     s().linkClick('B')
     expect(s().topology.links.at(-1)).toMatchObject({ a: 'S', b: 'B', metricAB: 10 })
     expect(s().selection).toEqual({ kind: 'link', id: 'S-B' })
+    // A second link between the same routers is a parallel link (D29).
     s().linkClick('S')
     s().linkClick('E')
-    expect(s().notice).toMatchObject({ kind: 'error', lines: ['S and E are already linked.'] })
+    expect(s().selection).toEqual({ kind: 'link', id: 'S-E#2' })
     expect(s().linkStart).toBeNull()
   })
 
@@ -108,7 +109,8 @@ describe('store', () => {
   it('adds a link between two routers from the keyboard form', () => {
     expect(s().addLinkBetween('S', 'B')).toBeNull()
     expect(s().selection).toEqual({ kind: 'link', id: 'S-B' })
-    expect(s().addLinkBetween('S', 'B')).toBe('S and B are already linked.')
+    expect(s().addLinkBetween('S', 'B')).toBeNull()
+    expect(s().selection).toEqual({ kind: 'link', id: 'S-B#2' })
   })
 
   it('renaming the source router keeps it as the source', () => {

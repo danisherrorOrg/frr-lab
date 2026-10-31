@@ -1,3 +1,4 @@
+import { hopText, isBundle, linkText, type Graph } from './graph'
 import { MAX_METRIC, type LfaCheck, type LfaResult } from './lfa'
 import type { RlfaResult } from './rlfa'
 import type { SegmentCheck, TilfaResult } from './tilfa'
@@ -13,6 +14,11 @@ export interface LfaContext {
   e: NodeId
   /** From ecmpProtectors(): other primary next hops that avoid S–E. */
   ecmpProtectors: NodeId[]
+  /** The protected link's id, the protectors' link ids and the graph: with them,
+   * text names the exact link when two routers have parallel links (D29). */
+  link?: string
+  ecmpLinks?: string[]
+  graph?: Graph
 }
 
 /**
@@ -21,13 +27,13 @@ export interface LfaContext {
  * Example: "Via A: dist(A,E)=2 < dist(A,S)+dist(S,E) = 1+1 = 2 ✗".
  */
 export function explainLfa(result: LfaResult, ctx: LfaContext): ExplainStep[] {
-  const { s, d, e } = ctx
+  const { s, d, e, graph } = ctx
   const steps: ExplainStep[] = []
 
   for (const skip of result.skipped) {
     steps.push({
       rule: 'LFA skipped',
-      text: `Via ${skip.neighbor}: skipped, link ${s}–${skip.neighbor} has the maximum metric ${MAX_METRIC}`,
+      text: `Via ${hopText(graph, s, skip.neighbor, skip.link)}: skipped, link ${linkText(graph, s, skip.neighbor, skip.link)} has the maximum metric ${MAX_METRIC}`,
       ok: false,
       rfc: 'RFC 5286 §3.5',
     })
@@ -36,7 +42,7 @@ export function explainLfa(result: LfaResult, ctx: LfaContext): ExplainStep[] {
   result.checks.forEach((c, i) => {
     const cand = result.candidates[i]
     if (cand === undefined) return
-    steps.push(...candidateSteps(c, { s, d, e }, cand))
+    steps.push(...candidateSteps(c, { s, d, e, graph }, cand))
   })
 
   steps.push(ecmpStep(ctx))
@@ -46,47 +52,55 @@ export function explainLfa(result: LfaResult, ctx: LfaContext): ExplainStep[] {
 
 function candidateSteps(
   c: LfaCheck,
-  { s, d, e }: { s: NodeId; d: NodeId; e: NodeId },
+  { s, d, e, graph }: { s: NodeId; d: NodeId; e: NodeId; graph?: Graph | undefined },
   flags: { loopFree: boolean; downstream: boolean; nodeProtecting: boolean },
 ): ExplainStep[] {
   const n = c.neighbor
+  const via = hopText(graph, s, n, c.link)
   const nd = `dist(${n},${d})=${num(c.distND)}`
   return [
     {
       rule: 'LFA loop-free (Inequality 1)',
-      text: `Via ${n}: ${nd} < dist(${n},${s})+dist(${s},${d}) = ${num(c.distNS)}+${num(c.distSD)} = ${num(c.distNS + c.distSD)} ${mark(flags.loopFree)}`,
+      text: `Via ${via}: ${nd} < dist(${n},${s})+dist(${s},${d}) = ${num(c.distNS)}+${num(c.distSD)} = ${num(c.distNS + c.distSD)} ${mark(flags.loopFree)}`,
       ok: flags.loopFree,
       rfc: 'RFC 5286 §3.1',
     },
     {
       rule: 'LFA downstream (Inequality 2)',
-      text: `Via ${n}: ${nd} < dist(${s},${d})=${num(c.distSD)} ${mark(flags.downstream)}`,
+      text: `Via ${via}: ${nd} < dist(${s},${d})=${num(c.distSD)} ${mark(flags.downstream)}`,
       ok: flags.downstream,
       rfc: 'RFC 5286 §1',
     },
     {
       rule: 'LFA node-protecting (Inequality 3)',
-      text: `Via ${n}: ${nd} < dist(${n},${e})+dist(${e},${d}) = ${num(c.distNE)}+${num(c.distED)} = ${num(c.distNE + c.distED)} ${mark(flags.nodeProtecting)}`,
+      text: `Via ${via}: ${nd} < dist(${n},${e})+dist(${e},${d}) = ${num(c.distNE)}+${num(c.distED)} = ${num(c.distNE + c.distED)} ${mark(flags.nodeProtecting)}`,
       ok: flags.nodeProtecting,
       rfc: 'RFC 5286 §3.2',
     },
   ]
 }
 
-function ecmpStep({ s, d, e, ecmpProtectors }: LfaContext): ExplainStep {
+function ecmpStep({ s, d, e, ecmpProtectors, link, ecmpLinks, graph }: LfaContext): ExplainStep {
   const ok = ecmpProtectors.length > 0
+  const sE = linkText(graph, s, e, link)
+  // With a bundle, name the links: "the other link S-E#2" (D29).
+  const bundled = ecmpLinks !== undefined && graph !== undefined && isBundle(graph, s, e)
+  const who = bundled ? `link ${ecmpLinks.join(', ')}` : `next hop ${ecmpProtectors.join(', ')}`
   return {
     rule: 'ECMP-protected',
     text: ok
-      ? `Other primary next hop ${ecmpProtectors.join(', ')} to ${d} avoids ${s}–${e}, so traffic keeps flowing ✓`
-      : `No other primary next hop to ${d} avoids ${s}–${e} ✗`,
+      ? `Other primary ${who} to ${d} avoids ${sE}, so traffic keeps flowing ✓`
+      : `No other primary next hop to ${d} avoids ${sE} ✗`,
     ok,
     rfc: 'RFC 5286 §3.4',
   }
 }
 
-function bestStep(result: LfaResult, { s, d }: LfaContext): ExplainStep {
-  const i = result.candidates.findIndex((c) => c.neighbor === result.best)
+function bestStep(result: LfaResult, { s, d, graph }: LfaContext): ExplainStep {
+  const i = result.candidates.findIndex(
+    (c) =>
+      c.neighbor === result.best && (result.bestLink === undefined || c.link === result.bestLink),
+  )
   const best = result.candidates[i]
   const check = result.checks[i]
   if (best === undefined || check === undefined) {
@@ -103,7 +117,7 @@ function bestStep(result: LfaResult, { s, d }: LfaContext): ExplainStep {
   ]
   return {
     rule: 'Best LFA',
-    text: `Best LFA: ${best.neighbor} (${kinds.join(', ')}, cost c(${s},${best.neighbor})+dist(${best.neighbor},${d}) = ${check.cSN}+${num(check.distND)} = ${num(best.cost)})`,
+    text: `Best LFA: ${hopText(graph, s, best.neighbor, best.link)} (${kinds.join(', ')}, cost c(${s},${best.neighbor})+dist(${best.neighbor},${d}) = ${check.cSN}+${num(check.distND)} = ${num(best.cost)})`,
     ok: true,
     rfc: 'RFC 5286 §3.6',
   }
@@ -114,6 +128,8 @@ export interface RlfaContext {
   d: NodeId
   /** The chosen LFA, if any: then RLFA isn't needed (docs/02-algorithms.md §3). */
   lfaBest?: NodeId | undefined
+  /** With it, text names the exact link of a bundle (D29). */
+  graph?: Graph
 }
 
 /**
@@ -123,12 +139,13 @@ export interface RlfaContext {
  */
 export function explainRlfa(result: RlfaResult, ctx: RlfaContext): ExplainStep[] {
   const { s, e, cSE } = result
+  const { graph } = ctx
   const steps: ExplainStep[] = []
 
   for (const skip of result.skipped) {
     steps.push({
       rule: 'Extended P-space skipped',
-      text: `Via ${skip.neighbor}: not used as a tunnel exit, link ${s}–${skip.neighbor} has the maximum metric ${MAX_METRIC}`,
+      text: `Via ${hopText(graph, s, skip.neighbor, skip.link)}: not used as a tunnel exit, link ${linkText(graph, s, skip.neighbor, skip.link)} has the maximum metric ${MAX_METRIC}`,
       ok: false,
       rfc: 'RFC 7490 §5.4',
     })
@@ -179,7 +196,7 @@ export function explainRlfa(result: RlfaResult, ctx: RlfaContext): ExplainStep[]
   return steps
 }
 
-function bestPqStep(result: RlfaResult, { d, lfaBest }: RlfaContext): ExplainStep {
+function bestPqStep(result: RlfaResult, { d, lfaBest, graph }: RlfaContext): ExplainStep {
   const { s, e } = result
   const rfc = 'RFC 7490 §5.2.2'
   if (lfaBest !== undefined) {
@@ -193,7 +210,12 @@ function bestPqStep(result: RlfaResult, { d, lfaBest }: RlfaContext): ExplainSte
   }
   const best = result.costs.find((c) => c.node === result.best)
   if (best === undefined) {
-    return { rule: 'Best PQ node', text: `No Remote LFA for link ${s}–${e}`, ok: false, rfc }
+    return {
+      rule: 'Best PQ node',
+      text: `No Remote LFA for link ${linkText(graph, s, e, result.link)}`,
+      ok: false,
+      rfc,
+    }
   }
   const p = best.node
   const lowest = result.costs.length > 1 ? ', lowest' : ''
@@ -204,8 +226,13 @@ function bestPqStep(result: RlfaResult, { d, lfaBest }: RlfaContext): ExplainSte
   return { rule: 'Best PQ node', text, ok: true, rfc }
 }
 
-const segmentName = (x: Segment) =>
-  x.kind === 'prefix' ? `Prefix-SID(${x.node})` : `Adj-SID(${x.from}→${x.to})`
+/** "Adj-SID(B→C)", or "Adj-SID(B→C over B-C#2)" for one link of a bundle (D29). */
+const segmentName = (x: Segment, graph?: Graph) =>
+  x.kind === 'prefix'
+    ? `Prefix-SID(${x.node})`
+    : isBundle(graph, x.from, x.to)
+      ? `Adj-SID(${x.from}→${x.to} over ${x.link})`
+      : `Adj-SID(${x.from}→${x.to})`
 
 /**
  * Turns a TI-LFA result into steps: the post-convergence path, each step of the
@@ -213,13 +240,15 @@ const segmentName = (x: Segment) =>
  * final label stack. Example:
  * "From B, C: dist(B,C)=4 matches path cost 10 ✗; avoids S–E: … ✗".
  */
-export function explainTilfa(result: TilfaResult): ExplainStep[] {
+export function explainTilfa(result: TilfaResult, graph?: Graph): ExplainStep[] {
   const { s, d, e } = result
+  const sE = linkText(graph, s, e, result.link)
+  const name = (x: Segment) => segmentName(x, graph)
   if (result.partitioned || result.path === undefined || result.segments === undefined) {
     return [
       {
         rule: 'Post-convergence path',
-        text: `${d} can’t be reached once ${s}–${e} fails: unprotected (the network is partitioned)`,
+        text: `${d} can’t be reached once ${sE} fails: unprotected (the network is partitioned)`,
         ok: false,
         rfc: 'RFC 9855 §3',
       },
@@ -229,7 +258,7 @@ export function explainTilfa(result: TilfaResult): ExplainStep[] {
   const steps: ExplainStep[] = [
     {
       rule: 'Post-convergence path',
-      text: `Post-convergence path with ${s}–${e} removed: ${result.path.join(' → ')} (cost ${num(result.cost ?? Infinity)})`,
+      text: `Post-convergence path with ${sE} removed: ${result.path.join(' → ')} (cost ${num(result.cost ?? Infinity)})`,
       ok: true,
       rfc: 'RFC 9855 §3',
     },
@@ -240,7 +269,7 @@ export function explainTilfa(result: TilfaResult): ExplainStep[] {
     if (w.rejected !== undefined) {
       steps.push({
         rule: 'TI-LFA walk',
-        text: `From ${w.from}, ${w.rejected.node}: ${checkText(w.rejected, result)}`,
+        text: `From ${w.from}, ${w.rejected.node}: ${checkText(w.rejected, result, sE)}`,
         ok: false,
         rfc: 'RFC 9855 §5',
       })
@@ -248,14 +277,14 @@ export function explainTilfa(result: TilfaResult): ExplainStep[] {
     if (w.segment.kind === 'prefix' && w.accepted !== undefined) {
       steps.push({
         rule: 'TI-LFA walk',
-        text: `From ${w.from}, ${w.accepted.node}: ${checkText(w.accepted, result)} → ${segmentName(w.segment)}`,
+        text: `From ${w.from}, ${w.accepted.node}: ${checkText(w.accepted, result, sE)} → ${name(w.segment)}`,
         ok: true,
         rfc: 'RFC 9855 §5',
       })
     } else if (w.segment.kind === 'adj') {
       steps.push({
         rule: 'TI-LFA walk',
-        text: `From ${w.from}: no router further along can be reached with a prefix-SID, so ${segmentName(w.segment)} forces the link ${w.segment.from}→${w.segment.to}`,
+        text: `From ${w.from}: no router further along can be reached with a prefix-SID, so ${name(w.segment)} forces the link ${w.segment.from}→${w.segment.to}`,
         ok: true,
         rfc: 'RFC 9855 §5.3',
       })
@@ -266,7 +295,7 @@ export function explainTilfa(result: TilfaResult): ExplainStep[] {
   if (result.dropped !== undefined) {
     steps.push({
       rule: 'TI-LFA clean-up',
-      text: `Dropped ${segmentName(result.dropped)}: ${n1} is the first hop, so sending out of ${s}–${n1} already gets there`,
+      text: `Dropped ${name(result.dropped)}: ${n1} is the first hop, so sending out of ${linkText(graph, s, n1, result.outLink)} already gets there`,
       ok: true,
       rfc: 'RFC 9855 §5.1',
     })
@@ -285,7 +314,7 @@ export function explainTilfa(result: TilfaResult): ExplainStep[] {
   const extra = result.extraLabels ?? 0
   steps.push({
     rule: 'TI-LFA segment list',
-    text: `Segment list [${result.segments.map(segmentName).join(', ')}] → labels ${(result.labelStack ?? []).join(', ')} (top first, before PHP): ${extra} extra label${extra === 1 ? '' : 's'}, sent out via ${n1}`,
+    text: `Segment list [${result.segments.map(name).join(', ')}] → labels ${(result.labelStack ?? []).join(', ')} (top first, before PHP): ${extra} extra label${extra === 1 ? '' : 's'}, sent out via ${hopText(graph, s, n1, result.outLink)}`,
     ok: true,
     rfc: 'RFC 9855 §5',
   })
@@ -293,12 +322,12 @@ export function explainTilfa(result: TilfaResult): ExplainStep[] {
 }
 
 /** "(a) same cost as the repair path; (b) all normal paths avoid S–E" with the numbers. */
-function checkText(c: SegmentCheck, { s, e, cSE }: TilfaResult): string {
+function checkText(c: SegmentCheck, { s, e, cSE }: TilfaResult, sE: string): string {
   const xy = `dist(${c.from},${c.node})=${num(c.distXY)}`
   const sum = c.distXS + cSE + c.distEY
   return (
     `${xy} matches path cost ${num(c.pathCost)} ${mark(c.onPath)}; ` +
-    `avoids ${s}–${e}: ${xy} < dist(${c.from},${s})+c(${s},${e})+dist(${e},${c.node}) = ` +
+    `avoids ${sE}: ${xy} < dist(${c.from},${s})+c(${s},${e})+dist(${e},${c.node}) = ` +
     `${num(c.distXS)}+${cSE}+${num(c.distEY)} = ${num(sum)} ${mark(c.avoids)}`
   )
 }

@@ -2,7 +2,7 @@ import { adjLabel } from '../engine/labels'
 import type { Link, RouterNode, Topology } from '../engine/types'
 import { useStore } from '../state/store'
 import { Field } from './Field'
-import { toNumber } from './format'
+import { bundles, isBundled, toNumber } from './format'
 
 const heading = 'mb-2 text-sm font-semibold'
 const danger =
@@ -94,7 +94,7 @@ function LinkForm({ link, topology: t }: { link: Link; topology: Topology }) {
         key={`${key}:${link.id}:${value ?? ''}`}
         label={`Adj-SID ${from}→${to}`}
         value={value === undefined ? '' : String(value)}
-        placeholder={`auto (${adjLabel(t, from, to)})`}
+        placeholder={`auto (${adjLabel(t, from, to, link.id)})`}
         inputMode="numeric"
         onCommit={(v) => update(link.id, { [key]: v.trim() === '' ? null : toNumber(v) })}
       />
@@ -104,6 +104,10 @@ function LinkForm({ link, topology: t }: { link: Link; topology: Topology }) {
     <section aria-label="Link properties">
       <h2 className={heading}>
         Link {a} — {b}
+        {/* Parallel links (D29): name which one of the bundle this is. */}
+        {isBundled(bundles(t), a, b) && (
+          <span className="ml-1 font-normal text-slate-500">({link.id})</span>
+        )}
       </h2>
       <Field
         key={`mab:${link.id}:${link.metricAB}`}

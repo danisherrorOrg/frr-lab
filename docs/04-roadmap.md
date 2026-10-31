@@ -74,7 +74,7 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 - [x] Close button / Escape for the detail panel
 - [x] Fail several links; follow traffic hop by hop as each router repairs its own failed link (D23, D24)
 - [x] Fail a router (down or rebooting): show which link-protecting repairs break because they go through it
-- [ ] Parallel links between two routers (replaces D4)
+- [x] Parallel links between two routers (replaces D4; D29)
 - [ ] Canvas usability: obvious dragging, tooltips, right-click menu, click-to-select destination
 
 ## Later (v0.2+), in priority order

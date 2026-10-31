@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
-import { protectionPaths } from './engine/paths'
+import { hopLinks, protectionPaths } from './engine/paths'
 import { readShareHash } from './io/share-url'
-import { useStore, type Tool } from './state/store'
+import { isRow, useStore, type Tool } from './state/store'
 import type { Highlight } from './ui/canvas'
 import { CoverageReport } from './ui/CoverageReport'
 import { DetailPanel } from './ui/DetailPanel'
@@ -106,7 +106,7 @@ export function App() {
   const selected = useMemo(() => {
     if (!results || !row || source === null) return null
     const result = results.find((r) => r.dest === row.dest)
-    const protection = result?.protections.find((p) => p.protectedLink.to === row.via)
+    const protection = result?.protections.find((p) => isRow(row, row.dest, p))
     if (!result || !protection) return null
     const paths = protectionPaths(topology, source, result.dest, protection)
     return { result, protection, paths, drawn: pickBackup(paths, backup) }
@@ -114,30 +114,68 @@ export function App() {
 
   const highlight = useMemo<Highlight>(() => {
     // Failed links: draw the simulated traffic instead of the selected row (F5).
+    // Links are named per hop so a bundle draws the link really used (D29).
     if (anyFailed) {
       const flow = sim.simulation && drawnFlow(sim.simulation, simDest)
       if (!flow) return { source }
-      if (converged) return { source, dest: flow.dest, ...(flow.after && { final: flow.after }) }
+      if (converged) {
+        const down = new Set(failedLinks)
+        for (const l of topology.links)
+          if (failedNodes.includes(l.a) || failedNodes.includes(l.b)) down.add(l.id)
+        return {
+          source,
+          dest: flow.dest,
+          ...(flow.after && {
+            final: flow.after,
+            finalLinks: hopLinks(topology, flow.after, { avoid: down }),
+          }),
+        }
+      }
       return {
         source,
         dest: flow.dest,
         primary: flow.before,
+        primaryLinks: hopLinks(topology, flow.before),
         // A repair that drops or loops is still drawn, but nothing flows along it.
-        ...(flow.repair && { backup: flow.repair, flowing: flow.status === 'repaired' }),
+        ...(flow.repair && {
+          backup: flow.repair,
+          ...(flow.repairLinks && { backupLinks: flow.repairLinks }),
+          flowing: flow.status === 'repaired',
+        }),
       }
     }
     if (!selected) return { source }
-    const { rlfa } = selected.protection
+    const { rlfa, protectedLink, lfa, tilfa } = selected.protection
+    const drawn = selected.drawn
+    const first =
+      drawn?.kind === 'lfa' ? lfa.bestLink : drawn?.kind === 'tilfa' ? tilfa.outLink : undefined
     return {
       source,
       dest: selected.result.dest,
       primary: selected.paths.primary,
-      ...(selected.drawn && { backup: selected.drawn.path }),
+      primaryLinks: hopLinks(topology, selected.paths.primary, { first: protectedLink.id }),
+      ...(drawn && {
+        backup: drawn.path,
+        backupLinks: hopLinks(topology, drawn.path, {
+          ...(first !== undefined && { first }),
+          avoid: [protectedLink.id],
+        }),
+      }),
       pSpace: rlfa.extended ? rlfa.extPSpace : rlfa.pSpace,
       qSpace: rlfa.qSpace,
       ...(rlfa.needed && rlfa.best !== undefined && { pq: rlfa.best }),
     }
-  }, [selected, source, anyFailed, sim.simulation, simDest, converged])
+  }, [
+    selected,
+    source,
+    anyFailed,
+    sim.simulation,
+    simDest,
+    converged,
+    topology,
+    failedLinks,
+    failedNodes,
+  ])
 
   return (
     <div className="flex min-h-screen flex-col bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">

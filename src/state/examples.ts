@@ -6,6 +6,7 @@ import ringHigh from '../../examples/03-ring5-highmetric.yaml?raw'
 import isp from '../../examples/04-isp-core.yaml?raw'
 import leafSpine from '../../examples/05-leaf-spine.yaml?raw'
 import linkProtecting from '../../examples/06-link-protecting.yaml?raw'
+import parallel from '../../examples/07-parallel.yaml?raw'
 import type { NodeId, Topology } from '../engine/types'
 import { parseTopology } from '../io/yaml'
 
@@ -34,6 +35,7 @@ export const EXAMPLES: Example[] = [
     source: 'S',
     yaml: linkProtecting,
   },
+  { key: 'parallel', title: 'Parallel links: bundles S–E and E–D', source: 'S', yaml: parallel },
 ]
 
 /** The example's topology. The files are checked by tests, so a failure here is a bug. */

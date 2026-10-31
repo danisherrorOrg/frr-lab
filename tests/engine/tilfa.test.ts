@@ -37,7 +37,10 @@ describe('computeTilfa: worked examples', () => {
     (file) => {
       const { d, e, tilfa } = expectedTilfa(file)
       const r = computeTilfa(loadFixture(file), 'S', d, e)
-      expect(tilfaForProtection(r)).toEqual(tilfa)
+      // The outgoing interface is the first hop's link (RFC 9855 §5); one link per pair here.
+      expect(tilfaForProtection(r)).toEqual({ ...tilfa, outLink: r.outLink })
+      const out = loadFixture(file).links.find((l) => l.id === r.outLink)
+      expect([out?.a, out?.b].sort()).toEqual(['S', tilfa.path![1]].sort())
     },
   )
 
@@ -86,7 +89,7 @@ describe('computeTilfa: rules', () => {
     expect(r.path).toEqual(['S', 'A', 'B', 'C'])
     expect(r.segments).toEqual([
       { kind: 'prefix', node: 'B', label: 16004 },
-      { kind: 'adj', from: 'B', to: 'C', label: 24005 },
+      { kind: 'adj', from: 'B', to: 'C', link: 'C-B', label: 24005 },
       { kind: 'prefix', node: 'C', label: 16005 },
     ])
     expect(r.labelStack).toEqual([16004, 24005, 16005])

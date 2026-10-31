@@ -9,12 +9,13 @@
       "nextHops": ["E"],
       "protections": [
         {
-          "protectedLink": { "from": "S", "to": "E" },
+          "protectedLink": { "from": "S", "to": "E", "id": "S-E" },
           "ecmpProtected": false,
           "lfa": {
             "candidates": [
               {
                 "neighbor": "A",
+                "link": "A-S",
                 "loopFree": false,
                 "downstream": false,
                 "nodeProtecting": false,

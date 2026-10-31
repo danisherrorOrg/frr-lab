@@ -1,0 +1,20 @@
+# Example 7 (docs/02-algorithms.md §9, Phase 9.4): parallel links between two routers.
+# S–E is a bundle of two links with different metrics (10 and 20); E–D is a bundle of two
+# equal links (10 and 10). Each link has its own id (S-E, S-E#2) and its own Adj-SID.
+# From S to E: the other link S-E#2 is an LFA. It is link-protecting only: it ends at E too.
+# From S to D: A is a node-protecting LFA, so it beats S-E#2.
+# From E to D: the two links are ECMP, so each one protects the other.
+name: Parallel links - bundles S-E and E-D
+srgb_base: 16000
+nodes:
+  - { id: S, sid: 1, pos: { x: 0, y: 0 } }
+  - { id: E, sid: 2, pos: { x: 300, y: 0 } }
+  - { id: D, sid: 3, pos: { x: 300, y: 250 } }
+  - { id: A, sid: 4, pos: { x: 0, y: 250 } }
+links:
+  - { a: S, b: E, metric: 10 }
+  - { a: S, b: E, metric: 20 }
+  - { a: E, b: D, metric: 10 }
+  - { a: E, b: D, metric: 10 }
+  - { a: S, b: A, metric: 15 }
+  - { a: A, b: D, metric: 10 }

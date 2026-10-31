@@ -7,9 +7,9 @@ import {
   type UnprotectedPair,
 } from './coverage'
 import { explainLfa, explainRlfa, explainTilfa } from './explain'
-import { computeLfa, ecmpProtectors } from './lfa'
+import { computeLfa, ecmpProtectorLinks } from './lfa'
 import { computeRlfa, rlfaForProtection, type RlfaResult } from './rlfa'
-import { allPairs } from './spf'
+import { allPairs, firstLinks } from './spf'
 import { computeTilfa, tilfaForProtection } from './tilfa'
 import type { DestinationResult, NodeId, Protection, Topology } from './types'
 
@@ -35,13 +35,13 @@ export function computeForSource(
   if (fromS === undefined) throw new Error(`Unknown source router "${source}".`)
   const withExplain = options.explain ?? true
 
-  // RLFA depends only on the protected link, not on D (RFC 7490 §5.2.1.3): once per neighbor.
-  const rlfaByLink = new Map<NodeId, RlfaResult>()
-  const rlfaFor = (e: NodeId) => {
-    let r = rlfaByLink.get(e)
+  // RLFA depends only on the protected link, not on D (RFC 7490 §5.2.1.3): once per link.
+  const rlfaByLink = new Map<string, RlfaResult>()
+  const rlfaFor = (e: NodeId, link: string) => {
+    let r = rlfaByLink.get(link)
     if (r === undefined) {
-      r = computeRlfa(table, source, e, { extended: options.extended ?? true })
-      rlfaByLink.set(e, r)
+      r = computeRlfa(table, source, e, { extended: options.extended ?? true, link })
+      rlfaByLink.set(link, r)
     }
     return r
   }
@@ -52,25 +52,37 @@ export function computeForSource(
     if (d === source || cost === undefined) continue
     const nextHops = fromS.firstHops.get(d) ?? []
 
-    const protections = nextHops.map((e): Protection => {
-      const lfa = computeLfa(table, source, d, e)
-      const ecmp = ecmpProtectors(table, source, d, e)
-      const rlfa = rlfaFor(e)
-      const tilfa = computeTilfa(topology, source, d, e)
+    // One protection per primary next-hop link: a bundle of equal links gives several (D29).
+    const protections = firstLinks(table, source, d).map((edge): Protection => {
+      const e = edge.to
+      const link = edge.linkId
+      const lfa = computeLfa(table, source, d, e, link)
+      const ecmp = ecmpProtectorLinks(table, source, d, e, link)
+      const rlfa = rlfaFor(e, link)
+      const tilfa = computeTilfa(topology, source, d, e, link)
+      const graph = table.graph
       const explain = withExplain
         ? [
-            ...explainLfa(lfa, { s: source, d, e, ecmpProtectors: ecmp }),
-            ...explainRlfa(rlfa, { d, lfaBest: lfa.best }),
-            ...explainTilfa(tilfa),
+            ...explainLfa(lfa, {
+              s: source,
+              d,
+              e,
+              ecmpProtectors: [...new Set(ecmp.map((x) => x.to))],
+              link,
+              ecmpLinks: ecmp.map((x) => x.linkId),
+              graph,
+            }),
+            ...explainRlfa(rlfa, { d, lfaBest: lfa.best, graph }),
+            ...explainTilfa(tilfa, graph),
           ]
         : []
       return {
-        protectedLink: { from: source, to: e },
+        protectedLink: { from: source, to: e, id: link },
         ecmpProtected: ecmp.length > 0,
         lfa:
           lfa.best === undefined
             ? { candidates: lfa.candidates }
-            : { candidates: lfa.candidates, best: lfa.best },
+            : { candidates: lfa.candidates, best: lfa.best, bestLink: lfa.bestLink! },
         rlfa: rlfaForProtection(rlfa, lfa.best),
         tilfa: tilfaForProtection(tilfa),
         explain,
@@ -120,4 +132,10 @@ export type {
   UnprotectedReason,
 } from './coverage'
 export { percent } from './coverage'
-export { protectionPaths, shortestPath, type ProtectionPaths } from './paths'
+export {
+  hopLinks,
+  protectionPaths,
+  shortestPath,
+  type HopLinkOptions,
+  type ProtectionPaths,
+} from './paths'

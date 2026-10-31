@@ -131,8 +131,7 @@ function parseLinks(raw: unknown, nodeIds: Set<NodeId>, errors: string[]): Link[
     return []
   }
   const links: Link[] = []
-  // Unordered pair → link number, to catch parallel links in either direction (MVP: D4).
-  const pairs = new Map<string, number>()
+  const ids = new Set<string>()
 
   raw.forEach((item, i) => {
     const where = `Link #${i + 1}`
@@ -157,12 +156,6 @@ function parseLinks(raw: unknown, nodeIds: Set<NodeId>, errors: string[]): Link[
     }
     if (a === b) fail("a link can't connect a router to itself.")
 
-    const pair = [a, b].sort().join('\u0000')
-    const earlier = pairs.get(pair)
-    if (earlier !== undefined && a !== b)
-      fail(`${a} and ${b} are already linked by link #${earlier}.`)
-    else pairs.set(pair, i + 1)
-
     const metricRule = `must be a whole number from 1 to ${fmt(MAX_METRIC)}.`
     if (!isWhole(metric, 1, MAX_METRIC)) fail(`"metric" ${metricRule}`)
     if (metric_ba !== undefined && !isWhole(metric_ba, 1, MAX_METRIC))
@@ -176,8 +169,11 @@ function parseLinks(raw: unknown, nodeIds: Set<NodeId>, errors: string[]): Link[
 
     if (!valid) return
     const metricAB = metric as number
+    // Parallel links are allowed (D29): the second S–E link gets id "S-E#2", and so on.
+    const id = uniqueLinkId(`${a}-${b}`, ids)
+    ids.add(id)
     const link: Link = {
-      id: `${a}-${b}`,
+      id,
       a,
       b,
       metricAB,
@@ -188,6 +184,17 @@ function parseLinks(raw: unknown, nodeIds: Set<NodeId>, errors: string[]): Link[
     links.push(link)
   })
   return links
+}
+
+/**
+ * `base`, or `base#2`, `base#3`… if taken. Link ids come from the ends (D14), so
+ * parallel links need a number; "#" never appears in ids typed in the UI (D21).
+ */
+export function uniqueLinkId(base: string, taken: { has: (id: string) => boolean }): string {
+  if (!taken.has(base)) return base
+  let n = 2
+  while (taken.has(`${base}#${n}`)) n++
+  return `${base}#${n}`
 }
 
 /** Warn, don't block: a disconnected network is still worth looking at (docs/03-architecture.md §5). */

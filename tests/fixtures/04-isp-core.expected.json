@@ -9,12 +9,13 @@
       "nextHops": ["P1"],
       "protections": [
         {
-          "protectedLink": { "from": "PE1", "to": "P1" },
+          "protectedLink": { "from": "PE1", "to": "P1", "id": "PE1-P1" },
           "ecmpProtected": false,
           "lfa": {
             "candidates": [
               {
                 "neighbor": "P2",
+                "link": "PE1-P2",
                 "loopFree": false,
                 "downstream": false,
                 "nodeProtecting": false,
@@ -35,7 +36,7 @@
           "tilfa": {
             "path": ["PE1", "P2", "P1"],
             "segments": [
-              { "kind": "adj", "from": "P2", "to": "P1", "label": 24000 },
+              { "kind": "adj", "from": "P2", "to": "P1", "link": "P1-P2", "label": 24000 },
               { "kind": "prefix", "node": "P1", "label": 16001 }
             ],
             "labelStack": [24000, 16001],
@@ -50,12 +51,13 @@
       "nextHops": ["P2"],
       "protections": [
         {
-          "protectedLink": { "from": "PE1", "to": "P2" },
+          "protectedLink": { "from": "PE1", "to": "P2", "id": "PE1-P2" },
           "ecmpProtected": false,
           "lfa": {
             "candidates": [
               {
                 "neighbor": "P1",
+                "link": "PE1-P1",
                 "loopFree": true,
                 "downstream": false,
                 "nodeProtecting": true,
@@ -80,12 +82,12 @@
       "nextHops": ["P1", "P2"],
       "protections": [
         {
-          "protectedLink": { "from": "PE1", "to": "P1" },
+          "protectedLink": { "from": "PE1", "to": "P1", "id": "PE1-P1" },
           "ecmpProtected": true,
           "lfa": { "best": "P2" }
         },
         {
-          "protectedLink": { "from": "PE1", "to": "P2" },
+          "protectedLink": { "from": "PE1", "to": "P2", "id": "PE1-P2" },
           "ecmpProtected": true,
           "lfa": { "best": "P1" }
         }

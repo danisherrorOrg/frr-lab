@@ -20,7 +20,7 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 
 ### D4 – MVP scope: IS-IS, point-to-point links, single level, link protection (2026-10-29)
 - **Why:** covers the core learning value. Node protection, SRLG, LAN links and multi-level come in v0.2+.
-- **Status:** Accepted.
+- **Status:** Accepted. The MVP rule "no parallel links" is replaced by D29 (Phase 9.4).
 
 ### D5 – Use extended P-space for RLFA by default (2026-10-29)
 - **Why:** this is what most implementations do, and it finds more PQ nodes. Plain P-space stays available as a toggle for teaching.
@@ -236,5 +236,31 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Changed – panel text when the failed router is not the protected neighbor:** the Remote LFA and TI-LFA reasons always ended "only protects / avoids the link PLR–X; node protection would plan around the router", with X the failed router met. When X isn't the PLR's next hop E, there may be no link PLR–X, and node protection of E would not help: X is a second failure. Example 5, source SP1, TI-LFA, fail L2–SP1 and router L1: it said "only avoids the link SP1–L1". It now says "L1 is a second failure: SP1's backup was planned for the link SP1–L2 alone, and FRR plans for one failure at a time." The node-protection notes (RFC 5286 §3.2, RFC 8102 §2.1, RFC 9855 §1) stay for X = E.
 - **Changed – backup neighbor itself down:** "LFA P2 reaches P4 through P2 (P1→P2)" (Example 4, source P1, fail P1–P4 and router P2) now says "LFA P2 is itself down"; the same for an ECMP member and a PQ node.
 - **Checked and unchanged:** only a router whose own next hop is down repairs; ECMP first, then LFA / Remote LFA / TI-LFA and what each puts on the packet; repairs towards the active target (D, PQ node, prefix segment, far end of a failed Adj-SID; RFC 9855 §6.1, §6.2, §9); one backup per router visit; exact loops and the 255-hop cut; status order; "Repair = final?" at the PLR; the converged path; the link-failure panel sentences.
+- **No new dependencies.**
+- **Status:** Accepted.
+
+### D29 – Parallel links between two routers (2026-10-31)
+- **Why:** Phase 9.4. Real networks often join two routers with a bundle of links. This replaces D4's "no parallel links" rule.
+- **RFC check (RFC 5286 §3.4–3.6, read 2026-10-31):** an alternate next hop is an **(outgoing link, neighbor)** pair: "A candidate next-hop is indicated by (outgoing link, neighbor)" (§3.6). Alternates are found per primary next hop (§3.4, §3.8), so each link of a bundle is protected on its own. For another link L2 to the same neighbor E:
+  - Inequality 1 always holds (`dist(E,D) < dist(E,S) + dist(S,D)`, E is on the primary path), and it is downstream.
+  - §3.6 step 7: "If H_h.link is not P_i.link, set cand_link-protect": it protects the **link**.
+  - §3.6 step 8 (Inequality 3) is `dist(E,D) < dist(E,E) + dist(E,D)`, never true: it never protects the **node**.
+  - §3.4's figure 4 (L2 to E1 and E2) shows the same idea: a next hop over the same link can't give link protection, one over another link can.
+  - §3.5: the reverse cost is the same link's reverse metric when the link is known (it always is here).
+- **Model:**
+  - A link keeps its own id. The YAML loader and the editor number a second link between the same ends: `S-E`, `S-E#2`, `S-E#3` (`#` is never in ids typed in the UI, D21). Links stay in file order, so saving and loading keeps the ids.
+  - SPF distances don't change (the cheapest link counts). A link X→N is a **primary next-hop link** for D when N is a first hop and the link costs `dist(X,N)`; the costlier link of a bundle isn't one. `Protection` is one per primary next-hop link, with `protectedLink.id`.
+  - Every check that says "avoids link S–E" uses the metric of that one link (`02-algorithms.md` §1.5). A tie still means "may use it" (D6): with two equal links, the other link's paths tie, so they count as "may use it", the safe answer.
+  - **LFA:** a candidate per link out of S except the protected one, with its `link`. Best-LFA order (D7) adds "then lowest link id". `lfa.bestLink` names the link.
+  - **ECMP:** members are links. Another equal link to E is an ECMP member, so an equal bundle is ECMP-protected.
+  - **Remote LFA:** spaces use the protected link's metric. Extended P-space uses each neighbor's cheapest usable link; another link to E is never an exit (E would be an LFA, D17).
+  - **TI-LFA:** the post-convergence SPF removes only that link, so the other link of a bundle stays. Each Adj-SID segment carries `link`, and every link direction has its own Adj-SID (RFC 8402 §3.4, RFC 8667 §2.2.1): auto-numbering goes in neighbor-id, then link-id order (D18). `adjLabel()` needs the link id when there is a bundle. `tilfa.outLink` is the outgoing interface (RFC 9855 §5): with a bundle it matters which link.
+  - **Which link carries traffic:** normal forwarding, Remote LFA exits and TI-LFA hops use the cheapest link, then the lowest link id (the same idea as the lowest-id tie-break, D21). LFA uses `bestLink`, ECMP the member link, an Adj-SID its own link. So there is still one flow per destination (D22): failing the link a flow doesn't use leaves it unaffected.
+  - **Simulation:** the walk follows links (`Flow.repairLinks`), and a failed link is a link id, not a router pair. A router finding its link down uses the backup for that link. Costs after convergence come from the reduced SPF. "Repair = final?" is `same` only when the routers *and* the cost match.
+- **Not modelled:** an Adj-SID for a whole bundle (the "parallel adjacency" / adjacency-set SID of RFC 8402 §3.4.1, RFC 8667 §2.2.2), LAG member links (one IS-IS adjacency over many members), and hashing flows over equal links.
+- **UI:** Cytoscape already draws parallel edges as curves (`curve-style: bezier`), each with its own metric label. The add-link tool adds a second link. Text names a link by id only when its routers have several (`S–E (S-E#2)`, `E (S-E#2)`, `Adj B→C (B-C#2)`), so the old examples read as before. The canvas draws the exact link of each hop (`hopLinks()` in `engine/paths.ts`, `Flow.repairLinks`). Results rows are keyed by link id.
+- **Speed:** TI-LFA's post-convergence graph is now filtered from the full graph instead of rebuilt and sorted, and primary links are cached per table. 200 routers / 600 links, all sources: about 0.9 s in Node (was 1.0 s).
+- **New example:** `07-parallel.yaml`: an unequal bundle S–E (10, 20), where the other link is a link-protecting LFA, and an equal bundle E–D (10, 10), which is ECMP.
+- **Other options considered:** one link per neighbor with the cheapest metric (hides the bundle, the point of the feature); identifying a next hop by neighbor and adding the link only to the Adj-SID (the simulation and drawings would pick the wrong link); explicit link ids in YAML (not needed: numbering from the ends is stable).
 - **No new dependencies.**
 - **Status:** Accepted.

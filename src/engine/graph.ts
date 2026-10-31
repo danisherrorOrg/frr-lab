@@ -5,15 +5,17 @@ export interface Edge {
   from: NodeId
   to: NodeId
   metric: number
+  /** Metric of the same link the other way (to→from). RFC 5286 §3.5 checks both. */
+  back: number
   linkId: string
 }
 
 export interface Graph {
   /** All router ids, sorted. */
   nodes: NodeId[]
-  /** Edges leaving each router, sorted by `to`. Used by forward SPF (§1.1). */
+  /** Edges leaving each router, sorted by `to`, then link id. Used by forward SPF (§1.1). */
   out: Map<NodeId, Edge[]>
-  /** Edges arriving at each router, sorted by `from`. Used by reverse SPF (§1.2). */
+  /** Edges arriving at each router, sorted by `from`, then link id. Used by reverse SPF (§1.2). */
   in: Map<NodeId, Edge[]>
 }
 
@@ -41,16 +43,87 @@ export function buildGraph(topology: Topology): Graph {
   }
 
   for (const link of topology.links) {
-    add({ from: link.a, to: link.b, metric: link.metricAB, linkId: link.id })
-    add({ from: link.b, to: link.a, metric: link.metricBA, linkId: link.id })
+    const { a, b, metricAB: ab, metricBA: ba, id } = link
+    add({ from: a, to: b, metric: ab, back: ba, linkId: id })
+    add({ from: b, to: a, metric: ba, back: ab, linkId: id })
   }
-  for (const edges of out.values()) edges.sort((x, y) => byId(x.to, y.to))
-  for (const edges of inc.values()) edges.sort((x, y) => byId(x.from, y.from))
+  // Parallel links (D29) share `to`, so the link id breaks the tie.
+  for (const edges of out.values())
+    edges.sort((x, y) => byId(x.to, y.to) || byId(x.linkId, y.linkId))
+  for (const edges of inc.values())
+    edges.sort((x, y) => byId(x.from, y.from) || byId(x.linkId, y.linkId))
 
   return { nodes, out, in: inc }
 }
 
-/** c(X,Y): metric of the direct link X→Y, or undefined if X and Y aren't neighbors. */
+/**
+ * c(X,Y): metric of the cheapest direct link X→Y, or undefined if X and Y aren't
+ * neighbors. With parallel links (D29) that is the one shortest paths use.
+ */
 export function linkMetric(graph: Graph, x: NodeId, y: NodeId): number | undefined {
-  return graph.out.get(x)?.find((e) => e.to === y)?.metric
+  return cheapestEdge(graph, x, y)?.metric
+}
+
+/** Every link direction X→Y, sorted by link id. More than one = parallel links (D29). */
+export function edgesBetween(graph: Graph, x: NodeId, y: NodeId): Edge[] {
+  return (graph.out.get(x) ?? []).filter((e) => e.to === y)
+}
+
+/**
+ * The link X→Y normal forwarding uses: the cheapest, then the lowest link id
+ * (same tie-break idea as §4.1, so one flow and one drawing per destination: D29).
+ * `skip` leaves links out (failed ones).
+ */
+export function cheapestEdge(
+  graph: Graph,
+  x: NodeId,
+  y: NodeId,
+  skip?: (linkId: string) => boolean,
+): Edge | undefined {
+  let best: Edge | undefined
+  for (const e of graph.out.get(x) ?? []) {
+    if (e.to !== y || skip?.(e.linkId)) continue
+    if (best === undefined || e.metric < best.metric) best = e
+  }
+  return best
+}
+
+/** The direction from→… of link `linkId`, or undefined if `from` isn't one of its ends. */
+export function edgeOf(graph: Graph, from: NodeId, linkId: string): Edge | undefined {
+  return graph.out.get(from)?.find((e) => e.linkId === linkId)
+}
+
+/** True when X and Y are joined by more than one link (a bundle, D29). */
+export function isBundle(graph: Graph | undefined, x: NodeId, y: NodeId): boolean {
+  return graph !== undefined && edgesBetween(graph, x, y).length > 1
+}
+
+/** "S–E", or "S–E (S-E#2)" when S and E have parallel links, so text names the one meant (D29). */
+export function linkText(
+  graph: Graph | undefined,
+  x: NodeId,
+  y: NodeId,
+  linkId: string | undefined,
+): string {
+  return linkId !== undefined && isBundle(graph, x, y) ? `${x}–${y} (${linkId})` : `${x}–${y}`
+}
+
+/** "N", or "N over S-N#2" when S and N have parallel links (D29). */
+export function hopText(
+  graph: Graph | undefined,
+  s: NodeId,
+  n: NodeId,
+  linkId: string | undefined,
+): string {
+  return linkId !== undefined && isBundle(graph, s, n) ? `${n} over ${linkId}` : n
+}
+
+/**
+ * The same graph without one link (both directions). Filtering keeps the sort
+ * order, so it is much cheaper than buildGraph(); TI-LFA needs one per protected link.
+ */
+export function withoutLink(graph: Graph, linkId: string): Graph {
+  const drop = (m: Map<NodeId, Edge[]>) =>
+    new Map([...m].map(([k, edges]) => [k, edges.filter((e) => e.linkId !== linkId)]))
+  return { nodes: graph.nodes, out: drop(graph.out), in: drop(graph.in) }
 }

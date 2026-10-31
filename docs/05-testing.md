@@ -21,6 +21,9 @@ The engine is the product. If its answers are wrong, the tool teaches wrong thin
 | `04-isp-core` | PE1 / P1 / PE1–P1 | none | {PE2} (extended, exit via P2), chosen PE2 | `[Adj P2→P1, Prefix P1]` | `24000, 16001` |
 | `05-leaf-spine` | L1 / SP1 / L1–SP1 | none | {L2, L3, L4} (extended, exit via SP2), chosen L2 | `[Prefix L2, Prefix SP1]` | `16012, 16001` |
 | `06-link-protecting` | S / D / S–E | N (link-protecting only, not downstream) | – (not needed) | `[Prefix D]` (path S-N-E-D) | `16005` |
+| `07-parallel` | S / E / link `S-E` | E over `S-E#2` (link-protecting, downstream) | – (not needed) | `[Prefix E]`, out on `S-E#2` | `16002` |
+
+Parallel links (Phase 9.4), worked out by hand in `02-algorithms.md` §9: `07-parallel` from S to D the node-protecting LFA A beats the parallel link; from E to D the equal bundle is ECMP; failing one link of a bundle leaves the other up. Property tests also run on random networks with bundles (`tests/engine/parallel.property.test.ts`).
 
 Router failure (Phase 9.3), worked out by hand in `02-algorithms.md` §8.1: `01-square` fail E → D's LFA N survives; `03-ring5-highmetric` fail E → C dropped without TI-LFA, TI-LFA survives; `06-link-protecting` fail E → LFA N breaks at N (N then repairs via M), TI-LFA breaks and loops.
 

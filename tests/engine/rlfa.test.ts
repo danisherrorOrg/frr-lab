@@ -221,7 +221,7 @@ describe('computeRlfa', () => {
 
   it('never uses a max-metric link as an exit (RFC 7490 §5.4)', () => {
     const r = computeRlfa(allPairs(ring({ 'A>S': 16_777_215 })), 'S', 'E')
-    expect(r.skipped).toEqual([{ neighbor: 'A', reason: 'max-metric' }])
+    expect(r.skipped).toEqual([{ neighbor: 'A', link: 'A-S', reason: 'max-metric' }])
     expect(r.extChecks).toEqual([])
     expect(r.extPSpace).toEqual(r.pSpace)
   })
