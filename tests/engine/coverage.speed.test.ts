@@ -35,6 +35,12 @@ function bigTopology(n = 200, linkCount = 600): Topology {
   }
 }
 
+/**
+ * Time limit for a speed test. The limits are for a laptop (docs/01-requirements.md);
+ * shared CI runners are about 2.7× slower, so CI gets 3× the time (DECISIONS.md D46).
+ */
+const budget = (ms: number) => (process.env.CI ? ms * 3 : ms)
+
 // TODO.md Phase 5: all-sources coverage on 200 routers / 600 links in under 2 s.
 describe('coverage speed', () => {
   it('200 routers, 600 links, all sources: under 2 s', () => {
@@ -45,7 +51,7 @@ describe('coverage speed', () => {
     const ms = performance.now() - start
     expect(r.sources).toHaveLength(200)
     expect(r.total.tilfa).toBe(r.total.pairs)
-    expect(ms).toBeLessThan(2000)
+    expect(ms).toBeLessThan(budget(2000))
   })
 
   // TODO backlog: the coverage heat map does the same work, grouped per link.
@@ -55,7 +61,7 @@ describe('coverage speed', () => {
     const ms = performance.now() - start
     expect(Object.keys(m.routers)).toHaveLength(200)
     expect(Object.keys(m.links)).toHaveLength(600)
-    expect(ms).toBeLessThan(2000)
+    expect(ms).toBeLessThan(budget(2000))
   })
 
   // TODO backlog: the what-if diff runs coverage twice (before and after), so 2 × 2 s.
@@ -69,7 +75,7 @@ describe('coverage speed', () => {
     const w = whatIf(topo, after)
     const ms = performance.now() - start
     expect(w.sources).toHaveLength(200)
-    expect(ms).toBeLessThan(4000)
+    expect(ms).toBeLessThan(budget(4000))
   })
 })
 
@@ -83,7 +89,7 @@ describe('all routers as the DUT: speed', () => {
     const ms = performance.now() - start
     expect(all).toHaveLength(200)
     expect(all.every((x) => x.rows.length >= 199)).toBe(true)
-    expect(ms).toBeLessThan(2000)
+    expect(ms).toBeLessThan(budget(2000))
   })
 
   it('failure summary for every router (a router and a link down, TI-LFA): under 2 s', () => {
@@ -92,6 +98,6 @@ describe('all routers as the DUT: speed', () => {
     const ms = performance.now() - start
     expect(all).toHaveLength(200)
     expect(all.filter((x) => 'down' in x).map((x) => x.source)).toEqual(['R005'])
-    expect(ms).toBeLessThan(2000)
+    expect(ms).toBeLessThan(budget(2000))
   })
 })
