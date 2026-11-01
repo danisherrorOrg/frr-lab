@@ -86,7 +86,8 @@ function Chain({ f }: { f: Flow }) {
     return w
   }
   const words = more.map((r) => word(r.link))
-  const dropWord = drop?.reason === 'no-backup' ? word(drop.link) : ''
+  const noBackup = drop?.reason === 'no-backup' || drop?.reason === 'too-deep'
+  const dropWord = noBackup ? word(drop.link) : ''
   // A backup can also leave on a link the traffic met earlier, at another router.
   const backupMet = drop?.reason === 'backup-down' && met.has(drop.link)
   return (
@@ -98,11 +99,14 @@ function Chain({ f }: { f: Flow }) {
           {r.at} switches to its own {METHOD[r.method]} backup.
         </span>
       ))}
-      {drop?.reason === 'no-backup' && (
+      {noBackup && (
         <>
           {' '}
           At {drop.at} it finds <strong>{dash(drop.at, drop.next, drop.link)}</strong> down{' '}
-          {dropWord}, and {drop.at} has no backup for it: traffic is <strong>dropped</strong>.
+          {dropWord}, and {drop.at} has no backup for it
+          {drop.reason === 'too-deep' &&
+            ' (its TI-LFA label stack is deeper than its max SID depth, so it was never installed)'}
+          : traffic is <strong>dropped</strong>.
         </>
       )}
       {drop?.reason === 'backup-down' && (

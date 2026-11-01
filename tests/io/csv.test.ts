@@ -9,12 +9,12 @@ describe('coverageCsv', () => {
     const csv = coverageCsv(computeCoverage(loadFixture('01-square.yaml')))
     expect(csv).toBe(
       [
-        'source,pairs,ecmp,lfa,lfa_pct,lfa_or_rlfa,lfa_or_rlfa_pct,tilfa,tilfa_pct',
-        'D,3,0,1,33.3,3,100,3,100',
-        'E,3,0,1,33.3,3,100,3,100',
-        'N,3,0,3,100,3,100,3,100',
-        'S,3,0,3,100,3,100,3,100',
-        'All sources,12,0,8,66.7,12,100,12,100',
+        'source,pairs,ecmp,lfa,lfa_pct,lfa_or_rlfa,lfa_or_rlfa_pct,tilfa,tilfa_pct,tilfa_too_deep',
+        'D,3,0,1,33.3,3,100,3,100,0',
+        'E,3,0,1,33.3,3,100,3,100,0',
+        'N,3,0,3,100,3,100,3,100,0',
+        'S,3,0,3,100,3,100,3,100,0',
+        'All sources,12,0,8,66.7,12,100,12,100,0',
         '',
       ].join('\r\n'),
     )
@@ -22,11 +22,13 @@ describe('coverageCsv', () => {
 
   it('leaves percentages empty when a source has nothing to protect', () => {
     const csv = coverageCsv({
-      sources: [{ source: 'S', counts: { pairs: 0, ecmp: 0, lfa: 0, rlfa: 0, tilfa: 0 } }],
-      total: { pairs: 0, ecmp: 0, lfa: 0, rlfa: 0, tilfa: 0 },
+      sources: [
+        { source: 'S', counts: { pairs: 0, ecmp: 0, lfa: 0, rlfa: 0, tilfa: 0, tooDeep: 0 } },
+      ],
+      total: { pairs: 0, ecmp: 0, lfa: 0, rlfa: 0, tilfa: 0, tooDeep: 0 },
       unprotected: [],
     })
-    expect(csv.split('\r\n')[1]).toBe('S,0,0,0,,0,,0,')
+    expect(csv.split('\r\n')[1]).toBe('S,0,0,0,,0,,0,,0')
   })
 })
 

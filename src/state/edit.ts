@@ -1,7 +1,9 @@
 // Topology edits for the canvas and properties panel (F1). Every function returns
 // a NEW topology and never changes its input: the engine caches by object (D15).
 import type { Link, NodeId, RouterNode, Topology } from '../engine/types'
-import { ID_PATTERN, MAX_LABEL, MAX_METRIC, uniqueLinkId } from '../io/yaml'
+import { ID_PATTERN, MAX_LABEL, MAX_METRIC, MAX_MSD, MIN_MSD, uniqueLinkId } from '../io/yaml'
+// BMI-MSD is one octet (RFC 8491 §2); below 2 not even a Remote LFA tunnel fits.
+const msdError = `Max SID depth must be a whole number from ${MIN_MSD} to ${MAX_MSD}, or empty for no limit.`
 
 export type EditResult = { ok: true; topology: Topology } | { ok: false; error: string }
 
@@ -83,6 +85,8 @@ export interface RouterPatch {
   /** Empty text removes the name. */
   name?: string
   sidIndex?: number
+  /** Max SID depth; null removes it (the router then uses the network's, D44). */
+  msd?: number | null
 }
 
 /** Change a router. Renaming also updates its links (ends and ids). */
@@ -110,6 +114,11 @@ export function updateRouter(t: Topology, id: NodeId, patch: RouterPatch): EditR
     const owner = t.nodes.find((n) => n.id !== id && n.sidIndex === patch.sidIndex)
     if (owner) return { ok: false, error: `SID index ${patch.sidIndex} is used by ${owner.id}.` }
     next.sidIndex = patch.sidIndex
+  }
+  if (patch.msd === null) delete next.msd
+  else if (patch.msd !== undefined) {
+    if (!isWhole(patch.msd, MIN_MSD, MAX_MSD)) return { ok: false, error: msdError }
+    next.msd = patch.msd
   }
 
   const rename = (x: NodeId) => (x === id ? next.id : x)
@@ -171,6 +180,8 @@ export function updateLink(t: Topology, id: string, patch: LinkPatch): EditResul
 export interface TopologyPatch {
   name?: string
   srgbBase?: number
+  /** Max SID depth of every router; null = no limit (D44). */
+  msd?: number | null
 }
 
 export function updateTopology(t: Topology, patch: TopologyPatch): EditResult {
@@ -180,6 +191,11 @@ export function updateTopology(t: Topology, patch: TopologyPatch): EditResult {
     if (!isWhole(patch.srgbBase, 0, MAX_LABEL))
       return { ok: false, error: `SRGB base must be a whole number from 0 to ${fmt(MAX_LABEL)}.` }
     next.srgbBase = patch.srgbBase
+  }
+  if (patch.msd === null) delete next.msd
+  else if (patch.msd !== undefined) {
+    if (!isWhole(patch.msd, MIN_MSD, MAX_MSD)) return { ok: false, error: msdError }
+    next.msd = patch.msd
   }
   return { ok: true, topology: next }
 }

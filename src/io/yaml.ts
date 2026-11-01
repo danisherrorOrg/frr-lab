@@ -7,6 +7,8 @@ import {
   LINK_FIELDS,
   MAX_LABEL,
   MAX_METRIC,
+  MAX_MSD,
+  MIN_MSD,
   NODE_FIELDS,
   TOP_FIELDS,
 } from './yaml-format'
@@ -16,7 +18,14 @@ import {
 export type ParseResult =
   { ok: true; topology: Topology; warnings: string[] } | { ok: false; errors: string[] }
 
-export { DEFAULT_SRGB_BASE, ID_PATTERN, MAX_LABEL, MAX_METRIC } from './yaml-format'
+export {
+  DEFAULT_SRGB_BASE,
+  ID_PATTERN,
+  MAX_LABEL,
+  MAX_METRIC,
+  MAX_MSD,
+  MIN_MSD,
+} from './yaml-format'
 
 type Raw = Record<string, unknown>
 
@@ -61,16 +70,24 @@ export function parseTopology(text: string): ParseResult {
     else errors.push(`"srgb_base" must be a whole number from 0 to ${fmt(MAX_LABEL)}.`)
   }
 
+  let msd: number | undefined
+  if (doc.msd !== undefined) {
+    if (isWhole(doc.msd, MIN_MSD, MAX_MSD)) msd = doc.msd
+    else errors.push(`"msd" ${msdRule}`)
+  }
+
   const { nodes, declared } = parseNodes(doc.nodes, errors)
   const links = parseLinks(doc.links, declared, errors)
 
   if (errors.length > 0) return { ok: false, errors }
   return {
     ok: true,
-    topology: { name, srgbBase, nodes, links },
+    topology: { name, srgbBase, ...(msd !== undefined && { msd }), nodes, links },
     warnings: connectivityWarnings(nodes, links),
   }
 }
+
+const msdRule = `(max SID depth) must be a whole number from ${MIN_MSD} to ${MAX_MSD}.`
 
 /** js-yaml's error as one line with its position (lines and columns counted from 1). */
 function syntaxError(e: unknown): string {
@@ -157,7 +174,7 @@ function parseNodes(
       errors.push(`${where}: must be a mapping like { id: S, sid: 1 }, not "${shown(item)}".`)
       return
     }
-    const { id, sid, name, pos } = item
+    const { id, sid, name, pos, msd } = item
     const named = typeof id === 'string' && id !== '' ? `${where} (${id})` : where
     unknownKeys(item, NODE_FIELDS, (key, hint) =>
       errors.push(`${named}: unknown field "${key}". ${hint}`),
@@ -201,6 +218,10 @@ function parseNodes(
       errors.push(`${label}: "name" must be text.`)
       valid = false
     }
+    if (msd !== undefined && !isWhole(msd, MIN_MSD, MAX_MSD)) {
+      errors.push(`${label}: "msd" ${msdRule}`)
+      valid = false
+    }
     const isPos = isMap(pos) && Number.isFinite(pos.x) && Number.isFinite(pos.y)
     if (pos !== undefined && !isPos) {
       errors.push(`${label}: "pos" must look like { x: 10, y: 20 }.`)
@@ -210,6 +231,7 @@ function parseNodes(
     if (!valid || !isWhole(sid, 0, MAX_LABEL)) return
     const node: RouterNode = { id, sidIndex: sid }
     if (typeof name === 'string') node.name = name
+    if (msd !== undefined) node.msd = msd as number
     if (isPos) node.pos = { x: pos.x as number, y: pos.y as number }
     nodes.push(node)
   })
@@ -324,10 +346,12 @@ export function serializeTopology(topology: Topology): string {
   const doc = {
     name: topology.name,
     srgb_base: topology.srgbBase,
+    ...(topology.msd !== undefined && { msd: topology.msd }),
     nodes: topology.nodes.map((n) => ({
       id: n.id,
       sid: n.sidIndex,
       ...(n.name !== undefined && { name: n.name }),
+      ...(n.msd !== undefined && { msd: n.msd }),
       ...(n.pos !== undefined && { pos: { x: n.pos.x, y: n.pos.y } }),
     })),
     links: topology.links.map((l) => ({

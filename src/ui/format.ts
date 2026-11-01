@@ -334,6 +334,11 @@ export function dutSummary(x: SourceFailure, routersDown: boolean): string {
  * How one results row is protected, in a line (per-link view, docs/02-algorithms.md §11):
  * "LFA A (node-protecting)", "Remote LFA: tunnel to PQ node B", "TI-LFA: B · E (16004 16002)".
  */
+/** Why a TI-LFA repair isn't installed: "3 labels > MSD 2 of S" (RFC 8491 §5, D44). */
+export function tooDeepText(router: NodeId, labels: number, msd: number): string {
+  return `${labels} label${labels === 1 ? '' : 's'} > MSD ${msd} of ${router}`
+}
+
 export function howText(r: ResultRow, b?: Bundles): string {
   switch (r.protectedBy) {
     case 'ecmp':
@@ -351,7 +356,9 @@ export function howText(r: ResultRow, b?: Bundles): string {
         ? `TI-LFA: ${segmentsShort(r.tilfa.segments, b)} (${r.tilfa.labelStack.join(' ')})`
         : 'TI-LFA'
     default:
-      return `Nothing: ${r.dest} is cut off from ${r.source} when the link fails`
+      return r.tilfa?.tooDeep && r.tilfa.msd !== undefined
+        ? `Nothing: TI-LFA ${segmentsShort(r.tilfa.segments, b)} is too deep (${tooDeepText(r.source, r.tilfa.labelStack.length, r.tilfa.msd)})`
+        : `Nothing: ${r.dest} is cut off from ${r.source} when the link fails`
   }
 }
 

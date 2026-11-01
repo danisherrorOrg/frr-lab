@@ -476,6 +476,12 @@ describe('howText (per-link view)', () => {
       'Nothing: B is cut off from A when the link fails',
     )
   })
+
+  it('says when the TI-LFA stack is deeper than the max SID depth (D44)', () => {
+    const t = { ...loadFixture('03-ring5-highmetric.yaml'), msd: 2 }
+    const row = toRows('S', computeForSource(t, 'S')).find((r) => r.dest === 'E')!
+    expect(howText(row)).toBe('Nothing: TI-LFA B · B→C · E is too deep (3 labels > MSD 2 of S)')
+  })
 })
 
 // Coverage heat map (docs/02-algorithms.md §12).
@@ -486,6 +492,7 @@ describe('heat map labels', () => {
     lfa,
     rlfa,
     tilfa,
+    tooDeep: 0,
   })
 
   it('buckets by the exact share, and never rounds up to ✓', () => {
@@ -531,6 +538,7 @@ describe('what-if text', () => {
     lfa,
     rlfa,
     tilfa,
+    tooDeep: 0,
   })
 
   it('Example 3 → 2: LFA 40% → 50%, +10 points', () => {

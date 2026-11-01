@@ -91,6 +91,31 @@ describe('App smoke test', () => {
     )
   })
 
+  it('Example 3 with max SID depth 2: the 3-label repair is flagged and not counted (D44)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'ring5-high')
+    await rowFor('E')
+    const msd = screen.getByLabelText('Max SID depth (MSD)')
+    await user.type(msd, '2{Enter}')
+    expect(useStore.getState().topology.msd).toBe(2)
+
+    const e = await rowFor('E')
+    await vi.waitFor(() => expect(e.textContent).toContain('too deep: 3 labels > MSD 2 of S'))
+    expect(e.textContent).toContain('✗ none')
+    await user.click(e)
+    expect(screen.getByRole('region', { name: 'Details' }).textContent).toContain(
+      'Too deep: 3 labels > MSD 2 of S',
+    )
+
+    // Back to no limit: protected again.
+    const cleared = screen.getByLabelText('Max SID depth (MSD)')
+    await user.clear(cleared)
+    await user.tab()
+    expect(useStore.getState().topology).not.toHaveProperty('msd')
+    await vi.waitFor(async () => expect((await rowFor('E')).textContent).toContain('✓ TI-LFA'))
+  })
+
   it('Example 3 packet walk: steps router by router with the label stack, PHP on and off', async () => {
     const user = userEvent.setup()
     render(<App />)

@@ -250,6 +250,7 @@ describe('parseTopology: errors that help fix the file', () => {
     ['routers', 'nodes'],
     ['edges', 'links'],
     ['srgb', 'srgb_base'],
+    ['max_sid_depth', 'msd'],
   ])('flags the unknown top-level key "%s" and suggests "%s"', (bad, good) => {
     const errors = errorsOf(`name: t\nnodes:\n  - { id: S, sid: 1 }\n${bad}: 1\n`)
     expect(errors).toContainEqual(`Unknown key "${bad}". Did you mean "${good}"?`)
@@ -258,7 +259,7 @@ describe('parseTopology: errors that help fix the file', () => {
   it('lists the allowed keys when there is no close match', () => {
     const errors = errorsOf('name: t\nnodes: []\ncolour: red\n')
     expect(errors).toContainEqual(
-      'Unknown key "colour". Allowed keys: name, srgb_base, nodes, links.',
+      'Unknown key "colour". Allowed keys: name, srgb_base, msd, nodes, links.',
     )
   })
 
@@ -328,6 +329,25 @@ links:
     )
     expect(topo.links[0]).toMatchObject({ adjSidAB: 24001, adjSidBA: 24002 })
   })
+
+  it('reads the max SID depth of the network and of one router (D44)', () => {
+    const topo = expectOk(
+      parseTopology(
+        'name: t\nmsd: 3\nnodes:\n  - { id: S, sid: 1, msd: 2 }\n  - { id: E, sid: 2 }\n',
+      ),
+    )
+    expect(topo.msd).toBe(3)
+    expect(topo.nodes.map((n) => n.msd)).toEqual([2, undefined])
+  })
+
+  it('checks the max SID depth range', () => {
+    expect(errorsOf('name: t\nmsd: 1\nnodes: []\n')).toContainEqual(
+      '"msd" (max SID depth) must be a whole number from 2 to 255.',
+    )
+    expect(errorsOf('name: t\nnodes:\n  - { id: S, sid: 1, msd: 300 }\n')).toContainEqual(
+      'Node #1 (S): "msd" (max SID depth) must be a whole number from 2 to 255.',
+    )
+  })
 })
 
 describe('parseTopology: warnings', () => {
@@ -364,9 +384,10 @@ describe('serializeTopology', () => {
       name: 'Round trip',
       srgbBase: 20000,
       nodes: [
-        { id: 'S', sidIndex: 1, name: 'Core-1', pos: { x: 1, y: 2 } },
+        { id: 'S', sidIndex: 1, name: 'Core-1', msd: 2, pos: { x: 1, y: 2 } },
         { id: 'E', sidIndex: 2 },
       ],
+      msd: 4,
       links: [{ id: 'S-E', a: 'S', b: 'E', metricAB: 10, metricBA: 20, adjSidBA: 24001 }],
     }
     expect(expectOk(parseTopology(serializeTopology(topo)))).toEqual(topo)

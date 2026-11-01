@@ -17,6 +17,7 @@ const LIST_LIMIT = 100
 const REASON: Record<UnprotectedReason, string> = {
   'no-lfa': 'Remote LFA',
   'no-rlfa': 'TI-LFA only',
+  'too-deep': '✗ TI-LFA too deep',
   partitioned: '✗ nothing',
 }
 
@@ -55,6 +56,12 @@ function Bars({ c }: { c: CoverageCounts }) {
       <p className="text-xs text-slate-500">
         {c.pairs} (destination, link) pairs; {c.ecmp} of them ECMP-protected (counted in LFA).
       </p>
+      {c.tooDeep > 0 && (
+        <p className="text-xs font-semibold text-red-700 dark:text-red-400">
+          ⚠ {c.tooDeep} TI-LFA repair{c.tooDeep === 1 ? ' needs' : 's need'} more labels than the
+          router&apos;s max SID depth (MSD): not counted as TI-LFA.
+        </p>
+      )}
     </div>
   )
 }
@@ -131,6 +138,7 @@ export function CoverageReport({ source }: { source: NodeId | null }) {
                     <th className={cell}>LFA</th>
                     <th className={cell}>+ RLFA</th>
                     <th className={cell}>TI-LFA</th>
+                    {report.total.tooDeep > 0 && <th className={cell}>Too deep</th>}
                   </tr>
                 </thead>
                 <tbody className="tabular-nums">
@@ -141,6 +149,7 @@ export function CoverageReport({ source }: { source: NodeId | null }) {
                       <td className={cell}>{pct(c.lfa, c.pairs)}</td>
                       <td className={cell}>{pct(c.rlfa, c.pairs)}</td>
                       <td className={cell}>{pct(c.tilfa, c.pairs)}</td>
+                      {report.total.tooDeep > 0 && <td className={cell}>{c.tooDeep}</td>}
                     </tr>
                   ))}
                 </tbody>
@@ -177,7 +186,7 @@ export function CoverageReport({ source }: { source: NodeId | null }) {
                         {u.link.from}–{u.link.to}
                       </td>
                       <td
-                        className={`px-2 py-1 ${u.reason === 'partitioned' ? 'text-red-700 dark:text-red-400' : ''}`}
+                        className={`px-2 py-1 ${u.reason === 'partitioned' || u.reason === 'too-deep' ? 'text-red-700 dark:text-red-400' : ''}`}
                       >
                         {REASON[u.reason]}
                       </td>

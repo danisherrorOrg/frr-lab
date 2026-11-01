@@ -13,7 +13,8 @@ export function protectedBy(p: Protection): Method | null {
   if (p.ecmpProtected) return 'ecmp'
   if (p.lfa.best !== undefined) return 'lfa'
   if (p.rlfa.needed && p.rlfa.best !== undefined) return 'rlfa'
-  if (p.tilfa.path !== undefined) return 'tilfa'
+  // Too deep for S's hardware: not installed, so it protects nothing (D44).
+  if (p.tilfa.path !== undefined && p.tilfa.tooDeep !== true) return 'tilfa'
   return null
 }
 
@@ -31,8 +32,18 @@ export interface ResultRow {
   lfa?: { neighbor: NodeId; link: string; nodeProtecting: boolean }
   /** `needed` = false when an LFA already protects D (the spaces are only shown). */
   rlfa: { needed: boolean; pq?: NodeId; via?: NodeId }
-  /** `out` is the first router after S, `outLink` the link to it (RFC 9855 §5). */
-  tilfa?: { segments: Segment[]; labelStack: number[]; out: NodeId; outLink: string }
+  /**
+   * `out` is the first router after S, `outLink` the link to it (RFC 9855 §5).
+   * `tooDeep`: the stack is longer than S's `msd`, so it is not installed (D44).
+   */
+  tilfa?: {
+    segments: Segment[]
+    labelStack: number[]
+    out: NodeId
+    outLink: string
+    msd?: number
+    tooDeep?: boolean
+  }
   protectedBy: Method | null
 }
 
@@ -69,6 +80,8 @@ export function toRows(source: NodeId, results: DestinationResult[]): ResultRow[
               labelStack: tilfa.labelStack ?? [],
               out,
               outLink: tilfa.outLink,
+              ...(tilfa.msd !== undefined && { msd: tilfa.msd }),
+              ...(tilfa.tooDeep === true && { tooDeep: true }),
             },
           }),
         protectedBy: protectedBy(p),

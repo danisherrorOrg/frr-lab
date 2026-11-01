@@ -10,6 +10,11 @@ export interface RouterNode {
   name?: string
   /** Prefix-SID index; label = srgbBase + sidIndex (RFC 8402, same SRGB everywhere: D9). */
   sidIndex: number
+  /**
+   * Base MPLS Imposition MSD: how many labels this router can put on a packet
+   * (RFC 8491 §5). Overrides the network's `msd`; left out = the network's value.
+   */
+  msd?: number
   /** UI only; the engine ignores it. */
   pos?: { x: number; y: number }
 }
@@ -32,6 +37,8 @@ export interface Topology {
   name: string
   /** Default 16000. */
   srgbBase: number
+  /** Max SID depth of every router without its own `msd` (RFC 8491 §5). Left out = no limit. */
+  msd?: number
   nodes: RouterNode[]
   /** Point-to-point. Two routers may have several links (parallel links, D29); each has its own id. */
   links: Link[]
@@ -91,6 +98,13 @@ export interface Protection {
     segments?: Segment[]
     labelStack?: number[]
     extraLabels?: number
+    /** S's max SID depth, when one is set (RFC 8491 §5). */
+    msd?: number
+    /**
+     * The label stack is longer than `msd`: S's hardware can't impose it, so this
+     * repair is not installed and doesn't count as protection (D44).
+     */
+    tooDeep?: boolean
   }
   explain: ExplainStep[]
 }

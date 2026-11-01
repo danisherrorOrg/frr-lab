@@ -240,7 +240,7 @@ const segmentName = (x: Segment, graph?: Graph) =>
  * final label stack. Example:
  * "From B, C: dist(B,C)=4 matches path cost 10 ✗; avoids S–E: … ✗".
  */
-export function explainTilfa(result: TilfaResult, graph?: Graph): ExplainStep[] {
+export function explainTilfa(result: TilfaResult, graph?: Graph, msd?: number): ExplainStep[] {
   const { s, d, e } = result
   const sE = linkText(graph, s, e, result.link)
   const name = (x: Segment) => segmentName(x, graph)
@@ -318,6 +318,17 @@ export function explainTilfa(result: TilfaResult, graph?: Graph): ExplainStep[] 
     ok: true,
     rfc: 'RFC 9855 §5',
   })
+  if (msd !== undefined) {
+    const depth = (result.labelStack ?? []).length
+    const fits = depth <= msd
+    // RFC 8491 §1.1: imposed = swapped (D's label) + pushed (the repair list).
+    steps.push({
+      rule: 'TI-LFA max SID depth',
+      text: `${depth} label${depth === 1 ? '' : 's'} (1 swapped + ${extra} pushed) ${fits ? '≤' : '>'} MSD ${msd} of ${s} ${mark(fits)}${fits ? '' : `: ${s}’s hardware can’t impose this stack, so no TI-LFA backup is installed`}`,
+      ok: fits,
+      rfc: 'RFC 8491 §5',
+    })
+  }
   return steps
 }
 

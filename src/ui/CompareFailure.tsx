@@ -240,7 +240,9 @@ function repairsText(f: Flow, b: Bundles): string {
     const why =
       f.drop.reason === 'no-backup'
         ? `${f.drop.at} has no backup for link ${link}`
-        : `the first link of ${f.drop.at}'s backup for ${link} is down too`
+        : f.drop.reason === 'too-deep'
+          ? `${f.drop.at}'s TI-LFA backup for link ${link} is deeper than its max SID depth, so it isn't installed`
+          : `the first link of ${f.drop.at}'s backup for ${link} is down too`
     return chain ? `${chain}; then ${why}.` : `${why[0]!.toUpperCase()}${why.slice(1)}.`
   }
   if (f.loopAt !== undefined) return `${chain}; the traffic comes back to ${f.loopAt}.`

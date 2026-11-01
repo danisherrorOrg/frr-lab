@@ -56,6 +56,7 @@ LFA LAB/
 │   │   ├── link-view.ts     per-link view: what one link carries and how it is protected (§11 of 02)
 │   │   ├── heat-map.ts      coverage per router and per link, for the canvas heat map (§12 of 02)
 │   │   ├── what-if.ts       coverage before vs after one change, e.g. a new metric (§13 of 02)
+│   │   ├── msd.ts           max SID depth: each router's limit, and "is this stack too deep?" (§14 of 02)
 │   │   ├── simulate.ts      failure simulation, per source and for every router
 │   │   └── index.ts         computeForSource(), computeCoverage()
 │   ├── io/
@@ -104,6 +105,7 @@ interface RouterNode {
   id: NodeId;            // short unique id, e.g. "S", "R1"
   name?: string;         // display name
   sidIndex: number;      // prefix-SID index; label = srgbBase + sidIndex
+  msd?: number;          // max SID depth of this router; overrides Topology.msd (D44)
   pos?: { x: number; y: number };  // UI only, ignored by the engine
 }
 
@@ -119,6 +121,7 @@ interface Link {
 interface Topology {
   name: string;
   srgbBase: number;      // default 16000
+  msd?: number;          // max SID depth of every router (RFC 8491 §5); none = no limit (D44)
   nodes: RouterNode[];
   links: Link[];         // point-to-point; parallel links allowed, each with its own id (D29)
 }
@@ -142,7 +145,8 @@ interface Protection {          // for one (S, D, protected link S–E)
            exitVia: Record<NodeId, NodeId>;  // PQ node → neighbor to send through (D11)
            extended: boolean; needed: boolean; best?: NodeId };  // needed = false when an LFA exists
   tilfa: { path?: NodeId[]; outLink?: string;  // outLink: outgoing interface, RFC 9855 §5
-           segments?: Segment[]; labelStack?: number[]; extraLabels?: number };
+           segments?: Segment[]; labelStack?: number[]; extraLabels?: number;
+           msd?: number; tooDeep?: boolean };  // tooDeep: stack > S's MSD, not installed (D44)
   explain: ExplainStep[];
 }
 
@@ -158,9 +162,10 @@ interface ExplainStep { rule: string; text: string; ok: boolean; rfc?: string }
 ```yaml
 name: Five-node ring
 srgb_base: 16000          # optional, default 16000
+msd: 3                    # optional max SID depth of every router, 2 to 255 (D44)
 nodes:
   - { id: S, sid: 1 }
-  - { id: E, sid: 2 }
+  - { id: E, sid: 2, msd: 2 }                                  # msd optional, overrides the top one
   - { id: C, sid: 3, name: "Core-3", pos: { x: 120, y: 40 } }  # name, pos optional
 links:
   - { a: S, b: E, metric: 1 }                 # same metric both ways
@@ -170,6 +175,7 @@ links:
 **Validation rules** (show clear errors in the UI):
 - Node ids are unique; SID indices are unique; links point to existing nodes.
 - Metrics are integers from 1 to 16,777,215 (the IS-IS wide-metric range).
+- `msd` (top level or per router) is a whole number from 2 to 255: BMI-MSD is one octet (RFC 8491 §2), and below 2 not even a Remote LFA tunnel fits (D44).
 - No self-loops. Two routers may have several links (parallel links, D29): the second `S`–`E` link gets id `S-E#2`, the third `S-E#3`.
 - Warn (don't block) if the graph is disconnected.
 - Router ids use letters, digits, `_` and `.` only (the same rule as the editor; `-` joins the ends in link ids).

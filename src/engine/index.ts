@@ -8,6 +8,7 @@ import {
 } from './coverage'
 import { explainLfa, explainRlfa, explainTilfa } from './explain'
 import { computeLfa, ecmpProtectorLinks } from './lfa'
+import { msdOf } from './msd'
 import { computeRlfa, rlfaForProtection, type RlfaResult } from './rlfa'
 import { toRows, type SourceRows } from './rows'
 import { allPairs, firstLinks } from './spf'
@@ -35,6 +36,8 @@ export function computeForSource(
   const fromS = table.from.get(source)
   if (fromS === undefined) throw new Error(`Unknown source router "${source}".`)
   const withExplain = options.explain ?? true
+  // The PLR's own limit: S is the router that imposes the repair (RFC 8491 §5, D44).
+  const msd = msdOf(topology, source)
 
   // RLFA depends only on the protected link, not on D (RFC 7490 §5.2.1.3): once per link.
   const rlfaByLink = new Map<string, RlfaResult>()
@@ -74,7 +77,7 @@ export function computeForSource(
               graph,
             }),
             ...explainRlfa(rlfa, { d, lfaBest: lfa.best, graph }),
-            ...explainTilfa(tilfa, graph),
+            ...explainTilfa(tilfa, graph, msd),
           ]
         : []
       return {
@@ -85,7 +88,7 @@ export function computeForSource(
             ? { candidates: lfa.candidates }
             : { candidates: lfa.candidates, best: lfa.best, bestLink: lfa.bestLink! },
         rlfa: rlfaForProtection(rlfa, lfa.best),
-        tilfa: tilfaForProtection(tilfa),
+        tilfa: tilfaForProtection(tilfa, msd),
         explain,
       }
     })
@@ -152,6 +155,7 @@ export type {
   UnprotectedReason,
 } from './coverage'
 export { percent } from './coverage'
+export { isTooDeep, msdOf } from './msd'
 export { protectedBy, toRows, type Method, type ResultRow, type SourceRows } from './rows'
 export {
   hopLinks,

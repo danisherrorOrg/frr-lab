@@ -1,5 +1,6 @@
 import { cheapestEdge, edgeOf, linkMetric, withoutLink, type Edge, type Graph } from './graph'
 import { adjLabel, prefixLabel } from './labels'
+import { isTooDeep } from './msd'
 import { allPairs, avoidsLink, dist, spf } from './spf'
 import type { NodeId, Protection, Segment, Topology } from './types'
 
@@ -260,8 +261,11 @@ export function computeTilfa(
   }
 }
 
-/** The TI-LFA part of a Protection. Empty when the network is partitioned. */
-export function tilfaForProtection(result: TilfaResult): Protection['tilfa'] {
+/**
+ * The TI-LFA part of a Protection. Empty when the network is partitioned. `msd` is
+ * S's max SID depth: a longer stack is kept but marked `tooDeep` (§14, D44).
+ */
+export function tilfaForProtection(result: TilfaResult, msd?: number): Protection['tilfa'] {
   const { path, outLink, segments, labelStack, extraLabels } = result
   if (
     result.partitioned ||
@@ -271,7 +275,15 @@ export function tilfaForProtection(result: TilfaResult): Protection['tilfa'] {
     !labelStack ||
     extraLabels === undefined
   ) {
-    return {}
+    return msd === undefined ? {} : { msd }
   }
-  return { path, outLink, segments, labelStack, extraLabels }
+  return {
+    path,
+    outLink,
+    segments,
+    labelStack,
+    extraLabels,
+    ...(msd !== undefined && { msd }),
+    ...(isTooDeep(labelStack, msd) && { tooDeep: true }),
+  }
 }

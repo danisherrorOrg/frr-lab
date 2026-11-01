@@ -29,6 +29,7 @@ const countCells = (c: CoverageCounts) => [
   percent(c.rlfa, c.pairs),
   c.tilfa,
   percent(c.tilfa, c.pairs),
+  c.tooDeep,
 ]
 
 /** Per-source coverage numbers, then an "All sources" total row (docs/02-algorithms.md §5). */
@@ -44,6 +45,7 @@ export function coverageCsv(report: CoverageReport): string {
       'lfa_or_rlfa_pct',
       'tilfa',
       'tilfa_pct',
+      'tilfa_too_deep',
     ],
     ...report.sources.map((s) => [s.source, ...countCells(s.counts)]),
     ['All sources', ...countCells(report.total)],

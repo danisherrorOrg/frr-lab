@@ -2,7 +2,15 @@ import { useMemo } from 'react'
 import { toRows, type ResultRow } from '../engine/rows'
 import type { DestinationResult, NodeId } from '../engine/types'
 import { useStore, type RowKey } from '../state/store'
-import { bundles, hopName, isBundled, METHOD_NAME, segmentsShort, type Bundles } from './format'
+import {
+  bundles,
+  hopName,
+  isBundled,
+  METHOD_NAME,
+  segmentsShort,
+  tooDeepText,
+  type Bundles,
+} from './format'
 import { rowKeys } from './keys'
 
 const cell = 'px-2 py-1 align-top'
@@ -34,9 +42,9 @@ function RlfaCell({ r }: { r: ResultRow }) {
 
 function TilfaCell({ r, b }: { r: ResultRow; b: Bundles }) {
   if (!r.tilfa) return <span className="text-slate-400">none</span>
-  const { segments, labelStack, out, outLink } = r.tilfa
+  const { segments, labelStack, out, outLink, msd, tooDeep } = r.tilfa
   return (
-    <span>
+    <span className={tooDeep ? 'text-slate-500' : ''}>
       {segmentsShort(segments, b)}
       {/* With a bundle, the outgoing link is part of the repair (RFC 9855 §5, D29). */}
       {isBundled(b, r.source, out) && (
@@ -45,6 +53,12 @@ function TilfaCell({ r, b }: { r: ResultRow; b: Bundles }) {
         </span>
       )}
       <span className="block font-mono text-xs text-slate-500">{labelStack.join(' ')}</span>
+      {/* RFC 8491 §5: the PLR can't impose more labels than its MSD (D44). */}
+      {tooDeep && msd !== undefined && (
+        <span className="block text-xs font-semibold text-red-700 dark:text-red-400">
+          ⚠ too deep: {tooDeepText(r.source, labelStack.length, msd)}
+        </span>
+      )}
     </span>
   )
 }

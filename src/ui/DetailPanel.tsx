@@ -12,6 +12,7 @@ import {
   METHOD_NAME,
   segmentText,
   spaceSet,
+  tooDeepText,
   type SpaceKind,
 } from './format'
 import { PacketWalk, type WalkPath } from './PacketWalk'
@@ -249,6 +250,22 @@ export function DetailPanel({
           <dd className="font-mono">{p.tilfa.labelStack.join(', ')}</dd>
           <dt className="text-slate-500">Extra labels</dt>
           <dd>{p.tilfa.extraLabels}</dd>
+          {p.tilfa.msd !== undefined && (
+            <>
+              <dt className="text-slate-500">Max SID depth</dt>
+              {p.tilfa.tooDeep ? (
+                <dd className="font-semibold text-red-700 dark:text-red-400">
+                  ⚠ Too deep: {tooDeepText(source, p.tilfa.labelStack.length, p.tilfa.msd)}.{' '}
+                  {source}&apos;s hardware can&apos;t put this many labels on a packet, so this
+                  backup is not installed.
+                </dd>
+              ) : (
+                <dd>
+                  ✓ {p.tilfa.labelStack.length} ≤ MSD {p.tilfa.msd} of {source}
+                </dd>
+              )}
+            </>
+          )}
         </dl>
       ) : (
         <p className="text-red-700 dark:text-red-400">

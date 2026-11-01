@@ -488,3 +488,32 @@ Worked checks:
 | 2, S–E 1 → 3 | 50% → 50% | 100% → 80% | 100% → 100% | worse: A→C, B→A, B→C, B→E, B→S, C→A |
 
 A property test (random networks, with and without bundles, both P-space settings, a random link given a random metric) checks that each side equals `computeCoverage()` in total and per router, that a router with no listed destination keeps its counts, and that swapping the sides swaps `better` and `worse`.
+
+---
+
+## 14. Max SID depth (TODO backlog, D44)
+Hardware can only put so many labels on a packet. A router advertises this as its **Base MPLS Imposition MSD** (BMI-MSD, RFC 8491 §5). RFC 9855 §3 warns that a TI-LFA repair list can be too long for it. LFA Lab checks every TI-LFA repair against the MSD of the router that imposes it, S (the PLR).
+
+- **Where it comes from:** `msdOf(topology, S)` = S's own `msd`, else the network's `msd`, else no limit. RFC 8491 also has a per-link MSD; LFA Lab models only the node value.
+- **What counts:** labels imposed = labels swapped + labels pushed (RFC 8491 §1.1). S swaps D's own label and pushes the repair list, so the whole label stack of §4.3 counts: `depth = labelStack.length = extraLabels + 1`. For IP traffic S pushes all of them: the same number.
+- **Too deep:** `depth > msd`. The repair is still worked out and shown (path, segments, labels) and marked `tooDeep`, but S can't install it:
+  - it doesn't count as TI-LFA in coverage (§5); it is counted apart as `tooDeep`, so `tilfa + tooDeep` is the TI-LFA count with no limit
+  - the results table's "protected by" skips it (`protectedBy` is `null` unless an ECMP, LFA or Remote LFA protects the pair), and so do the heat map (§12) and what-if diff (§13)
+  - in the simulation's TI-LFA mode the router has no backup for that link: traffic is dropped with reason `too-deep` (§8)
+  - an extra explain step gives the numbers: `3 labels (1 swapped + 2 pushed) > MSD 2 of S ✗`
+- **Range:** 2 to 255. BMI-MSD is one octet (RFC 8491 §2). With 1, S couldn't even push a Remote LFA tunnel (PQ label + D's label), so LFA Lab doesn't model it; LFA and Remote LFA always fit.
+- No limit (the default) changes nothing: every earlier result and worked example stays the same.
+- The greedy walk of §4.2 does not try a shorter list when the first one is too deep. It already takes the furthest Prefix-SID it can at each step; a list with other segments or along another path is out of scope, and LFA Lab always repairs along the post-convergence path (§4.1).
+
+Worked checks (Example 3, `msd: 2`):
+
+| Pair | Label stack | Result |
+|---|---|---|
+| S → E over S–E | 16004, 24005, 16002 (3) | too deep, `protectedBy` = none |
+| S → C over S–E | 16004, 24005, 16005 (3) | too deep |
+| Whole network | | TI-LFA 14/20, too deep 6 (S: 4, A: 1, E: 1); LFA and Remote LFA unchanged (8/20) |
+| `msd: 3` | | nothing is too deep: TI-LFA 20/20 |
+| `msd: 3`, S `msd: 2` | | TI-LFA 16/20, too deep 4 (all S's) |
+| Simulation, S–E down, TI-LFA mode | | traffic to C and E dropped at S, reason `too-deep` |
+
+A property test (random networks, MSD 2 to 4) checks that `tilfa + tooDeep` equals the TI-LFA count with no limit, that the other counts don't change, and that a repair is `tooDeep` exactly when its stack is longer than the MSD.

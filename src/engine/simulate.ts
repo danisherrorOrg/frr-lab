@@ -54,8 +54,12 @@ export interface Drop {
   /** The failed link, and the router on its far side. */
   link: string
   next: NodeId
-  /** `no-backup`: no backup for that link. `backup-down`: the backup's own first link is down too. */
-  reason: 'no-backup' | 'backup-down'
+  /**
+   * `no-backup`: no backup for that link. `too-deep`: the TI-LFA backup's label stack
+   * is deeper than the router's MSD, so it isn't installed (D44). `backup-down`: the
+   * backup's own first link is down too.
+   */
+  reason: 'no-backup' | 'too-deep' | 'backup-down'
 }
 
 /**
@@ -560,7 +564,9 @@ function forward(
         : undefined
     const r = viaNormal ?? repairAt(table, resultsAt(at), down, target, mode, isUp, prefixOf)
     if (r === undefined) {
-      return { ...sofar(), delivered: false, drop: { at, link: down, next, reason: 'no-backup' } }
+      const reason =
+        mode === 'tilfa' && tooDeepAt(resultsAt(at), down, target) ? 'too-deep' : 'no-backup'
+      return { ...sofar(), delivered: false, drop: { at, link: down, next, reason } }
     }
     repairs.push({ at, link: down, next, target, method: r.method, atIndex: path.length - 1 })
     stack = [...r.instrs, ...stack.slice(1)]
@@ -627,8 +633,9 @@ function repairAt(
   }
 
   if (mode === 'tilfa') {
-    const { path, outLink, segments } = p.tilfa
-    if (!path || !outLink || !segments) return undefined
+    const { path, outLink, segments, tooDeep } = p.tilfa
+    // Deeper than the router's MSD: never installed (D44).
+    if (!path || !outLink || !segments || tooDeep === true) return undefined
     // Out of the post-convergence first-hop interface, then the segment list (RFC 9855 §5.1).
     const segs = segments.map((s): Instr =>
       s.kind === 'prefix' ? { to: s.node, seg: s } : { hop: s.to, link: s.link, seg: s },
@@ -651,6 +658,12 @@ function repairAt(
     return { method: 'rlfa', instrs: [...tunnel, { to: t, seg: prefixOf(t) }] }
   }
   return undefined
+}
+
+/** The router's TI-LFA backup for target `t` over link `failed` exists but is deeper than its MSD. */
+function tooDeepAt(results: DestinationResult[], failed: string, t: NodeId): boolean {
+  const r = results.find((x) => x.dest === t)
+  return r?.protections.find((x) => x.protectedLink.id === failed)?.tilfa.tooDeep === true
 }
 
 /**

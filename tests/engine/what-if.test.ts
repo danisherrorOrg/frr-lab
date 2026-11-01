@@ -17,6 +17,7 @@ const c = (pairs: number, ecmp: number, lfa: number, rlfa: number, tilfa: number
   lfa,
   rlfa,
   tilfa,
+  tooDeep: 0,
 })
 
 // Worked checks, docs/02-algorithms.md §13.

@@ -43,6 +43,15 @@ function TopologyForm({ topology: t }: { topology: Topology }) {
         hint="Prefix label = SRGB base + SID index"
         onCommit={(v) => update({ srgbBase: toNumber(v) })}
       />
+      <Field
+        key={`msd:${t.msd ?? ''}`}
+        label="Max SID depth (MSD)"
+        value={t.msd === undefined ? '' : String(t.msd)}
+        placeholder="no limit"
+        inputMode="numeric"
+        hint="Most labels a router can push. Deeper TI-LFA repairs are flagged."
+        onCommit={(v) => update({ msd: v.trim() === '' ? null : toNumber(v) })}
+      />
       <p className="text-xs text-slate-500">
         {t.nodes.length} routers, {t.links.length} links. Click a router or link to edit it.
       </p>
@@ -75,6 +84,15 @@ function RouterForm({ node, topology: t }: { node: RouterNode; topology: Topolog
         inputMode="numeric"
         hint={`Label ${t.srgbBase + node.sidIndex}`}
         onCommit={(v) => update(node.id, { sidIndex: toNumber(v) })}
+      />
+      <Field
+        key={`msd:${node.id}:${node.msd ?? ''}`}
+        label="Max SID depth (MSD)"
+        value={node.msd === undefined ? '' : String(node.msd)}
+        placeholder={t.msd === undefined ? 'no limit' : `network (${t.msd})`}
+        inputMode="numeric"
+        hint="Empty = the network's value"
+        onCommit={(v) => update(node.id, { msd: v.trim() === '' ? null : toNumber(v) })}
       />
       <button type="button" className={danger} onClick={remove}>
         Delete router

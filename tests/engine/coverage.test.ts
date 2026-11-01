@@ -19,15 +19,15 @@ describe('coverage: one source', () => {
   it('01-square from S: every pair has an LFA', () => {
     const r = computeCoverage(loadFixture('01-square.yaml'), { sources: ['S'] })
     expect(r.sources).toEqual([
-      { source: 'S', counts: { pairs: 3, ecmp: 0, lfa: 3, rlfa: 3, tilfa: 3 } },
+      { source: 'S', counts: { pairs: 3, ecmp: 0, lfa: 3, rlfa: 3, tilfa: 3, tooDeep: 0 } },
     ])
-    expect(r.total).toEqual({ pairs: 3, ecmp: 0, lfa: 3, rlfa: 3, tilfa: 3 })
+    expect(r.total).toEqual({ pairs: 3, ecmp: 0, lfa: 3, rlfa: 3, tilfa: 3, tooDeep: 0 })
     expect(r.unprotected).toEqual([])
   })
 
   it('02-ring5 from S: LFA protects C and B, RLFA also protects E and A', () => {
     const r = computeCoverage(loadFixture('02-ring5.yaml'), { sources: ['S'] })
-    expect(r.total).toEqual({ pairs: 4, ecmp: 0, lfa: 2, rlfa: 4, tilfa: 4 })
+    expect(r.total).toEqual({ pairs: 4, ecmp: 0, lfa: 2, rlfa: 4, tilfa: 4, tooDeep: 0 })
     expect(r.unprotected).toEqual([
       {
         source: 'S',
@@ -54,7 +54,7 @@ describe('coverage: one source', () => {
 
   it('03-ring5-highmetric from S: only TI-LFA protects anything', () => {
     const r = computeCoverage(loadFixture('03-ring5-highmetric.yaml'), { sources: ['S'] })
-    expect(r.total).toEqual({ pairs: 4, ecmp: 0, lfa: 0, rlfa: 0, tilfa: 4 })
+    expect(r.total).toEqual({ pairs: 4, ecmp: 0, lfa: 0, rlfa: 0, tilfa: 4, tooDeep: 0 })
     expect(r.unprotected.map((u) => [u.dest, u.link.to, u.reason])).toEqual([
       ['A', 'A', 'no-rlfa'],
       ['B', 'A', 'no-rlfa'],
@@ -76,14 +76,14 @@ describe('coverage: all sources', () => {
       ['N', 3, 3, 3],
       ['S', 3, 3, 3],
     ])
-    expect(r.total).toEqual({ pairs: 12, ecmp: 0, lfa: 8, rlfa: 12, tilfa: 12 })
+    expect(r.total).toEqual({ pairs: 12, ecmp: 0, lfa: 8, rlfa: 12, tilfa: 12, tooDeep: 0 })
   })
 
   it('02-ring5: every router sees the same 4 pairs, LFA 2, RLFA 4', () => {
     const r = computeCoverage(loadFixture('02-ring5.yaml'))
     for (const s of r.sources)
-      expect(s.counts).toEqual({ pairs: 4, ecmp: 0, lfa: 2, rlfa: 4, tilfa: 4 })
-    expect(r.total).toEqual({ pairs: 20, ecmp: 0, lfa: 10, rlfa: 20, tilfa: 20 })
+      expect(s.counts).toEqual({ pairs: 4, ecmp: 0, lfa: 2, rlfa: 4, tilfa: 4, tooDeep: 0 })
+    expect(r.total).toEqual({ pairs: 20, ecmp: 0, lfa: 10, rlfa: 20, tilfa: 20, tooDeep: 0 })
   })
 
   it('totals are the sum of the per-source rows', () => {
@@ -126,7 +126,7 @@ describe('coverage: details', () => {
     const { counts } = summarizeSource('S', computeForSource(t, 'S', { explain: false }))
     // D over S–A and S–B: the other next hop protects (ECMP). A and B: B is not
     // loop-free for A (dist(B,A)=2 < dist(B,S)+dist(S,A)=1+1 ✗), RLFA is.
-    expect(counts).toEqual({ pairs: 4, ecmp: 2, lfa: 2, rlfa: 4, tilfa: 4 })
+    expect(counts).toEqual({ pairs: 4, ecmp: 2, lfa: 2, rlfa: 4, tilfa: 4, tooDeep: 0 })
   })
 
   it('a bridge link: partitioned, nothing protects', () => {
@@ -138,7 +138,7 @@ describe('coverage: details', () => {
       ],
     )
     const r = computeCoverage(t, { sources: ['S'] })
-    expect(r.total).toEqual({ pairs: 2, ecmp: 0, lfa: 0, rlfa: 0, tilfa: 0 })
+    expect(r.total).toEqual({ pairs: 2, ecmp: 0, lfa: 0, rlfa: 0, tilfa: 0, tooDeep: 0 })
     expect(r.unprotected.map((u) => [u.dest, u.reason, u.text])).toEqual([
       ['A', 'partitioned', 'A can’t be reached once S–A fails: the link is a bridge'],
       ['E', 'partitioned', 'E can’t be reached once S–A fails: the link is a bridge'],

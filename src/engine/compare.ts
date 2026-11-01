@@ -5,6 +5,7 @@ import { edgeOf } from './graph'
 import { prefixLabel } from './labels'
 import { computeLfa, ecmpProtectorLinks, primaryLink } from './lfa'
 import { hopLinks, lfaPath, rlfaPath } from './paths'
+import { isTooDeep, msdOf } from './msd'
 import { computeRlfa } from './rlfa'
 import type { Method } from './rows'
 import { allPairs, dist } from './spf'
@@ -40,6 +41,10 @@ export interface BackupOption {
   segments?: Segment[]
   /** Labels on top of D's own one. */
   extraLabels?: number
+  /** TI-LFA: S's max SID depth, when one is set (RFC 8491 §5). */
+  msd?: number
+  /** TI-LFA: the stack is deeper than `msd`, so S can't install it and it isn't `used` (D44). */
+  tooDeep?: boolean
   vsFinal?: VsFinal
   /** LFA: the neighbor N. Remote LFA: the PQ node. */
   via?: NodeId
@@ -160,7 +165,11 @@ export function compareBackups(
   })
 
   // TI-LFA (RFC 9855): the post-convergence path, with its segment list.
-  const tiOpt = option('tilfa', final, tilfa.segments ?? [], {})
+  const msd = msdOf(topology, s)
+  const tiOpt = option('tilfa', final, tilfa.segments ?? [], {
+    ...(msd !== undefined && { msd }),
+    ...(isTooDeep(tilfa.labelStack ?? [], msd) && { tooDeep: true }),
+  })
 
   const ecmp = ecmpProtectorLinks(table, s, d, e, link).length > 0
   const protectedBy: Method | null = ecmp
@@ -169,7 +178,7 @@ export function compareBackups(
       ? 'lfa'
       : rlfaOpt.found
         ? 'rlfa'
-        : tiOpt.found
+        : tiOpt.found && tiOpt.tooDeep !== true
           ? 'tilfa'
           : null
   const opts: BackupComparison['options'] = [lfaOpt, rlfaOpt, tiOpt]

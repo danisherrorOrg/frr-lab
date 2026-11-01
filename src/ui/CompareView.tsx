@@ -3,7 +3,15 @@ import type { BackupComparison, BackupOption, CompareMethod } from '../engine/co
 import type { ProtectionPaths } from '../engine/paths'
 import type { NodeId, Topology } from '../engine/types'
 import { useStore, type BackupKind } from '../state/store'
-import { bundles, hopName, linkName, METHOD_NAME, segmentText, type Bundles } from './format'
+import {
+  bundles,
+  hopName,
+  linkName,
+  METHOD_NAME,
+  segmentText,
+  tooDeepText,
+  type Bundles,
+} from './format'
 import { MiniMap } from './MiniMap'
 
 interface Props {
@@ -148,6 +156,14 @@ function Card({
           <dd>
             <Mono>{o.segments!.map((x) => x.label).join(', ')}</Mono> ({o.extraLabels} extra)
           </dd>
+          {o.tooDeep && o.msd !== undefined && (
+            <>
+              <dt className="text-slate-500">MSD</dt>
+              <dd className="font-semibold text-red-700 dark:text-red-400">
+                ⚠ Too deep: {tooDeepText(c.s, o.segments!.length, o.msd)}, not installed
+              </dd>
+            </>
+          )}
           <dt className="text-slate-500">vs final</dt>
           <dd>{vsFinal(c, o)}</dd>
         </dl>

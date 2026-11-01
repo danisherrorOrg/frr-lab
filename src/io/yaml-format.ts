@@ -7,6 +7,9 @@ export const DEFAULT_SRGB_BASE = 16000
 export const MAX_METRIC = 16_777_215
 // MPLS labels are 20 bits (RFC 3032 §2.1).
 export const MAX_LABEL = 1_048_575
+// BMI-MSD is one octet (RFC 8491 §2). Below 2, even a Remote LFA tunnel (PQ + D) can't be pushed.
+export const MIN_MSD = 2
+export const MAX_MSD = 255
 /** Router ids: letters, digits, "_" and "." ("-" joins the two ends in link ids, D14). */
 export const ID_PATTERN = /^[A-Za-z0-9_.]+$/
 
@@ -34,6 +37,13 @@ export const TOP_FIELDS: FieldDoc[] = [
     what: 'First label of the SR global block',
     rule: `Whole number 0 to ${fmt(MAX_LABEL)}. Default ${DEFAULT_SRGB_BASE}. Prefix label = srgb_base + sid.`,
     example: 'srgb_base: 16000',
+  },
+  {
+    key: 'msd',
+    required: false,
+    what: 'Max SID depth of every router',
+    rule: `Whole number ${MIN_MSD} to ${MAX_MSD}: the most labels a router can put on a packet (RFC 8491). Left out = no limit. A TI-LFA repair with more labels is flagged and not counted.`,
+    example: 'msd: 3',
   },
   {
     key: 'nodes',
@@ -67,6 +77,13 @@ export const NODE_FIELDS: FieldDoc[] = [
     example: 'sid: 1',
   },
   { key: 'name', required: false, what: 'Display name', rule: 'Text.', example: 'name: Core-1' },
+  {
+    key: 'msd',
+    required: false,
+    what: 'Max SID depth of this router',
+    rule: `Whole number ${MIN_MSD} to ${MAX_MSD}. Overrides the top-level msd for this router.`,
+    example: 'msd: 2',
+  },
   {
     key: 'pos',
     required: false,
@@ -143,6 +160,8 @@ export const KEY_ALIASES: Record<string, string> = {
   cost_ba: 'metric_ba',
   reverse_metric: 'metric_ba',
   adj_sid: 'adj_sid_ab',
+  max_sid_depth: 'msd',
+  bmi_msd: 'msd',
 }
 
 /** A small file that loads, shown first in the guide. */

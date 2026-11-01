@@ -139,6 +139,24 @@ describe('updateTopology', () => {
     expect(ok(updateTopology(square(), { srgbBase: 20000 })).srgbBase).toBe(20000)
     expect(updateTopology(square(), { srgbBase: -1 })).toMatchObject({ ok: false })
   })
+
+  it('sets and clears the max SID depth, 2 to 255 (D44)', () => {
+    const t = ok(updateTopology(square(), { msd: 3 }))
+    expect(t.msd).toBe(3)
+    expect(ok(updateTopology(t, { msd: null }))).not.toHaveProperty('msd')
+    for (const bad of [1, 256, 2.5])
+      expect(updateTopology(square(), { msd: bad })).toMatchObject({ ok: false })
+  })
+})
+
+describe('updateRouter: max SID depth', () => {
+  it("sets a router's own MSD and clears it back to the network's (D44)", () => {
+    const t = ok(updateRouter(square(), 'S', { msd: 2 }))
+    expect(t.nodes.find((n) => n.id === 'S')!.msd).toBe(2)
+    const cleared = ok(updateRouter(t, 'S', { msd: null }))
+    expect(cleared.nodes.find((n) => n.id === 'S')).not.toHaveProperty('msd')
+    expect(updateRouter(square(), 'S', { msd: 0 })).toMatchObject({ ok: false })
+  })
 })
 
 describe('withPositions', () => {

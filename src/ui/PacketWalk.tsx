@@ -134,7 +134,9 @@ function actionText(
       const l = linkName(b, a.drop.at, a.drop.next, a.drop.link)
       return a.drop.reason === 'no-backup'
         ? `Link ${l} is down and ${r} has no backup for it: the packet is dropped here.`
-        : `The backup's own first link ${l} is down too, and a router holds only one backup: the packet is dropped here.`
+        : a.drop.reason === 'too-deep'
+          ? `Link ${l} is down and ${r}'s TI-LFA backup needs more labels than its max SID depth, so it was never installed: the packet is dropped here.`
+          : `The backup's own first link ${l} is down too, and a router holds only one backup: the packet is dropped here.`
     }
     case 'loop':
       return a.exact
