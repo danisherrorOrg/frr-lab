@@ -1,6 +1,6 @@
 # TODO
 
-The step-by-step task list for building LFA Lab v0.1. It follows the phase order in
+The step-by-step task list for building LFA Lab, from the v0.1 MVP through the v0.2 work to launch. It follows the phase order in
 [`docs/04-roadmap.md`](docs/04-roadmap.md) but breaks each phase into small tasks with a
 clear "done when".
 
@@ -315,10 +315,13 @@ Things that fit the "learn and check FRR" goal and stay offline / no backend.
 
 > **Do this last:** launch only after Phase 9 and the other planned work are done.
 
-- [ ] Pick Vercel or GitHub Pages; log it in `DECISIONS.md`
-- [ ] Deploy the static build
+- [ ] Pick Vercel or GitHub Pages; log it in `DECISIONS.md` (next entry: D60)
+- [ ] For GitHub Pages only: set `base` in `vite.config.ts` to the repo path so the built files load
+- [ ] Deploy the static build; check it still works offline after first load
 - [ ] Record a demo GIF; take screenshots
-- [ ] Update the README: status, live link, GIF, how to run locally
-- [ ] Tag release `v0.1.0`
+- [ ] Update the README: status, live link, GIF, screenshots, a "how to run locally" section, and replace "What it will do (MVP)" with what the app does now
+- [ ] Set `version` in `package.json` to `0.2.0` and tag release `v0.2.0` (MVP + Phase 9 + ideas backlog + Later list)
 - [ ] Blog / LinkedIn post: "TI-LFA explained with pictures" (use Examples 2 and 3)
-- [ ] Add `projects/lfa-lab.md` + an `INDEX.md` row in the profile folder; update the resume bullet
+- [ ] Add `projects/lfa-lab.md` + a row in `projects/INDEX.md` in `Profiles/DanishMahajan/`; add an LFA Lab bullet to the resume
+
+**Done when:** the live link loads and works offline, the README shows it, and the `v0.2.0` tag is pushed.

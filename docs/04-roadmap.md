@@ -61,15 +61,6 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 
 🎯 **Milestone B: MVP (v0.1).**
 
-## Phase 8 – Launch (1–2 days)
-
-> **Do this last:** launch only after Phase 9 and the other planned work are done.
-
-- [ ] Deploy (Vercel / GitHub Pages)
-- [ ] README with a demo GIF and screenshots
-- [ ] Blog / LinkedIn post: "TI-LFA explained with pictures" (use Examples 2 and 3)
-- [ ] Add `projects/lfa-lab.md` + an `INDEX.md` row in the profile folder; update the resume bullet
-
 ## Phase 9 – User feedback, v0.2
 - [x] Close button / Escape for the detail panel
 - [x] Fail several links; follow traffic hop by hop as each router repairs its own failed link (D23, D24)
@@ -85,5 +76,15 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 4. [x] Quiz mode for students *(D54)*
 5. [x] LAN links / pseudonodes, multi-level IS-IS *(D55, D56)*
 6. [x] Microloop view, Flex-Algo, SRv6 *(D57–D59)*
+
+## Phase 10 – Launch (1–2 days)
+
+> **Do this last:** launch only after Phase 9 and the other planned work are done.
+
+- [ ] Pick a host (Vercel / GitHub Pages), log it in DECISIONS.md, deploy
+- [ ] README with a live link, demo GIF, screenshots and how to run locally
+- [ ] Set version `0.2.0` and tag release `v0.2.0`
+- [ ] Blog / LinkedIn post: "TI-LFA explained with pictures" (use Examples 2 and 3)
+- [ ] Add `projects/lfa-lab.md` + an `INDEX.md` row in the profile folder; add an LFA Lab resume bullet
 
 **Total MVP estimate:** about 3–4 weeks part-time.
