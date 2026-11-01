@@ -1,7 +1,14 @@
 // Compact results-table rows (Phase 9.6). The "All routers" view holds every router's
 // rows at once, so a row keeps only what the table shows: no LFA candidates, P/Q
 // spaces or explain steps. The detail panel still asks for one source's full results.
-import type { DestinationResult, NodeId, Protection, Segment } from './types'
+import type {
+  DestinationResult,
+  NodeFallback,
+  NodeId,
+  Protection,
+  Protects,
+  Segment,
+} from './types'
 
 export type Method = 'ecmp' | 'lfa' | 'rlfa' | 'tilfa'
 
@@ -31,7 +38,8 @@ export interface ResultRow {
   /** The chosen LFA and the link S uses to reach it. */
   lfa?: { neighbor: NodeId; link: string; nodeProtecting: boolean }
   /** `needed` = false when an LFA already protects D (the spaces are only shown). */
-  rlfa: { needed: boolean; pq?: NodeId; via?: NodeId }
+  /** `protects` / `fallback`: node mode only, what the PQ node's tunnel avoids (D51). */
+  rlfa: { needed: boolean; pq?: NodeId; via?: NodeId; protects?: Protects; fallback?: NodeFallback }
   /**
    * `out` is the first router after S, `outLink` the link to it (RFC 9855 §5).
    * `tooDeep`: the stack is longer than S's `msd`, so it is not installed (D44).
@@ -43,6 +51,11 @@ export interface ResultRow {
     outLink: string
     msd?: number
     tooDeep?: boolean
+    /** SRv6 networks: the repair list as SIDs (D59). */
+    srv6?: string[]
+    /** Node mode only: does the repair avoid router E (D51)? */
+    protects?: Protects
+    fallback?: NodeFallback
   }
   protectedBy: Method | null
 }
@@ -71,6 +84,8 @@ export function toRows(source: NodeId, results: DestinationResult[]): ResultRow[
           needed: rlfa.needed,
           ...(pq !== undefined && { pq }),
           ...(via !== undefined && { via }),
+          ...(pq !== undefined && rlfa.protects !== undefined && { protects: rlfa.protects }),
+          ...(pq !== undefined && rlfa.fallback !== undefined && { fallback: rlfa.fallback }),
         },
         ...(tilfa.segments &&
           out !== undefined &&
@@ -82,6 +97,9 @@ export function toRows(source: NodeId, results: DestinationResult[]): ResultRow[
               outLink: tilfa.outLink,
               ...(tilfa.msd !== undefined && { msd: tilfa.msd }),
               ...(tilfa.tooDeep === true && { tooDeep: true }),
+              ...(tilfa.srv6 !== undefined && { srv6: tilfa.srv6 }),
+              ...(tilfa.protects !== undefined && { protects: tilfa.protects }),
+              ...(tilfa.fallback !== undefined && { fallback: tilfa.fallback }),
             },
           }),
         protectedBy: protectedBy(p),

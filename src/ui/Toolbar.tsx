@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { shareHash } from '../io/share-url'
 import { parseTopology, serializeTopology } from '../io/yaml'
 import { EXAMPLES } from '../state/examples'
-import { useStore } from '../state/store'
+import { fullTopology, useStore } from '../state/store'
 import { downloadText } from './download'
 import { fileName } from './format'
 import { applyTheme, currentTheme, type Theme } from './theme'
@@ -12,8 +12,10 @@ const button =
 
 /** Put the topology in the page URL and copy the link. Nothing is uploaded (F2). */
 async function share() {
-  const { topology, source, setNotice } = useStore.getState()
-  const hash = shareHash(topology, source)
+  const st = useStore.getState()
+  const { source, setNotice } = st
+  // The whole network, also while one IS-IS level is shown (D56).
+  const hash = shareHash(fullTopology(st), source)
   window.history.replaceState(null, '', hash)
   const url = window.location.href
   const note = `Anyone who opens it sees this topology. The data is inside the link itself (${url.length} characters); nothing is uploaded.`
@@ -65,7 +67,7 @@ export function Toolbar() {
   }
 
   const exportFile = () => {
-    const t = useStore.getState().topology
+    const t = fullTopology(useStore.getState())
     downloadText(fileName(t.name), serializeTopology(t), 'text/yaml')
   }
 
@@ -95,6 +97,14 @@ export function Toolbar() {
       </button>
       <button type="button" className={button} onClick={() => fileInput.current?.click()}>
         Import YAML
+      </button>
+      <button
+        type="button"
+        className={button}
+        onClick={() => useStore.getState().setFrrImport(true)}
+        title='Paste FRR "show isis database detail" output'
+      >
+        Import FRR…
       </button>
       <input
         ref={fileInput}

@@ -95,6 +95,33 @@ The choice doesn't depend on D: E's Q-space stands in for every destination behi
 
 Checked against RFC 7490 §5.2–5.4 on 2026-10-30 (D17). The RFC's Q-space formula writes `dist(S,E)` where we write `c(S,E)`; they are equal whenever S–E is a primary link.
 
+### 3.1 Node protection (RFC 8102, Later #1, D51)
+With `protection: node`, Remote LFA looks for a PQ node whose whole repair also survives **router E** failing. Checked against RFC 8102 §2 on 2026-11-01. Unlike link protection this depends on D, so it is worked out per (D, link S–E) and only when D ≠ E.
+
+For each router Y in E's Q-space of §3 (RFC 8102 §2.2.3 uses the link's Q-space):
+1. **Node-protecting P-space** (§2.2.2): the tunnel to Y avoids E. Either S's own normal path, `dist(S,Y) < dist(S,E) + dist(E,Y)`, or through a neighbor N ≠ E (the same tunnel exits as §3: no max metric, no overload bit):
+   ```
+   dist(N,Y) < dist(N,E) + dist(E,Y)        and   dist(N,Y) < dist(N,S) + dist(S,Y)
+   ```
+   The second test is the link rule of §3: the tunnel never comes back through S (D17). RFC 8102 §2.2.6.2 only states the first; keeping both is stricter, never looser. The cheapest way in is kept: `dist(S,Y)`, or `c(S,N) + dist(N,Y)`, lowest neighbor id on ties.
+2. **Y's own path to D avoids E** (§2.3.2):
+   ```
+   dist(Y,D) < dist(Y,E) + dist(E,D)
+   ```
+   A tie counts as "may use E", like Inequality 3.
+3. Y is not overloaded (RFC 7490 §5.4).
+
+The node-protecting PQ nodes are the ones that pass all three. **Best:** lowest cost from S (the cheapest way in of step 1), then lowest router id (RFC 8102 §2.3.4). The rule that prefers a PQ node covering more ECMP next hops (§2.3.3–2.3.4) is not modelled: LFA Lab protects each primary link on its own.
+
+**Which one is used:** as in §3, Remote LFA only runs when there is no LFA. Then the node-protecting PQ node if there is one (`rlfa.protects = node`), else the link-protecting one of §3 (`protects = link`, `fallback = none`; `dest-is-next-hop` when D = E). RFC 8102 gives no fallback rule (D51). LFAs are not changed: to prefer or require node-protecting LFAs use the LFA policy (§15).
+
+Example 8 (§4.4 has the topology), S → D over S–E:
+- No LFA: N, `dist(N,D)=6 < dist(N,S)+dist(S,D) = 2+4` ✗.
+- Q-space (link): {B, C, D}. Link PQ = {B, C}, best **B** via N (cost 5), but B's path to D is B-E-D.
+- Node P-space: B via N (`3 < dist(N,E)+dist(E,B) = 4+1`), C via N (`6 < 4+4`); D: own `4 < 2+2` ✗, via N `6 < 4+2` ✗.
+- Path to D: B `dist(B,D)=3 < dist(B,E)+dist(E,D) = 1+2` ✗; C `3 < 4+2` ✓.
+- **Node-protecting PQ = {C}, best C via N (cost 8).** The repair S-N-B-C-D costs 11. With router E failed, it gets through, where the link-protecting tunnel to B breaks at B.
+
 ---
 
 ## 4. TI-LFA (Segment Routing): link protection
@@ -133,12 +160,23 @@ while current != D:
 - Adj-SID label = value from the topology file, or auto-assigned: Adj-SIDs are local to each router (RFC 8402 §3.4), so each router numbers its own links from 24000 in neighbor-ID order (then link-id order for parallel links), skipping labels it already uses (D18). Each link of a bundle has its own Adj-SID, so an Adj-SID segment names its link (§9).
 - Show the stack top-first, before any penultimate-hop popping (state this in the UI). So RFC 9855 §7.1 rule 1 (pop the destination label when PHP is on and the list ends at the penultimate hop) is not shown.
 
-### 4.4 Node protection (v0.2)
-Same as above, but remove node E (all its links) for the post-convergence SPF, and the avoid-check becomes "all normal shortest paths current→Y avoid node E":
+### 4.4 Node protection (Later #1, D51)
+With `protection: node` (network setting, §3.1 for Remote LFA), TI-LFA plans for router E failing: remove **node E** (all its links) for the post-convergence SPF (RFC 9855 §2.1, `SPT_new(S, E)`; Appendix A: "the expected post-convergence path … considering that the node has failed"). The greedy walk of §4.2 is unchanged except check (b), which becomes "all normal shortest paths current→Y avoid node E":
 ```
-dist(X,Y) < dist(X,E) + dist(E,Y)
+dist(X,Y) < dist(X,E) + dist(E,Y)        (∞ when E has the overload bit, §16)
 ```
-If D == E, node protection doesn't apply (fall back to link protection).
+E is not on the post-convergence path, so it is never an end of a segment, and (b) also rules out the link S–E. An Adj-SID can't name a link of E for the same reason.
+- **D = E:** node protection can't apply (E is the destination), so the repair is the link-protecting one, marked `fallback: dest-is-next-hop`.
+- **D cut off without E** (E is a cut vertex for D): link-protecting repair, `fallback: none`. RFC 9855 gives no rule here; falling back keeps traffic protected against the link failure (D51).
+- `Protection.tilfa.protects` says which one is installed (`node` or `link`). It is set only in node mode, so link-mode results are unchanged.
+- The repair can cost more than S's final path after a *link* failure (it also avoids E), so in node mode "TI-LFA is always `same`" (§8 step 6, §10) no longer holds.
+
+Example 8 (`examples/08-node-protection.yaml`): S–E 2, S–N 2, E–B 1, E–D 2, N–B 3, B–C 3, C–D 3; S → D over S–E.
+- Link protection: S-N-B-E-D (8), `[PrefixSID(B), PrefixSID(D)]` = `16004, 16006`: goes through E.
+- Node protection: E removed, S-N-B-C-D (11). From S: B fails (a) (`dist(S,B)=3`, path 5); N passes (`2 < dist(S,E)+dist(E,N) = 2+4`) and is dropped (first hop). From N: D fails (a) (`6`, path 9); C passes (`6 < 4+4`). From C: D (`3 < 4+2`). **`[PrefixSID(C), PrefixSID(D)]` = `16005, 16006`**, out via N.
+- S → E: D = E, link protection: S-N-B-E, `[PrefixSID(B), PrefixSID(E)]`.
+
+Example 6 with `protection: node`: S → D: E removed, S-N-M-D (21). From S: M (`11 = 11`, `11 < 1+11`); from M: D (`10 < 11+1`). `[PrefixSID(M), PrefixSID(D)]` = `16004, 16005`. With router E failed, the traffic is delivered on S-N-M-D instead of looping (§8.1, §10.1).
 
 ### 4.5 Packet walk (TODO backlog, D34, D35)
 `packetWalk()` (`src/engine/packet-walk.ts`) follows one packet along the repair from §4.2, router by router, and records the label stack each router receives and sends (top first). It is a teaching view; it changes no result.
@@ -179,6 +217,7 @@ TI-LFA coverage = protected-by-TI-LFA pairs / all pairs   (should be 100% unless
 Counting details (D19):
 - A pair is (D, primary next-hop link S–E). D with two ECMP next hops gives two pairs. Routers S can't reach give none.
 - "Protected by LFA" means a best LFA exists. ECMP-protected pairs are also counted on their own; they are always LFA-protected too (§2).
+- Node mode (§3.1, §4.4, D51) adds `node`: the pairs with D ≠ E, and of those the ones whose LFA-or-Remote-LFA backup avoids E (a node-protecting LFA, else a node-protecting PQ node) and whose installed TI-LFA repair does. Example 8 from S: 3 pairs (B, C, D via E), 3 and 3.
 - The unprotected list holds every pair LFA doesn't protect, with the reason from the strongest method that fails: `no-lfa` (RLFA or TI-LFA protects it), `no-rlfa` (only TI-LFA), `partitioned` (nothing: the link is a bridge for D).
 
 **Every router as the DUT (Phase 9.6, D31).** `computeAllSources()` runs the same `computeForSource()` for every router and keeps one compact row per pair (`ResultRow` in `src/engine/rows.ts`): cost, next hop and link, the chosen LFA, PQ node and exit, TI-LFA segments and labels, and `protectedBy`, the simplest method that protects the pair in the order above (ECMP, LFA, Remote LFA, TI-LFA). Nothing is recomputed differently, so each router's rows equal its own single-source table (tested on Example 4).
@@ -278,7 +317,7 @@ Worked check, ECMP with two members down (Example 5, source SP1, fail L1–SP1 a
 Worked check, a third path (S–E 10, E–D 10, S–A 10, A–D 15, A–B 10, B–D 10; fail S–E and A–D, TI-LFA): S's backup S→A→D runs into A–D at A; A's own backup A→B→D avoids both failures, so traffic reaches D on S→A→B→D (cost 30), which is also the final path.
 
 ### 8.1 Router failure (Phase 9.3, D27)
-A failed router E takes all its links down at once and its Prefix-SID stops working. The simulation treats it as "every link of E is down", so the hop-by-hop walk above is unchanged. E's neighbors only see their own link fail, so they use the **link-protecting** backup they built for that link; nobody plans for E itself (node protection is Later #1, §4.4).
+A failed router E takes all its links down at once and its Prefix-SID stops working. The simulation treats it as "every link of E is down", so the hop-by-hop walk above is unchanged. E's neighbors only see their own link fail, so they use the backup they built for that link. By default that is **link-protecting**: nobody plans for E itself. With `protection: node` (§3.1, §4.4) Remote LFA and TI-LFA backups avoid E where they can, so they survive.
 
 For every destination D:
 - **D = E:** unreachable. That is expected, so it is shown on its own line, not as a protection failure. No repair is followed.
@@ -415,7 +454,7 @@ Worked checks:
 | Example 6, S→D, router E | delivered S-N-M-D, 21 (S, then N repair; S's LFA N breaks at E) | same as LFA only (an LFA exists) | loops S→N→S: the backup `[Prefix D]` out via N goes back through E |
 | Example 4, PE1→P3, links PE1–P1 and P2–P4 | dropped at PE1 | delivered, 70, longer than 50 | delivered, 100 (PE1, P2, then PE1 again repair), longer than 50 |
 
-Example 6 is the lesson: with a router down, link-protecting TI-LFA can do worse than plain LFA, because each router repairs only its own link (RFC 9855 §1; node protection is Later #1).
+Example 6 is the lesson: with a router down, link-protecting TI-LFA can do worse than plain LFA, because each router repairs only its own link (RFC 9855 §1). With `protection: node` (§4.4) TI-LFA delivers on S-N-M-D (21).
 
 ---
 
@@ -450,7 +489,7 @@ A property test (random networks, with and without bundles) checks that the rows
 ## 12. Coverage heat map (TODO backlog, D42)
 `coverageMap()` (`src/engine/heat-map.ts`) gives the §5 coverage numbers grouped two ways, so the canvas can colour each router and link by how well it is protected. It decides nothing new: it runs `computeForSource()` once per router (as "all sources" coverage does) and counts each (D, link S–E) pair twice.
 
-- **Per router R:** the pairs R repairs as the router before a failed link (the PLR), i.e. R's own coverage row (§5). This is link protection, so it answers "if one of R's links fails, how much of R's traffic has a backup", not "what if R fails" (node protection is Later #1).
+- **Per router R:** the pairs R repairs as the router before a failed link (the PLR), i.e. R's own coverage row (§5). This is link protection, so it answers "if one of R's links fails, how much of R's traffic has a backup", not "what if R fails". In node mode (§4.4) the backups counted are the node-protecting ones where they exist.
 - **Per link:** the pairs whose protected link is this one, both directions added up. Each is a row of the router before the link (FRR is local repair, §11), so the link's numbers are the per-link view's rows counted. A link on no shortest path has 0 pairs: it can only be a backup.
 
 Every pair belongs to exactly one router and one link, so both groupings add up to the all-sources total.
@@ -640,3 +679,152 @@ A test checks every example, every mode, and random networks (with bundles and o
 | Example 6, TI-LFA | **router E**: 2 of 4 flows loop (the §8.1 lesson: link-protecting TI-LFA with a router down) |
 | Example 6, LFA only | link E–D 5 of 8 dropped; router E: 0 of 4 (N's node-protecting LFA M takes over) |
 | Example 1, N overloaded, TI-LFA | link E–D first: it cuts N off from E and S |
+
+---
+
+## 18. SRLG: links that fail together (Later #3, D53)
+A **shared risk link group** (RFC 4202 §2.3) names a risk several links share: one fibre duct, one optical system, one line card. A link lists its groups (`srlg: [duct-1]`); two links share a risk when they have a name in common. Checked against RFC 9855 §1 and RFC 7916 §6.2.4.1 on 2026-11-01.
+
+**Failing an SRLG** is the multi-failure of §8 with every link of the group down: the link form and the right-click menu have "Fail SRLG duct-1 (n links)". Nothing new in the simulation.
+
+**SRLG protection** (`protection: srlg`, or `node-srlg` with node protection, §4.4). For the protected link S–E, the *shared links* are the other links with a group in common with S–E (both directions fail):
+- **TI-LFA** (RFC 9855 §1: "a configured set of links sharing fate with the primary link has failed"): the post-convergence SPF also removes the shared links, and check (b) of §4.2 adds, for every shared link direction u→v, `dist(X,Y) < dist(X,u) + c(u,v) + dist(v,Y)` (a tie counts as "may use it", §1.5). A failed check names the link: `may use A-B of the same SRLG ✗`.
+- **Fallback, one step at a time:** `node-srlg` tries node + SRLG, then node, then SRLG, then link; `srlg` tries SRLG, then link. The first that reaches D is installed; `protects` says which, and `fallback` why (`dest-is-next-hop` when only the node part was impossible because D = E, else `none`).
+- **LFA** (RFC 7916 §6.2.4.1, the SRLG criterion): each candidate gets `srlgDisjoint`: its link S→N is not a shared link, and N's path to D avoids every shared link direction (same test). SRLG-disjoint candidates rank first, then the order of §2 / §15. A candidate that shares the SRLG is still an LFA (it protects the link alone).
+- **Remote LFA:** the PQ node is chosen as in §3 / §3.1; then LFA Lab checks whether the tunnel (S's own path, or the exit link S→N and N's path to the PQ node) and the PQ node's path to D avoid every shared link. If so `protects` gains `srlg` (`srlg` or `node-srlg`), else it keeps `link` / `node` with `fallback: none`. RFC 7490 doesn't define SRLG-aware PQ selection, so the choice itself doesn't change.
+- A link with no SRLG (or whose groups hold only itself) has no shared links: SRLG protection is the same as link (or node) protection, and `Protection.srlg` is not set.
+- **Coverage** adds `srlg`: pairs whose link has shared links, and of those the ones whose LFA-or-Remote-LFA and TI-LFA backups avoid them all.
+
+### Example 9 (`examples/09-srlg.yaml`)
+S–E 1, E–D 1, S–A 1, A–B 1, B–D 1, S–C 3, C–D 3. S–E and A–B are in `duct-1`. S → D over S–E (cost 2):
+
+| | A | C |
+|---|---|---|
+| Loop-free | `dist(A,D)=2 < 1+2` ✓ | `3 < 3+2` ✓ |
+| Node-protecting | `2 < dist(A,E)+dist(E,D) = 2+1` ✓ | `3 < 4+1` ✓ |
+| SRLG-disjoint | A's path A-B-D uses A–B ✗ | `3 < dist(C,A)+1+dist(B,D) = 4+1+1`, `3 < dist(C,B)+1+dist(A,D) = 4+1+2` ✓ |
+| Cost | 3 | 6 |
+
+- Link protection: LFA **A**; TI-LFA S-A-B-D, `[PrefixSID(B), PrefixSID(D)]` = `16004, 16006`. Fail the duct: S's LFA runs into A–B at A, which repairs again.
+- SRLG protection: LFA **C**; TI-LFA with S–E and A–B removed: S-C-D (6), `[PrefixSID(D)]` = `16006`. Fail the duct: delivered on S-C-D by S alone.
+- S → E with `node-srlg`: D = E, so SRLG only: S-C-D-E (7), `fallback: dest-is-next-hop`.
+- With C–D also in `duct-1`, D can't be reached without the SRLG: link protection, `fallback: none`.
+- Coverage from S: 2 SRLG pairs (D and E over S–E); 1 with an SRLG-safe LFA or Remote LFA (D's LFA C; E's PQ node B is reached over S-A-B), 2 with SRLG-safe TI-LFA.
+
+A property test (random networks, random groups) checks that a TI-LFA repair marked `srlg` never uses a shared link and walks on normal tables, and that an SRLG-disjoint LFA's link and path avoid them.
+
+---
+
+## 19. Quiz mode (Later #4, D54)
+`makeQuiz(topology, seed, count)` (`src/engine/quiz.ts`) asks about the network on screen. It decides nothing new: every question is one results-table row (S, D, protected link S–E) from `computeForSource()`, and its explanation is that row's explain steps, so the numbers are the ones the detail panel shows.
+
+| Kind | Question | Right answer from |
+|---|---|---|
+| `loop-free` | Is neighbor N loop-free for D? | the candidate's Inequality 1 (§2) |
+| `best-lfa` | Which neighbor does S pick as its LFA? | `lfa.best` (§2, §15), else "No LFA" |
+| `method` | Simplest method that protects S → D? | `protectedBy` (§5): ECMP, LFA, Remote LFA, TI-LFA or nothing |
+| `p-space` / `q-space` | Is Y in S's P-space / E's Q-space? | `rlfa.pSpace` / `rlfa.qSpace` (§3) |
+| `pq-node` | Which PQ node does Remote LFA tunnel to? | `rlfa.best` when Remote LFA is needed, else "No PQ node" |
+| `extra-labels` | How many labels does TI-LFA push on D's label? | `extraLabels`, "3 or more" from 3 (§4.2) |
+| `label-stack` | Which stack does TI-LFA send? | `labelStack`, against the reversed stack and stacks with a label missing or doubled |
+
+- **Seeded:** Park–Miller (as in D50) picks the source, the row, the kind and the order of the choices, so a seed always gives the same quiz and tests can pin it. The kinds take turns; a kind that doesn't fit the row (no LFA candidates, no TI-LFA path…) gives way to the next. No question is asked twice in one quiz.
+- Uses the network's own settings (MSD, LFA policy, node or SRLG protection), so a quiz on Example 8 asks about node-protecting PQ nodes.
+- Worked check: Example 2, P-space of S for link S–E, router B: `dist(S,B)=2 < c(S,E)+dist(E,B) = 1+2 = 3` ✓, answer "Yes".
+
+A property test (random networks, random seeds) checks every answer against the engine, that choices are unique and that each question has an explanation.
+
+---
+
+## 20. LAN links / pseudonodes (Later #5, D55)
+A broadcast LAN (an Ethernet segment with several routers) is, in IS-IS, a **pseudonode**: every member reaches it at its own metric, and it reaches every member at 0 (ISO 10589 §7.2.3). In YAML: `lans: [{ id: LAN1, metric: 10, members: [A, B, { node: C, metric: 20 }] }]`. Checked against RFC 5286 §3.6 on 2026-11-01.
+
+**Model.** The engine keeps point-to-point maths: each pair of members gets a link `LAN1:A-B` with `c(A,B) = m_A` and `c(B,A) = m_B` (A → pseudonode → B costs `m_A + 0`). Distances, first hops and ECMP are exactly the pseudonode's, and no fake router enters any space, path or label stack. Adj-SIDs are per neighbor on the LAN (one per link, as RFC 8667 §2.2.2 LAN-Adj-SIDs). The canvas draws the pseudonode (a small square, not selectable) with one spoke per member; a path over `LAN1:A-B` lights A's spoke and B's spoke.
+
+**What fails.** Protecting S's link to E on a LAN means S's *interface* to the LAN fails, so all of S's links on that LAN go down together (RFC 5286 §3.6: an alternate "across the same LAN" doesn't protect). The fate group of `LAN1:S-E` is S's other links on LAN1:
+- **LFA:** a candidate over another link of the same LAN is skipped (reason `same-lan`). A candidate's own path may cross the LAN between other members: only S's interface is down. Inequality 1 already keeps N's path off S.
+- **ECMP:** another primary next hop on the same LAN is not a protector.
+- **Remote LFA:** P(S) also needs S's path to Y to avoid S's other LAN links (`dist(S,Y) < m_S + dist(R_j,Y)` for each member R_j); those links are never a tunnel exit. Q-space is unchanged (a path through S's interface goes through S).
+- **TI-LFA:** the post-convergence SPF removes S's whole LAN interface, and check (b) of §4.2 adds S's other LAN links (both ways), as for an SRLG (§18). In node mode (§4.4) the failure is router E, so S's interface stays up.
+- **Simulation:** the fail-link tool on a spoke fails the member's whole interface (all its LAN links); failing one LAN link by id fails only that adjacency.
+- Every router plans for its own interface failing. Another member's interface failing (only its adjacencies go) is a different failure the plan doesn't cover; the simulation shows what then happens.
+
+### Example 10 (`examples/10-lan-levels.yaml`), LAN part
+LAN1 = {R2, R3, R4}, metric 10 each. R1–R2 10, R1–R3 10, R2–R3 15, R3–R4 30, R4–R5 10. R2 → R4 over `LAN1:R2-R4` (cost 10):
+- R3 over `LAN1:R2-R3`: skipped, same LAN. (As three plain links it would win: cost 10 + 10 = 20.)
+- R1 over R1–R2: `dist(R1,R4) = 20 < dist(R1,R2) + dist(R2,R4) = 10 + 10` ✗ (tie).
+- R3 over R2–R3: `10 < 10 + 10` ✓, cost 25. **LFA = R3 over R2–R3.**
+- TI-LFA with R2's interface down: R2 →(R2–R3, 15)→ R3 →(LAN, 10)→ R4 = 25. From R2, R3 fails (a) (`dist(R2,R3) = 10` over the LAN, path 15): `AdjSID(R2→R3 over R2-R3)`, dropped as the first hop. From R3, R4 passes. **`[PrefixSID(R4)]` = `16004`** out on R2–R3.
+- Fail R2's interface (both its LAN links): LFA and TI-LFA deliver on R2-R3-R4 (25) in one repair.
+
+---
+
+## 21. Multi-level IS-IS (Later #5, D56)
+IS-IS splits a network into Level-1 areas and a Level-2 backbone (ISO 10589 §7.2). Each level has its own adjacencies, its own SPF and its own FRR, so LFA Lab shows **one level at a time**. In YAML: a router's `level: 1 | 2 | 1-2` (left out = 1-2, FRR's default `is-type`) and `area: "49.0001"`; a link's `level: 1 | 2` (circuit type; left out = both); a LAN's `level` likewise.
+
+`levelTopology(t, key)` (`src/engine/levels.ts`):
+- **Level-2** (`2`): the L2-capable routers (not `level: 1`), the links between them that aren't `level: 1`, and the LANs that aren't `level: 1` with their L2-capable members.
+- **Level-1 of area A** (`1:A`): the L1-capable routers of area A, the links between them that aren't `level: 2`. L1 adjacencies only form inside one area, so a link to another area is left out; a LAN keeps its members in A.
+- A LAN left with fewer than two members in the level is dropped.
+
+The sidebar's **IS-IS level** picker shows the levels (only when the network has levels or areas). Picking one makes that level the network on screen: every view (results, failure, coverage, heat map, what-if, weak spots, quiz) works on it unchanged. "Whole network, as one level" is the file as drawn, every adjacency in one SPF.
+
+**Edits in a level** are merged back (`mergeLevel`): routers and links the view showed are replaced by their edited versions or removed; new ones are added; a LAN member's metric follows. Network settings come from the view, the name stays the network's. Export and Share always write the whole network. Switching level clears failures and starts the undo history afresh.
+
+**Not modelled:** routes between levels (an L1 router's default route to the nearest attached L1/L2 router, ATT bit; route leaking), so destinations in other areas don't appear in a Level-1 view; LFA for inter-area prefixes (RFC 5286 §6.2); per-level metrics on one link (import them as two links with `level: 1` and `level: 2`).
+
+Worked check (Example 10): Level-2 = {R2, R3, R4} with R2–R3, R3–R4 and LAN1 (R2, R3, R4); R2 → R4 gives the same LFA as above. Level-1 area 49.0001 = {R1, R2, R3} with R1–R2, R1–R3, R2–R3 and LAN1 (R2, R3). Level-1 area 49.0002 = {R4, R5} with R4–R5; LAN1 has only R4 there, so it is dropped.
+
+---
+
+## 22. Microloops (Later #6, D57)
+FRR covers the moment right after a failure; then every router runs SPF and updates its table on its own time. While some routers use the new table and others the old one, traffic can go round between them for a moment: a **microloop** (RFC 5715 §1). `microloops(topology, failures)` (`src/engine/microloop.ts`) lists, per destination D, the loops some update order can make. It decides nothing new: old next hops are the normal tables, new ones the SPF without what is down (§8 step 4), both with the lowest-id tie-break of the drawings.
+
+- **Each router R ≠ D** forwards on its old next hop or its new one. A router whose old next hop is over a failed link (or a failed router) is a **PLR**: until it updates, its FRR repair carries the traffic past the others' tables (TI-LFA's segments, RFC 9855 §1), so it has only its new next hop.
+- **A loop** is a cycle that follows old and new next hops. Old ones alone never loop (SPF), nor new ones alone, so every loop needs some routers `updated` (on their new next hop) and some `waiting`. Found breadth-first from each router whose next hop changes, so loops are short; the same loop from another start is listed once, starting at its lowest id.
+- **`plrEarly`:** a PLR is among the `updated`: it left its repair before the others had updated. Local convergence delay (RFC 8333, for a link going down) keeps the PLR on its repair until then, so such a loop doesn't form. Loops away from any PLR are not helped by it (RFC 8333 §3; ordered FIB updates, RFC 6976, would be).
+- **UI:** "Microloops while the network converges" in the failure panel: the count of changed next hops, each loop (`To E: A → S → A, if S updates before A`), and whether local delay avoids it.
+
+Worked checks:
+
+| Network, failure | Loops |
+|---|---|
+| Example 2, S–E | to E: A → S → A (S updated, A waiting: A still goes A-S-E, 2 < 3); to S: C → E → C. Both through a PLR: avoided by local delay. |
+| Example 1, S–E | to S: D → E → D (D still goes D-E-S, 20 < 25; E's new next hop is D). PLR E: avoided. |
+| S–E 1, E–D 1, S–A 1, A–D 5; E–D fails | to D: A → S → A (S's new next hop A; A still goes A-S-E-D, 3 < 5). No PLR in it (E is the PLR): local delay doesn't help. |
+
+A property test (random networks, one failed link) checks that every loop is a closed cycle of neighbors that never passes D and has a router that updated.
+
+---
+
+## 23. Flex-Algo (Later #6, D58)
+A **Flexible Algorithm** (RFC 9350) is another SPF in the same network: its own metric and its own link constraints. Checked against RFC 9350 §5–§6 on 2026-11-01. YAML: `flex_algo: [{ algo: 128, metric: delay, exclude_any: [red] }]`; on links `affinity: [red]`, `te_metric`, `delay` (µs, both ways); on routers `algos: [128]` (participation, left out = all) and `algo_sids: { 128: 101 }`.
+
+`flexTopology(t, algo)` (`src/engine/flex-algo.ts`) is the network the algorithm computes on:
+- **Routers:** those that take part. Each gets its Prefix-SID for the algorithm (RFC 8667 §2.1: one per algorithm): `algo_sids`, else its index + 1000 × the algorithm's place in the list (128 first: +1000). Indices are checked unique over all algorithms, since they share the SRGB.
+- **Links:** between taking-part routers, that pass the colour rules (exclude-any §6.2, include-any §6.4, include-all §6.5), and that have the metric (§5.1: a link without a TE metric or delay is left out of an algorithm on it). Their cost is that metric.
+- **LANs** stay for the IGP metric only (no TE metric or delay on them here).
+- Everything else (SRGB, MSD, LFA policy, protection goal) is the network's.
+
+**FRR inside the algorithm:** RFC 9350 §6.1 says repair paths for a Flex-Algo prefix MUST use the same Flex-Algo. So LFA, Remote LFA, TI-LFA (and the simulation, coverage…) run unchanged on `flexTopology`. The sidebar's **Algorithm** picker makes it the network on screen, read-only (its metrics are not the IGP ones; moving routers still works).
+
+### Example 11 (`examples/11-flex-algo.yaml`)
+S–E 10 (delay 100, red), E–D 10 (100), S–A 10 (10), A–D 30 (10), S–B 15 (50), B–D 15 (50). Flex-Algo 128: delay, exclude red.
+- Algorithm 0: S → D via E (20); LFA B (`15 < 15+20`, downstream, node-protecting); TI-LFA S-B-D `[16005]`.
+- Algorithm 128: no S–E; S → D via A (20 µs). Protect S–A: B `50 < dist(B,S)+dist(S,D) = 50+20` ✓, node-protecting `50 < dist(B,A)+dist(A,D) = 60+10` ✓: **LFA B**. TI-LFA S-B-D (100): `[PrefixSID(D) in 128]` = 16000 + 1005 = **17005**.
+
+A property test checks that a Flex-Algo on the IGP metric with no constraints gives algorithm 0's paths.
+
+---
+
+## 24. SRv6 (Later #6, D59)
+TI-LFA computes the same repair on SRv6 as on SR-MPLS (RFC 9855 §7.2: "the TI-LFA path computation algorithm is the same"). Only the encoding differs: segments are IPv6 addresses (SIDs) from each router's **locator** (RFC 8986 §3.1). `dataplane: srv6` in YAML or "Data plane" in the topology properties.
+
+- **Locator:** the router's `locator` (e.g. `fc00:0:1::/48`), else `fc00:0:<SID index in hex>::/48`. In a Flex-Algo view (§23) the locator comes from the algorithm's SID index, so each algorithm has its own (RFC 9350 §14).
+- **End SID** (node segment, RFC 8986 §4.1) = locator + function 1: `fc00:0:4::1`.
+- **End.X SID** (adjacency segment, §4.2) = locator + function 0x40 + the link's place among the router's links, in the Adj-SID order of D18 (by neighbor, then link id), so a bundle's links differ.
+- **Repair list** = the segment list of §4.2 without the destination's own segment: D stays the inner packet's address (H.Encaps, RFC 8986 §5). An empty list means the outgoing interface is enough (the LFA case). The list is the same as SR-MPLS's; RFC 9855 §7.2 notes an End.X SID needs no node SID before it, which could save a SID, not modelled.
+- **Max SID depth** counts the SIDs S pushes (RFC 9352 §4), not a label stack.
+- The packet walk (§4.5) and the simulation's labels stay SR-MPLS; the detail panel says so.
+
+Worked check (Example 3, `dataplane: srv6`, S → E): segments `[PrefixSID(B), AdjSID(B→C), PrefixSID(E)]` → **`[fc00:0:4::1, fc00:0:4::41]`** (B's links: to A first, then C, so B→C is 0x41). 2 SIDs: within an MSD of 2, where the 3-label SR-MPLS stack is too deep (§14).

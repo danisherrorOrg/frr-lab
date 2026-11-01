@@ -3,6 +3,8 @@
 // the engine worker for them whenever the topology or source changes.
 import { create } from 'zustand'
 import type { RepairMode } from '../engine/simulate'
+import { flexTopology } from '../engine/flex-algo'
+import { levelTopology, mergeLevel, type LevelKey } from '../engine/levels'
 import type { NodeId, Topology } from '../engine/types'
 import * as edit from './edit'
 import { EXAMPLES, exampleTopology } from './examples'
@@ -90,6 +92,18 @@ export interface AppState {
   yamlGuide: boolean
   /** The random topology generator dialog is open (D50). */
   generator: boolean
+  /** The FRR `show isis database detail` import dialog is open (D52). */
+  frrImport: boolean
+  /**
+   * Multi-level IS-IS (D56): while one level is shown, `topology` is that level and
+   * `full` the whole network; edits are merged back when the view changes.
+   */
+  level: { key: LevelKey; full: Topology } | null
+  /**
+   * Flex-Algo (D58): while one algorithm is shown, `topology` is its topology (its
+   * routers, links and metric) and `full` the network. Read-only: edits are refused.
+   */
+  algo: { algo: number; full: Topology } | null
   /** The per-link view (TODO backlog): null = closed, else the link picked (null = none yet). */
   linkView: { link: string | null } | null
   /**
@@ -149,6 +163,13 @@ export interface AppState {
   setTour: (step: number | null) => void
   setYamlGuide: (open: boolean) => void
   setGenerator: (open: boolean) => void
+  setFrrImport: (open: boolean) => void
+  /** Show one IS-IS level (D56), or the whole network (null). Clears undo and failures. */
+  setLevel: (key: LevelKey | null) => void
+  /** Show one Flex-Algo's topology (D58), or algorithm 0 (null). */
+  setAlgo: (algo: number | null) => void
+  /** Fail every link of router `node` on this LAN (its interface goes down), or restore them (D55). */
+  toggleLanInterface: (lan: string, node: NodeId) => void
   /** Open the per-link view on this link (null = open with none picked) and select it. */
   openLinkView: (link: string | null) => void
   closeLinkView: () => void
@@ -161,6 +182,15 @@ export interface AppState {
 }
 
 /** Keep the chosen source if it still exists, else 'S', else the first router. */
+/** The whole network: the level view's edits merged back when one is shown (D56). */
+export function fullTopology(s: Pick<AppState, 'topology' | 'level' | 'algo'>): Topology {
+  if (s.algo !== null) return s.algo.full
+  return s.level === null ? s.topology : mergeLevel(s.level.full, s.level.key, s.topology)
+}
+
+const ALGO_READ_ONLY =
+  'This is a Flex-Algo view: its metrics come from the links’ TE metric or delay. Pick “Algorithm 0” in the sidebar to edit the network.'
+
 function pickSource(t: Topology, wanted: NodeId | null | undefined): NodeId | null {
   const ids = t.nodes.map((n) => n.id)
   if (wanted && ids.includes(wanted)) return wanted
@@ -218,6 +248,11 @@ export const useStore = create<AppState>()((set, get) => {
   const commit = (t: Topology, extra: Partial<AppState> = {}) => {
     const s = get()
     if (t === s.topology) return
+    // A Flex-Algo view is read-only (D58).
+    if (s.algo !== null) {
+      set({ notice: { kind: 'error', title: 'Read-only view', lines: [ALGO_READ_ONLY] } })
+      return
+    }
     set({
       ...tidy(s, t),
       topology: t,
@@ -228,6 +263,7 @@ export const useStore = create<AppState>()((set, get) => {
   }
   const result = (r: edit.EditResult): string | null => {
     if (!r.ok) return r.error
+    if (get().algo !== null) return ALGO_READ_ONLY
     commit(r.topology)
     return null
   }
@@ -254,12 +290,19 @@ export const useStore = create<AppState>()((set, get) => {
     tour: null,
     yamlGuide: false,
     generator: false,
+    frrImport: false,
+    level: null,
+    algo: null,
     linkView: null,
     heatMap: null,
     whatIf: null,
 
     loadTopology: (t, source, warnings = []) => {
       const placed = edit.withPositions(t)
+      // Leaving a level view: undo should bring back the whole network, not the view.
+      const st = get()
+      if (st.level !== null || st.algo !== null)
+        set({ topology: fullTopology(st), level: null, algo: null })
       commit(placed, {
         source: pickSource(placed, source),
         selection: null,
@@ -290,6 +333,15 @@ export const useStore = create<AppState>()((set, get) => {
     moveRouter: (id, pos) => {
       const node = get().topology.nodes.find((n) => n.id === id)
       if (node?.pos && Math.round(pos.x) === node.pos.x && Math.round(pos.y) === node.pos.y) return
+      const algo = get().algo
+      if (algo !== null) {
+        // Moving a router changes no metric, so it is allowed in a Flex-Algo view (D58).
+        set({
+          topology: edit.moveRouter(get().topology, id, pos),
+          algo: { ...algo, full: edit.moveRouter(algo.full, id, pos) },
+        })
+        return
+      }
       commit(edit.moveRouter(get().topology, id, pos))
     },
 
@@ -461,6 +513,64 @@ export const useStore = create<AppState>()((set, get) => {
     setTour: (tour) => set({ tour }),
     setYamlGuide: (yamlGuide) => set({ yamlGuide }),
     setGenerator: (generator) => set({ generator }),
+    setFrrImport: (frrImport) => set({ frrImport }),
+    setAlgo: (algo) => {
+      const st = get()
+      if (algo === (st.algo?.algo ?? null)) return
+      const full = fullTopology(st)
+      const t = algo === null ? full : flexTopology(full, algo)
+      set({
+        topology: t,
+        algo: algo === null ? null : { algo, full },
+        level: null,
+        past: algo === null ? st.past : [],
+        future: algo === null ? st.future : [],
+        failedLinks: [],
+        failedNodes: [],
+        converged: false,
+        simDest: null,
+        selection: null,
+        row: null,
+        source: pickSource(t, st.source),
+        loadCount: st.loadCount + 1,
+      })
+    },
+    setLevel: (key) => {
+      const st = get()
+      if (st.algo !== null) get().setAlgo(null)
+      const full = fullTopology(get())
+      if (key === st.level?.key || (key === null && st.level === null)) return
+      const t = key === null ? full : levelTopology(full, key)
+      set({
+        topology: t,
+        level: key === null ? null : { key, full },
+        // A view is not an edit: start its undo history afresh.
+        past: [],
+        future: [],
+        failedLinks: [],
+        failedNodes: [],
+        converged: false,
+        simDest: null,
+        selection: null,
+        row: null,
+        source: pickSource(t, st.source),
+        loadCount: st.loadCount + 1,
+      })
+    },
+    toggleLanInterface: (lan, node) => {
+      const st = get()
+      const ids = st.topology.links
+        .filter((l) => l.lan === lan && (l.a === node || l.b === node))
+        .map((l) => l.id)
+      const allDown = ids.every((id) => st.failedLinks.includes(id))
+      set({
+        failedLinks: allDown
+          ? st.failedLinks.filter((id) => !ids.includes(id))
+          : [...st.failedLinks, ...ids.filter((id) => !st.failedLinks.includes(id))],
+        converged: false,
+        simDest: null,
+      })
+    },
     openLinkView: (link) =>
       set({ linkView: { link }, ...(link !== null && { selection: { kind: 'link', id: link } }) }),
     closeLinkView: () => set({ linkView: null }),

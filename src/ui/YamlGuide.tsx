@@ -3,6 +3,8 @@ import { parseTopology, serializeTopology } from '../io/yaml'
 import {
   BLOCK_STYLE_YAML,
   DEFAULT_SRGB_BASE,
+  FLEX_ALGO_FIELDS,
+  LAN_FIELDS,
   LFA_POLICY_FIELDS,
   LINK_FIELDS,
   MAX_LABEL,
@@ -153,6 +155,8 @@ export function YamlGuide() {
           <FieldTable title="Each router (under nodes)" fields={NODE_FIELDS} />
           <FieldTable title="Each link (under links)" fields={LINK_FIELDS} />
           <FieldTable title="LFA policy (under lfa_policy)" fields={LFA_POLICY_FIELDS} />
+          <FieldTable title="Each LAN (under lans)" fields={LAN_FIELDS} />
+          <FieldTable title="Each Flex-Algo (under flex_algo)" fields={FLEX_ALGO_FIELDS} />
 
           <section>
             <h3 className="mb-1 font-semibold">Rules</h3>

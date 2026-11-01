@@ -2,6 +2,7 @@
 // follow the traffic from S to every destination, first on the FRR repair path,
 // then on the path the network uses once it has reconverged.
 import { cheapestEdge, type Edge } from './graph'
+import { lanOfLinkId } from './lan'
 import { computeForSource } from './index'
 import { prefixLabel } from './labels'
 import { shortestPath } from './paths'
@@ -730,7 +731,11 @@ function repairAt(
   // none is, it keeps the lowest-id one and the packet is dropped there: the members
   // are each other's backups, so the entry has nothing left. Members are links, so
   // another link of a bundle is one too (D29).
-  const others = r.protections.map((x) => x.protectedLink).filter((x) => x.id !== failed)
+  // Not another link on the same LAN: it fails with the interface (RFC 5286 §3.6, D55).
+  const lan = lanOfLinkId(failed)
+  const others = r.protections
+    .map((x) => x.protectedLink)
+    .filter((x) => x.id !== failed && (lan === undefined || lanOfLinkId(x.id) !== lan))
   const other = others.find((x) => isUp(x.id)) ?? others[0]
   if (p.ecmpProtected && other !== undefined) {
     return {

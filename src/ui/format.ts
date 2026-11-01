@@ -14,7 +14,7 @@ import type {
   SourceFailure,
   Through,
 } from '../engine/simulate'
-import type { NodeId, Protection, Segment, Topology } from '../engine/types'
+import type { NodeFallback, NodeId, Protection, Protects, Segment, Topology } from '../engine/types'
 import type { PairMethod } from '../engine/what-if'
 import type { BackupKind, Selection } from '../state/store'
 import type { Highlight } from './canvas'
@@ -143,11 +143,14 @@ export function lfaTags(c: {
   loopFree: boolean
   downstream: boolean
   nodeProtecting: boolean
+  srlgDisjoint?: boolean
   policyRejected?: 'not-node-protecting' | 'not-downstream'
 }): string {
   if (!c.loopFree) return 'not loop-free'
   const tags = [c.nodeProtecting ? 'node-protecting' : 'link-protecting']
   if (c.downstream) tags.push('downstream')
+  // SRLG modes (D53, RFC 7916 §6.2.4.1).
+  if (c.srlgDisjoint !== undefined) tags.push(c.srlgDisjoint ? 'SRLG-disjoint' : 'shares the SRLG')
   // RFC 7916 §6.2: a "require" in the LFA policy rules it out.
   if (c.policyRejected !== undefined)
     tags.push(
@@ -289,6 +292,7 @@ export function tooltipLines(
       ? `Metric ${l.metricAB} both ways`
       : `Metric ${a}→${b} ${l.metricAB} · ${b}→${a} ${l.metricBA}`,
     `Adj-SID ${adj(a, b, l.adjSidAB)} · ${adj(b, a, l.adjSidBA)}`,
+    ...(l.srlg !== undefined && l.srlg.length > 0 ? [`SRLG ${l.srlg.join(', ')}`] : []),
     ...(deadEnd !== undefined
       ? [`✕ down (router ${deadEnd} is down)`]
       : down.links.includes(l.id)
@@ -487,4 +491,38 @@ export function pairsText(source: NodeId, pairs: PairMethod[], b?: Bundles): str
         `via ${hopName(b, source, p.via, p.link)}: ${p.by === null ? '✗ none' : METHOD_NAME[p.by]}`,
     )
     .join(' · ')
+}
+
+/**
+ * What a backup protects against when the network asks for more than link
+ * protection (D51, D53): "avoids router E", "avoids the SRLG", or what it falls back
+ * to and why. Undefined in link mode (`protects` is not set then).
+ */
+export function protectsText(
+  protects: Protects | undefined,
+  fallback: NodeFallback | undefined,
+  e: string,
+): string | undefined {
+  if (protects === undefined) return undefined
+  const what: Record<Protects, string> = {
+    link: 'link only',
+    node: `node-protecting: avoids router ${e}`,
+    srlg: 'SRLG-disjoint: avoids every link of the SRLG',
+    'node-srlg': `node + SRLG: avoids router ${e} and the SRLG`,
+  }
+  if (fallback === undefined) return what[protects]
+  const why =
+    fallback === 'dest-is-next-hop' ? `the destination is ${e} itself` : 'nothing avoids more'
+  return `${protects === 'link' ? 'link only' : what[protects]} (fallback: ${why})`
+}
+
+/** Short tag for a results cell: "node-prot.", "SRLG-safe", "link only"… */
+export function protectsTag(protects: Protects, fallback: NodeFallback | undefined): string {
+  const tag = {
+    link: 'link only',
+    node: 'node-prot.',
+    srlg: 'SRLG-safe',
+    'node-srlg': 'node+SRLG',
+  }[protects]
+  return fallback === undefined ? tag : `${tag}, fallback`
 }

@@ -1,0 +1,46 @@
+{
+  "$comment": "Expected engine results for Example 10 (docs/02-algorithms.md §20, D55), whole network as one level. Only the fields listed here are checked. null means 'none'.",
+  "fixture": "10-lan-levels.yaml",
+  "source": "R2",
+  "results": [
+    {
+      "dest": "R4",
+      "cost": 10,
+      "nextHops": ["R4"],
+      "protections": [
+        {
+          "protectedLink": { "from": "R2", "to": "R4", "id": "LAN1:R2-R4" },
+          "ecmpProtected": false,
+          "lfa": {
+            "candidates": [
+              {
+                "neighbor": "R1",
+                "link": "R1-R2",
+                "loopFree": false,
+                "cost": 30
+              },
+              {
+                "neighbor": "R3",
+                "link": "R2-R3",
+                "loopFree": true,
+                "downstream": false,
+                "nodeProtecting": false,
+                "cost": 25
+              }
+            ],
+            "best": "R3",
+            "bestLink": "R2-R3"
+          },
+          "rlfa": { "needed": false, "best": null },
+          "tilfa": {
+            "path": ["R2", "R3", "R4"],
+            "outLink": "R2-R3",
+            "segments": [{ "kind": "prefix", "node": "R4", "label": 16004 }],
+            "labelStack": [16004],
+            "extraLabels": 0
+          }
+        }
+      ]
+    }
+  ]
+}

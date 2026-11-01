@@ -14,6 +14,6 @@ export function msdOf(topology: Topology, node: NodeId): number | undefined {
  * label and pushes the repair list, so the whole stack counts (for IP traffic S
  * pushes all of it, the same number).
  */
-export function isTooDeep(labelStack: readonly number[], msd: number | undefined): boolean {
+export function isTooDeep(labelStack: readonly unknown[], msd: number | undefined): boolean {
   return msd !== undefined && labelStack.length > msd
 }

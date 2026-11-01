@@ -909,6 +909,170 @@ describe('Phase 9.3: router failure', () => {
 })
 
 // Phase 9.4 (D29): a bundle of two links between routers.
+describe('Node protection (D51)', () => {
+  it('Example 6: switching to node protection makes TI-LFA survive router E', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'link-protecting')
+    const d = await rowFor('D')
+    expect(d.textContent).not.toContain('node-prot.')
+
+    await user.selectOptions(screen.getByLabelText('Backups protect against'), 'node')
+    expect(useStore.getState().topology.protection).toBe('node')
+    // TI-LFA with E removed: S→N→M→D, [Prefix-SID(M), Prefix-SID(D)] = 16004 16005.
+    await vi.waitFor(async () => expect((await rowFor('D')).textContent).toContain('16004 16005'))
+    expect((await rowFor('D')).textContent).toContain('(node-prot.)')
+    // S → E: E is the destination itself, so link protection only.
+    expect((await rowFor('E')).textContent).toContain('(link only, fallback)')
+
+    await user.click(await rowFor('D'))
+    expect(screen.getByRole('region', { name: 'Details' }).textContent).toContain(
+      'node-protecting: avoids router E',
+    )
+
+    useStore.getState().toggleFailedNode('E')
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    await user.click(within(panel).getByLabelText('TI-LFA'))
+    await within(panel).findByText(/E down: 1 destination affected, 1 repair survives, 0 break/)
+    expect(panel.textContent).toContain('This network uses node protection')
+
+    // Back to link protection: the setting is not stored.
+    await user.selectOptions(screen.getByLabelText('Backups protect against'), 'link')
+    expect(useStore.getState().topology).not.toHaveProperty('protection')
+  })
+})
+
+describe('SRLG (D53)', () => {
+  it('Example 9: the SRLG-disjoint LFA C is chosen, and failing the duct repairs in one step', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'srlg')
+    const d = await rowFor('D')
+    expect(d.textContent).toContain('C')
+    expect(d.textContent).toContain('(SRLG-safe)')
+    await user.click(d)
+    const details = screen.getByRole('region', { name: 'Details' })
+    expect(details.textContent).toContain('Shares an SRLG with A-B')
+    expect(details.textContent).toContain('shares the SRLG')
+
+    // The link form fails the whole group.
+    act(() => useStore.getState().select({ kind: 'link', id: 'S-E' }))
+    await user.click(screen.getByRole('button', { name: /Fail SRLG duct-1 \(2 links\)/ }))
+    expect(useStore.getState().failedLinks).toEqual(['A-B', 'S-E'])
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    expect(panel.textContent).toContain('A–B')
+  })
+})
+
+describe('Quiz (D54)', () => {
+  it('Example 2: answers a question, shows why, draws the row, and keeps score', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'ring5')
+    await rowFor('E')
+    await user.click(screen.getByRole('button', { name: '🎓 Quiz' }))
+    const quiz = screen.getByRole('region', { name: 'Quiz' })
+    expect(quiz.textContent).toContain('Question 1 of 10')
+    expect(within(quiz).getByLabelText('Score').textContent).toBe('Score 0 of 0')
+
+    // Answer every question with the first choice; the right one is always marked.
+    for (let i = 0; i < 10; i++) {
+      const choices = within(within(quiz).getByRole('group', { name: 'Answers' })).getAllByRole(
+        'button',
+      )
+      await user.click(choices[0]!)
+      expect(within(quiz).getByRole('list', { name: 'Why' }).textContent).not.toBe('')
+      expect(quiz.textContent).toMatch(/✓ Right\.|✗ Not quite/)
+      // The question's row is the open one.
+      expect(useStore.getState().row).not.toBeNull()
+      await user.click(within(quiz).getByRole('button', { name: /Next question|See my score/ }))
+    }
+    expect(quiz.textContent).toMatch(/You got \d+ of 10 right\./)
+    await user.click(within(quiz).getAllByRole('button', { name: 'New quiz' })[0]!)
+    expect(quiz.textContent).toContain('Question 1 of 10')
+  })
+})
+
+describe('LAN and IS-IS levels (D55, D56)', () => {
+  it('Example 10: the LFA skips the LAN; the level picker shows each level and keeps edits', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'lan-levels')
+    // R2 → R4 over LAN1: LFA R3 over the point-to-point link R2–R3.
+    const r4 = await rowFor('R4')
+    expect(r4.textContent).toContain('R3')
+    expect(r4.textContent).toContain('16004')
+
+    const picker = screen.getByLabelText('IS-IS level')
+    await user.selectOptions(picker, '2')
+    const s = useStore.getState()
+    expect(s.topology.nodes.map((n) => n.id)).toEqual(['R2', 'R3', 'R4'])
+    expect(s.past).toEqual([])
+    expect(await screen.findByRole('table', { name: 'Results for R2' })).toBeTruthy()
+
+    // An edit in the Level-2 view is kept in the whole network.
+    expect(useStore.getState().updateLink('R2-R3', { metricAB: 7, metricBA: 7 })).toBeNull()
+    await user.selectOptions(screen.getByLabelText('IS-IS level'), '')
+    const full = useStore.getState().topology
+    expect(full.nodes).toHaveLength(5)
+    expect(full.links.find((l) => l.id === 'R2-R3')).toMatchObject({ metricAB: 7 })
+
+    await user.selectOptions(screen.getByLabelText('IS-IS level'), '1:49.0002')
+    expect(useStore.getState().topology.nodes.map((n) => n.id)).toEqual(['R4', 'R5'])
+  })
+})
+
+describe('Microloops (D57)', () => {
+  it('ring, fail S–E: lists S⇄A for E and says local delay avoids it', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'ring5')
+    await rowFor('E')
+    useStore.getState().toggleFailedLink('S-E')
+    const panel = await screen.findByRole('region', { name: 'Failure simulation' })
+    await user.click(
+      within(panel).getByRole('button', { name: /Microloops while the network converges/ }),
+    )
+    const loops = within(panel).getByLabelText('Microloops')
+    expect(loops.textContent).toContain(
+      '2 possible microloops, all avoided by local convergence delay (RFC 8333)',
+    )
+    expect(loops.textContent).toContain('To E: A → S → A, if S updates before A.')
+  })
+})
+
+describe('Flex-Algo and SRv6 (D58, D59)', () => {
+  it('Example 11: the algorithm picker shows Flex-Algo 128’s own path; edits are refused there', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'flex-algo')
+    expect((await rowFor('D')).textContent).toContain('E')
+    await user.selectOptions(screen.getByLabelText('Algorithm'), '128')
+    // Delay metric, no red link: D via A, LFA B, TI-LFA label 17005 (index 5 + 1000).
+    await vi.waitFor(async () => expect((await rowFor('D')).textContent).toContain('17005'))
+    const d = await rowFor('D')
+    expect(d.querySelectorAll('td')[1]!.textContent).toBe('A')
+    expect(useStore.getState().updateLink('S-A', { metricAB: 3 })).toContain(
+      'This is a Flex-Algo view',
+    )
+    await user.selectOptions(screen.getByLabelText('Algorithm'), '')
+    expect(useStore.getState().topology.links.find((l) => l.id === 'S-E')).toBeDefined()
+  })
+
+  it('Example 3 on SRv6: the table and details show SIDs instead of labels', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'ring5-high')
+    await rowFor('E')
+    await user.selectOptions(screen.getByLabelText('Data plane'), 'srv6')
+    await vi.waitFor(async () =>
+      expect((await rowFor('E')).textContent).toContain('fc00:0:4::1 fc00:0:4::41'),
+    )
+    await user.click(await rowFor('E'))
+    expect(screen.getByRole('region', { name: 'Details' }).textContent).toContain('SRv6 SID list')
+  })
+})
+
 describe('App: parallel links', () => {
   it('Example 7: names the bundle link, draws it, and fails each link on its own', async () => {
     const user = userEvent.setup()

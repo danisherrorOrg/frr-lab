@@ -6,14 +6,24 @@ import {
   type CoverageReport,
   type UnprotectedPair,
 } from './coverage'
-import { explainLfa, explainRlfa, explainTilfa } from './explain'
+import { explainLfa, explainNodeRlfa, explainRlfa, explainSrv6, explainTilfa } from './explain'
 import { computeLfa, ecmpProtectorLinks } from './lfa'
 import { lfaPolicyOf } from './lfa-policy'
 import { msdOf } from './msd'
-import { computeRlfa, rlfaForProtection, type RlfaResult } from './rlfa'
+import { lanFate } from './lan'
+import { protectionOf } from './protection'
+import { srv6RepairList } from './srv6'
+import { hasNode, hasSrlg, rlfaAvoidsSrlg, sharedEdges, srlgShared, withSrlgProtects } from './srlg'
+import {
+  computeRlfa,
+  nodeRlfa,
+  rlfaForNodeProtection,
+  rlfaForProtection,
+  type RlfaResult,
+} from './rlfa'
 import { toRows, type SourceRows } from './rows'
 import { allPairs, firstLinks } from './spf'
-import { computeTilfa, tilfaForProtection } from './tilfa'
+import { tilfaFor, tilfaForProtection } from './tilfa'
 import type { DestinationResult, NodeId, Protection, Topology } from './types'
 
 export interface ComputeOptions {
@@ -41,16 +51,41 @@ export function computeForSource(
   const msd = msdOf(topology, source)
   // S's own LFA policy (RFC 7916 §6.2, D45).
   const policy = lfaPolicyOf(topology, source)
+  // Link or node protection for Remote LFA and TI-LFA (D51).
+  const goal = protectionOf(topology)
 
   // RLFA depends only on the protected link, not on D (RFC 7490 §5.2.1.3): once per link.
   const rlfaByLink = new Map<string, RlfaResult>()
   const rlfaFor = (e: NodeId, link: string) => {
     let r = rlfaByLink.get(link)
     if (r === undefined) {
-      r = computeRlfa(table, source, e, { extended: options.extended ?? true, link })
+      r = computeRlfa(table, source, e, {
+        extended: options.extended ?? true,
+        link,
+        lanEdges: lanFate(topology, table.graph, link, source).edges,
+      })
       rlfaByLink.set(link, r)
     }
     return r
+  }
+
+  // The Remote LFA part for the goal: node protection (RFC 8102, D51), then whether
+  // the chosen tunnel also avoids S–E's SRLG (D53).
+  const rlfaForGoal = (
+    rlfa: RlfaResult,
+    node: ReturnType<typeof nodeRlfa> | undefined,
+    lfaBest: NodeId | undefined,
+    d: NodeId,
+    sharedE: ReturnType<typeof sharedEdges>,
+  ): Protection['rlfa'] => {
+    const base = hasNode(goal)
+      ? rlfaForNodeProtection(rlfa, node, lfaBest)
+      : rlfaForProtection(rlfa, lfaBest)
+    if (!hasSrlg(goal)) return base
+    const pq = base.needed ? base.best : undefined
+    const avoids =
+      pq !== undefined && rlfaAvoidsSrlg(table, source, pq, base.exitVia[pq], d, sharedE)
+    return withSrlgProtects(base, avoids)
   }
 
   const results: DestinationResult[] = []
@@ -63,13 +98,20 @@ export function computeForSource(
     const protections = firstLinks(table, source, d).map((edge): Protection => {
       const e = edge.to
       const link = edge.linkId
-      const lfa = computeLfa(table, source, d, e, link, policy)
+      // SRLG modes: the links that fail with S–E (D53).
+      const shared = hasSrlg(goal) ? srlgShared(topology, link) : []
+      const sharedE = sharedEdges(table.graph, shared)
+      // On a LAN, S's other links on it fail with its interface (RFC 5286 §3.6, D55).
+      const lan = lanFate(topology, table.graph, link, source)
+      const lfa = computeLfa(table, source, d, e, link, policy, sharedE, lan.ids)
       const excluded = [
         ...new Set(lfa.skipped.filter((x) => x.reason === 'excluded').map((x) => x.neighbor)),
       ]
-      const ecmp = ecmpProtectorLinks(table, source, d, e, link)
+      const ecmp = ecmpProtectorLinks(table, source, d, e, link, lan.ids)
       const rlfa = rlfaFor(e, link)
-      const tilfa = computeTilfa(topology, source, d, e, link)
+      // RFC 8102 node protection depends on D; it can't apply when D is E.
+      const node = hasNode(goal) && d !== e ? nodeRlfa(table, rlfa, d) : undefined
+      const tilfa = tilfaFor(topology, source, d, e, link, goal)
       const graph = table.graph
       const explain = withExplain
         ? [
@@ -83,19 +125,33 @@ export function computeForSource(
               graph,
             }),
             ...explainRlfa(rlfa, { d, lfaBest: lfa.best, graph }),
-            ...explainTilfa(tilfa, graph, msd),
+            ...(node
+              ? explainNodeRlfa(node, { lfaBest: lfa.best, linkBest: rlfa.best, graph })
+              : []),
+            ...explainTilfa(tilfa, graph, topology.dataplane === 'srv6' ? undefined : msd),
+            ...(topology.dataplane === 'srv6' && tilfa.segments
+              ? explainSrv6(srv6RepairList(topology, tilfa.segments), d, msd, source)
+              : []),
           ]
         : []
       return {
         protectedLink: { from: source, to: e, id: link },
         ecmpProtected: ecmp.length > 0,
+        ...(shared.length > 0 && { srlg: shared }),
         lfa: {
           candidates: lfa.candidates,
           ...(lfa.best !== undefined && { best: lfa.best, bestLink: lfa.bestLink! }),
           ...(excluded.length > 0 && { excluded }),
         },
-        rlfa: rlfaForProtection(rlfa, lfa.best),
-        tilfa: tilfaForProtection(tilfa, msd),
+        rlfa: rlfaForGoal(rlfa, node, lfa.best, d, sharedE),
+        tilfa: tilfaForProtection(
+          tilfa,
+          msd,
+          goal,
+          topology.dataplane === 'srv6' && tilfa.segments
+            ? srv6RepairList(topology, tilfa.segments)
+            : undefined,
+        ),
         explain,
       }
     })
@@ -163,6 +219,8 @@ export type {
 } from './coverage'
 export { percent } from './coverage'
 export { isTooDeep, msdOf } from './msd'
+export { protectionOf } from './protection'
+export { endSid, endXSid, locatorOf, srv6RepairList, srv6Sid } from './srv6'
 export {
   DEFAULT_LFA_POLICY,
   hasLfaPolicy,

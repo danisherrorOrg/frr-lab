@@ -232,6 +232,20 @@ export const STYLE: cytoscape.StylesheetJson = [
     selector: 'edge.failed',
     style: { 'line-color': '#dc2626', 'line-style': 'dotted', width: 4 },
   },
+  // A LAN's pseudonode (D55): a small square, not a router.
+  {
+    selector: 'node.lan',
+    style: {
+      shape: 'round-rectangle',
+      width: 22,
+      height: 22,
+      'background-color': '#64748b',
+      'border-width': 0,
+      'font-size': 11,
+      'text-valign': 'bottom',
+      'text-margin-y': 4,
+    },
+  },
 ]
 
 function nodeLabel(
@@ -254,11 +268,31 @@ function edgeLabels(metricAB: number, metricBA: number, failed: boolean) {
     : { label: mark, srcLabel: String(metricAB), tgtLabel: String(metricBA) }
 }
 
+/** Canvas id of a LAN's pseudonode and of a member's spoke to it (D55). */
+export const lanNodeId = (lan: string) => `lan:${lan}`
+export const spokeId = (lan: string, node: NodeId) => `lan:${lan}:${node}`
+
+/**
+ * The canvas edges that draw link `id`: itself, or for a LAN link the two members'
+ * spokes, the one of `from` first (D55).
+ */
+export function drawnEdges(t: Topology, id: string, from?: NodeId): string[] {
+  const l = t.links.find((x) => x.id === id)
+  if (l?.lan === undefined) return [id]
+  const [first, second] = from === l.b ? [l.b, l.a] : [l.a, l.b]
+  return [spokeId(l.lan, first), spokeId(l.lan, second)]
+}
+
 /** Put the topology on the canvas, changing only what differs so zoom and drag aren't disturbed. */
 export function sync(cy: cytoscape.Core, t: Topology) {
   cy.batch(() => {
-    const nodeIds = new Set(t.nodes.map((n) => n.id))
-    const linkIds = new Set(t.links.map((l) => l.id))
+    const lans = t.lans ?? []
+    const pos = new Map(t.nodes.map((n) => [n.id, n.pos ?? { x: 0, y: 0 }]))
+    const nodeIds = new Set([...t.nodes.map((n) => n.id), ...lans.map((l) => lanNodeId(l.id))])
+    const linkIds = new Set([
+      ...t.links.filter((l) => l.lan === undefined).map((l) => l.id),
+      ...lans.flatMap((l) => l.members.map((m) => spokeId(l.id, m.node))),
+    ])
     cy.edges().forEach((e) => {
       if (!linkIds.has(e.id())) e.remove()
     })
@@ -267,20 +301,51 @@ export function sync(cy: cytoscape.Core, t: Topology) {
     })
     for (const n of t.nodes) {
       const el = cy.getElementById(n.id)
-      const pos = n.pos ?? { x: 0, y: 0 }
+      const p = pos.get(n.id)!
       if (el.empty()) {
-        cy.add({ group: 'nodes', data: { id: n.id, name: n.name ?? '' }, position: { ...pos } })
+        cy.add({ group: 'nodes', data: { id: n.id, name: n.name ?? '' }, position: { ...p } })
       } else {
         el.data('name', n.name ?? '')
-        if (!el.grabbed()) el.position({ ...pos })
+        if (!el.grabbed()) el.position({ ...p })
       }
     }
     for (const l of t.links) {
+      if (l.lan !== undefined) continue
       const el = cy.getElementById(l.id)
       const data = { metricAB: l.metricAB, metricBA: l.metricBA }
       if (el.empty())
         cy.add({ group: 'edges', data: { id: l.id, source: l.a, target: l.b, ...data } })
       else el.data(data)
+    }
+    // A LAN is drawn as its pseudonode, in the middle of its members, with a spoke to
+    // each. A spoke costs the member's metric one way and 0 back (ISO 10589 §7.2.3).
+    for (const lan of lans) {
+      const at = lan.members.map((m) => pos.get(m.node)!)
+      const centre = {
+        x: at.reduce((a, p) => a + p.x, 0) / at.length,
+        y: at.reduce((a, p) => a + p.y, 0) / at.length,
+      }
+      const id = lanNodeId(lan.id)
+      const el = cy.getElementById(id)
+      if (el.empty())
+        cy.add({
+          group: 'nodes',
+          data: { id, name: '', lan: lan.id },
+          position: centre,
+          classes: 'lan',
+          grabbable: false,
+        })
+      else el.position(centre)
+      for (const m of lan.members) {
+        const sid = spokeId(lan.id, m.node)
+        // The member's first link on the LAN stands for the spoke when it is clicked.
+        const rep = t.links.find((l) => l.lan === lan.id && (l.a === m.node || l.b === m.node))
+        const data = { metricAB: m.metric, metricBA: 0, lan: lan.id, member: m.node, rep: rep?.id }
+        const e = cy.getElementById(sid)
+        if (e.empty())
+          cy.add({ group: 'edges', data: { id: sid, source: m.node, target: id, ...data } })
+        else e.data(data)
+      }
     }
   })
 }
@@ -309,6 +374,11 @@ export function decorate(
     const downNodes = new Set(extra.failedNodes ?? [])
     const overloaded = new Set(t.nodes.filter((n) => n.overload === true).map((n) => n.id))
     cy.nodes().forEach((n) => {
+      if (n.data('lan') !== undefined) {
+        n.data('display', n.data('lan'))
+        n.addClass('lan')
+        return
+      }
       const down = downNodes.has(n.id())
       const heat = extra.heat?.nodes[n.id()]
       const ol = overloaded.has(n.id())
@@ -321,8 +391,19 @@ export function decorate(
       if (heat) n.addClass(`heat-${heat.level}`)
     })
     cy.edges().forEach((e) => {
+      // A spoke is down when its router is, or all its links on the LAN are (D55).
+      const lan = e.data('lan') as string | undefined
+      const member = e.data('member') as NodeId | undefined
+      const spokeDown =
+        lan !== undefined &&
+        t.links
+          .filter((l) => l.lan === lan && (l.a === member || l.b === member))
+          .every((l) => failed.has(l.id))
       const f =
-        failed.has(e.id()) || downNodes.has(e.data('source')) || downNodes.has(e.data('target'))
+        spokeDown ||
+        failed.has(e.id()) ||
+        downNodes.has(e.data('source')) ||
+        downNodes.has(e.data('target'))
       const labels = edgeLabels(e.data('metricAB'), e.data('metricBA'), f)
       const heat = extra.heat?.links[e.id()]
       if (heat) {
@@ -350,7 +431,8 @@ export function decorate(
     add(h.source === null ? [] : [h.source], 'source')
     add(h.dest === undefined ? [] : [h.dest], 'dest')
     if (extra.linkStart) cy.getElementById(extra.linkStart).addClass('link-start')
-    if (extra.selection) cy.getElementById(extra.selection).addClass('sel')
+    if (extra.selection)
+      for (const id of drawnEdges(t, extra.selection)) cy.getElementById(id).addClass('sel')
 
     const drawPath = (
       path: NodeId[] | undefined,
@@ -367,6 +449,13 @@ export function decorate(
         const link =
           t.links.find((l) => l.id === named && joins(l)) ?? t.links.find((l) => joins(l))
         if (!link) continue
+        if (link.lan !== undefined) {
+          // x → LAN → y: x's spoke runs member → LAN, y's spoke LAN → member (D55).
+          const [out, into] = drawnEdges(t, link.id, x)
+          cy.getElementById(out!).addClass(kind).addClass(`${kind}-fwd`).data('arrow', color)
+          cy.getElementById(into!).addClass(kind).addClass(`${kind}-rev`).data('arrow', color)
+          continue
+        }
         const e = cy.getElementById(link.id)
         e.addClass(kind).addClass(link.a === x ? `${kind}-fwd` : `${kind}-rev`)
         e.data('arrow', color)
@@ -377,9 +466,10 @@ export function decorate(
     drawPath(h.final, h.finalLinks, 'final')
     if (h.flowing) cy.edges('.backup').addClass('flowing')
     if (h.packetAt !== undefined) cy.getElementById(h.packetAt).addClass('packet-at')
-    if (h.packetLink !== undefined) cy.getElementById(h.packetLink).addClass('packet-hop')
+    if (h.packetLink !== undefined)
+      for (const id of drawnEdges(t, h.packetLink)) cy.getElementById(id).addClass('packet-hop')
     for (const { link, lines, current } of h.packetStacks ?? []) {
-      const e = cy.getElementById(link)
+      const e = cy.getElementById(drawnEdges(t, link)[0]!)
       if (e.empty()) continue
       const metric = e.data('label') as string
       e.data('label', [metric, ...lines].filter((x) => x !== '').join('\n'))

@@ -473,3 +473,86 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Other options considered:** `Math.random` in the UI (can't reproduce a network someone reports); more shapes such as full mesh or hub-and-spoke (easy to add later).
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D51 – Node protection: Remote LFA per RFC 8102, TI-LFA with router E removed (2026-11-01)
+- **Why:** Later #1. Link-protecting backups break when the next-hop router fails (§8.1, Example 6 loops with TI-LFA). Real routers can be told to protect against the router instead.
+- **Where the setting lives:** in the topology, `protection: link | node` (only `node` is stored), like MSD (D44) and the LFA policy (D45), so the YAML file, share link, undo and the what-if diff pick it up with no extra wiring. Edited in the topology properties ("Backups protect against: Link failure / Node failure").
+- **TI-LFA (RFC 9855 §2.1, Appendix A):** the post-convergence SPF removes router E and all its links; the greedy walk's avoid-check becomes `dist(X,Y) < dist(X,E) + dist(E,Y)` (`docs/02-algorithms.md` §4.4). `computeTilfa(…, scope)` takes `'link' | 'node'`; `tilfaFor()` picks it from the goal.
+- **Remote LFA (RFC 8102, checked 2026-11-01):** per destination, node-protecting extended P-space (S's own, or through a neighbor N with `dist(N,Y) < dist(N,E) + dist(E,Y)`) ∩ the link's Q-space, then the PQ node's path to D avoids E. Best = lowest cost from S, then lowest id (§2.3.4). The tunnel through N must also never come back through S (the D17 rule); RFC 8102 states only the node test, so this is stricter, never looser. `nodeRlfa()` in `rlfa.ts`.
+- **Fallback:** when D is E itself, or nothing avoids E (no node path, no node-protecting PQ node), the link-protecting backup is installed and marked `protects: link` with `fallback`. RFC 8102 and RFC 9855 give no rule here; real routers fall back, and dropping the backup would leave the link unprotected too.
+- **What stays the same:** LFA selection (RFC 5286 Inequality 3 is already the node check; use `lfa_policy: { node_protecting: require }` to insist on it), ECMP, Remote LFA only when there is no LFA. Link mode results are byte-for-byte unchanged (a test compares them) and cost nothing extra: the node work only runs in node mode.
+- **Everything downstream follows:** `Protection.rlfa.best`/`exitVia` and `Protection.tilfa` hold the installed backup, so the results table, simulation, compare view, packet walk, coverage, heat map, what-if and weak spots use node-protecting backups with no changes of their own. Coverage adds a `node` count (pairs with D ≠ E; how many LFA-or-RLFA and TI-LFA backups avoid E). The table tags each Remote LFA and TI-LFA cell "(node-prot.)" or "(link only)", the detail panel shows the node P- and PQ sets and why a backup is link only, and the explain steps give every node check with its numbers.
+- **Not modelled:** RFC 8102 §2.3.3–2.3.4 preference for PQ nodes covering several ECMP next hops, and the "at most 16 PQ nodes" limit; per-router protection settings; SRLG (Later #3).
+- **New example:** `08-node-protection.yaml`, where the link-protecting PQ node B's path goes through E and the node-protecting PQ node is C.
+- **No new dependencies.**
+- **Status:** Accepted.
+
+### D52 – Import from FRR `show isis database detail` (2026-11-01)
+- **Why:** Later #2 and the "Vendor CLI import" backlog item. Engineers want to check FRR coverage on their real network without retyping it.
+- **What:** `importFrr()` in `src/io/frr.ts` (pure) reads the LSPs of one level: hostname, overload bit, extended (and narrow) IS reachability with metrics, Adj-SIDs, the algorithm-0 Prefix-SID of the router's host route, SRGB and node MSD (`docs/03-architecture.md` §5.1). A link needs both directions (the IS-IS two-way check); parallel adjacencies become a bundle. The result is checked with the YAML rules. UI: "Import FRR…" in the toolbar, a dialog with paste / open file, level picker, a live "Found: n routers, m links" line, every warning, then Load (auto layout, one undo step).
+- **Tolerant, not strict:** FRR's output is for people and changes between releases (hostnames or system ids, `Adjacency-SID` or `Adj-SID`, `Prefix-SID Index` or `Label`). The parser looks for those few lines and ignores the rest, and says what it skipped instead of failing. Tested on an FRR 8+ hostname-style dump (Example 2's ring, which gives the same backups as the hand-written file) and an older system-id dump with two levels, fragments, a LAN, a one-way adjacency, MT, IPv6 and backup Adj-SIDs.
+- **Not imported:** multi-topology, Flex-Algo SIDs (Later #6), per-router SRGBs (LFA Lab has one, D9), positions. Other vendors (Cisco `show isis database verbose`, Junos) are not parsed; their formats differ and there are no samples to test against.
+- **Other options considered:** parse `show isis database detail json` (FRR's JSON output differs a lot between releases and is often missing SR sub-TLVs); import `show isis topology` (has no Adj-SIDs or Prefix-SIDs).
+- **No new dependencies.**
+- **Status:** Accepted.
+
+### D53 – SRLG: links that fail together (2026-11-01)
+- **Why:** Later #3. Two links in one fibre duct fail together; a backup over the other link is no backup. Builds on the multi-failure simulation (D24).
+- **Model:** each link has an optional list of group names (`srlg: [duct-1]`, letters, digits, `_`, `.`, `-`). Two links share a risk when they have a name in common. Edited on the link ("SRLGs"), shown in the link tooltip.
+- **Failing a group:** "Fail SRLG duct-1 (n links)" on the link form and the right-click menu takes exactly those links down (the D24 multi-failure); nothing new in the simulation.
+- **Protection:** two more goals next to D51's: `srlg` and `node-srlg`. TI-LFA removes the shared links too and checks every segment against them (RFC 9855 §1); it falls back one step at a time (node + SRLG → node → SRLG → link) and says which it got. LFAs get `srlgDisjoint` and those rank first (RFC 7916 §6.2.4.1). Remote LFA keeps its PQ choice (RFC 7490 has no SRLG rule) and is marked SRLG-safe or not. `docs/02-algorithms.md` §18.
+- **One `protects` field for all goals:** `Protects` is `link | node | srlg | node-srlg`, and `fallback` is set whenever a backup protects less than the goal, so the table tag ("node-prot.", "SRLG-safe", "node+SRLG", amber "…, fallback") and the coverage lines need no special cases.
+- **Prefer, not require, for LFA:** an LFA sharing the SRLG still protects the link alone, which is better than nothing; a `require` knob can be added to the LFA policy later.
+- **Not modelled:** SRLG-aware PQ selection, SRLGs on routers (line cards: use node protection), weights per group, SRLG-diverse ECMP.
+- **New example:** `09-srlg.yaml`.
+- **No new dependencies.**
+- **Status:** Accepted.
+
+### D54 – Quiz mode for students (2026-11-01)
+- **Why:** Later #4. Students learn FRR by working the inequalities themselves; the app already has every answer and the reasoning.
+- **What:** "🎓 Quiz" under the results: ten multiple-choice questions on the network on screen (loop-free?, best LFA, simplest method, P-space, Q-space, PQ node, extra labels, label stack). After each answer it marks right and wrong, lists the explain steps with the numbers and the RFC, and opens that row so the diagram draws it. Score, "Next question", "New quiz" (next seed). `docs/02-algorithms.md` §19.
+- **Built from the engine:** `makeQuiz()` in `src/engine/quiz.ts` (pure, seeded) reads `computeForSource()`; it never works anything out on its own, so a quiz can't disagree with the results table. A property test checks every answer against the engine on random networks.
+- **Not stored:** the score lives in the panel only; no accounts, no backend (CLAUDE.md rule 5).
+- **Other options considered:** fixed question banks per example (only work on the examples, can drift from the engine); free-text answers (hard to mark fairly, e.g. label stacks with spaces or commas).
+- **No new dependencies.**
+- **Status:** Accepted.
+
+### D55 – LAN links as IS-IS pseudonodes (2026-11-01)
+- **Why:** Later #5. Real networks have Ethernet segments with three or more routers; IS-IS models each as a pseudonode, and FRR has its own rule for them (RFC 5286 §3.6).
+- **Model:** `lans: [{ id, metric, members }]` in the topology. The engine sees a link per pair of members, A→B costing A's metric to the LAN (pseudonode → B costs 0), tagged with `lan`. Every distance and next hop equals the pseudonode model, and nothing in the engine has to learn about a "router that isn't one" (P/Q spaces, label stacks, the simulation, the quiz…). The canvas draws the pseudonode and spokes instead of the pairs. `docs/02-algorithms.md` §20.
+- **Protection:** the failure of a LAN link is S's interface to the LAN, so S's other links on it fail too: LFAs across the same LAN are skipped, ECMP members on it don't protect, P(S) and TI-LFA avoid them (the SRLG machinery of D53), tunnel exits skip them. Node mode plans for E instead.
+- **Editing:** a LAN link's metric is its members' LAN metrics (changing one changes it for every neighbor on the LAN); renaming or deleting a router updates its LANs; deleting a LAN link deletes the LAN. LANs are created in YAML or by the FRR import (no drawing tool yet). Adj-SIDs set on a LAN link survive edits but aren't written to YAML (auto-assigned on load).
+- **Other options considered:** a real pseudonode in the graph (every space, path, packet walk and count would need "skip the pseudonode" rules); the RFC 5286 §3.6 stricter test "loop-free with respect to the pseudonode" for every alternate (rules out alternates whose path crosses the LAN between other members, which only S's interface failing doesn't break).
+- **No new dependencies.**
+- **Status:** Accepted.
+
+### D56 – Multi-level IS-IS as one level at a time (2026-11-01)
+- **Why:** Later #5. Large IS-IS networks use Level-1 areas and a Level-2 backbone; each level runs its own SPF, so FRR has to be looked at per level.
+- **Model:** a router's `level` (1, 2, or left out = 1-2 like FRR) and `area`, a link's and a LAN's `level` (circuit type). `levelTopology()` builds one level (ISO 10589 §7.2.1 adjacency rules: L1 only inside one area), and the sidebar's "IS-IS level" picker makes it the network on screen, so every view works on it with no changes. Edits made in a level are merged back (`mergeLevel()`); Export and Share write the whole network. `docs/02-algorithms.md` §21.
+- **Not modelled:** traffic between levels (ATT-bit default route, route leaking, RFC 5286 §6.2 inter-area LFA) and per-level metrics on one link; a switch of level clears failures and the undo history (an undo across two different networks would be confusing).
+- **FRR import:** "Both levels" now imports Level-1 and Level-2 together with levels and areas (D52).
+- **Other options considered:** one SPF that mixes the levels (an L1 router's path to another area goes to the nearest attached router first, so `dist` stops being a shortest path in one graph and the RFC inequalities no longer apply as written).
+- **No new dependencies.**
+- **Status:** Accepted.
+
+### D57 – Microloop view (2026-11-01)
+- **Why:** Later #6. FRR protects the first moment after a failure; the loops that follow while routers update one by one are a common surprise (RFC 5715), and TI-LFA deployments pair it with local convergence delay (RFC 8333).
+- **What:** `microloops()` in `src/engine/microloop.ts`: per destination, the cycles that mix old and new next hops (lowest-id tie-break, as the simulation draws). A PLR only has its new next hop (its repair carries the traffic until it updates), and a loop with an updated PLR is marked as avoided by local convergence delay. "Microloops while the network converges" in the failure panel, opened on demand. `docs/02-algorithms.md` §22.
+- **Not modelled:** timings (which order really happens), ECMP members other than the lowest-id one, ordered FIB updates (RFC 6976), SR-based microloop avoidance beyond RFC 8333.
+- **No new dependencies.**
+- **Status:** Accepted.
+
+### D58 – Flex-Algo (2026-11-01)
+- **Why:** Later #6. Operators carve low-delay or "avoid this colour" planes out of one IGP (RFC 9350), and FRR must stay inside each plane (§6.1).
+- **Model:** `flex_algo` definitions (metric IGP / TE / delay; exclude-any, include-any, include-all), link `affinity`, `te_metric`, `delay`, router `algos` and `algo_sids` (default index + 1000 per algorithm, checked unique over all algorithms). `flexTopology()` builds the algorithm's network; every engine view runs on it unchanged. The sidebar's "Algorithm" picker shows one, read-only. `docs/02-algorithms.md` §23.
+- **Read-only:** a Flex-Algo view costs links by TE metric or delay, so an edit there can't be written back to the IGP metric. Edits are refused with a short note; moving routers is allowed.
+- **Not modelled:** the FAD election and flags (RFC 9350 §5.3), ASLA (application-specific link attributes), per-direction TE metric and delay, Flex-Algo prefix metrics, inter-area Flex-Algo.
+- **No new dependencies.**
+- **Status:** Accepted.
+
+### D59 – SRv6 (2026-11-01)
+- **Why:** Later #6. Many new deployments use SRv6; TI-LFA is the same computation (RFC 9855 §7.2) with SIDs instead of labels.
+- **Model:** `dataplane: srv6` on the topology, a `locator` per router (default `fc00:0:<sid hex>::/48`). End SID = locator + 1, End.X SID = locator + 0x40 + the link's place in Adj-SID order. The repair list leaves out D (the inner destination); the MSD check counts SIDs. Shown in the results table, detail panel and explain steps. `docs/02-algorithms.md` §24.
+- **Not modelled:** uSID / compressed SIDs, H.Insert vs H.Encaps differences, End.X without a preceding End SID (RFC 9855 §7.2), an SRv6 packet walk (the walk and simulation labels stay SR-MPLS, and the panel says so).
+- **No new dependencies.**
+- **Status:** Accepted.

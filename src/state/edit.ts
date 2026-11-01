@@ -1,7 +1,17 @@
 // Topology edits for the canvas and properties panel (F1). Every function returns
 // a NEW topology and never changes its input: the engine caches by object (D15).
-import type { LfaPolicy, Link, NodeId, RouterNode, Topology } from '../engine/types'
+import { expandLans } from '../engine/lan'
+import type {
+  Lan,
+  LfaPolicy,
+  Link,
+  NodeId,
+  ProtectionGoal,
+  RouterNode,
+  Topology,
+} from '../engine/types'
 import { ID_PATTERN, MAX_LABEL, MAX_METRIC, MAX_MSD, MIN_MSD, uniqueLinkId } from '../io/yaml'
+import { SRLG_PATTERN } from '../io/yaml-format'
 // BMI-MSD is one octet (RFC 8491 §2); below 2 not even a Remote LFA tunnel fits.
 const msdError = `Max SID depth must be a whole number from ${MIN_MSD} to ${MAX_MSD}, or empty for no limit.`
 
@@ -55,9 +65,12 @@ export function moveRouter(t: Topology, id: NodeId, pos: Pos): Topology {
   return { ...t, nodes: t.nodes.map((n) => (n.id === id ? { ...n, pos: roundPos(pos) } : n)) }
 }
 
-/** Removes the router and every link that touches it, and takes it off LFA exclude lists. */
+/**
+ * Removes the router and every link that touches it, and takes it off LFA exclude
+ * lists and LANs (a LAN left with one member goes, D55).
+ */
 export function deleteRouter(t: Topology, id: NodeId): Topology {
-  return {
+  return withLans(t, (lan) => ({ ...lan, members: lan.members.filter((m) => m.node !== id) }), {
     ...t,
     nodes: t.nodes
       .filter((n) => n.id !== id)
@@ -68,7 +81,20 @@ export function deleteRouter(t: Topology, id: NodeId): Topology {
         ),
       ),
     links: t.links.filter((l) => l.a !== id && l.b !== id),
-  }
+  })
+}
+
+/**
+ * `next` with every LAN changed by `change` (null drops it), LANs under two members
+ * dropped, and the LAN links made again (D55).
+ */
+function withLans(t: Topology, change: (lan: Lan) => Lan | null, next: Topology = t): Topology {
+  if ((t.lans ?? []).length === 0) return next
+  const lans = (t.lans ?? []).flatMap((lan) => {
+    const c = change(lan)
+    return c === null || c.members.length < 2 ? [] : [c]
+  })
+  return expandLans({ ...next, lans })
 }
 
 /** The router with this exclude list; an empty list removes the field. */
@@ -80,7 +106,10 @@ function withExclude(n: RouterNode, list: NodeId[] | undefined): RouterNode {
   return next
 }
 
+/** Removes the link. A LAN's link stands for the whole LAN, so that removes the LAN (D55). */
 export function deleteLink(t: Topology, id: string): Topology {
+  const lan = t.links.find((l) => l.id === id)?.lan
+  if (lan !== undefined) return withLans(t, (x) => (x.id === lan ? null : x))
   return { ...t, links: t.links.filter((l) => l.id !== id) }
 }
 
@@ -154,12 +183,15 @@ export function updateRouter(t: Topology, id: NodeId, patch: RouterPatch): EditR
 
   const rename = (x: NodeId) => (x === id ? next.id : x)
   // Renamed links get new ids; parallel ones are numbered again in file order (D29).
-  const taken = new Set(t.links.filter((l) => l.a !== id && l.b !== id).map((l) => l.id))
+  const taken = new Set(
+    t.links.filter((l) => (l.a !== id && l.b !== id) || l.lan !== undefined).map((l) => l.id),
+  )
   const links =
     next.id === id
       ? t.links
       : t.links.map((l) => {
-          if (l.a !== id && l.b !== id) return l
+          // LAN links are made again from the LAN below (D55).
+          if ((l.a !== id && l.b !== id) || l.lan !== undefined) return l
           const a = rename(l.a)
           const b = rename(l.b)
           const newId = uniqueLinkId(linkId(a, b), taken)
@@ -171,7 +203,22 @@ export function updateRouter(t: Topology, id: NodeId, patch: RouterPatch): EditR
     if (next.id === id || me.lfaExclude === undefined) return me
     return withExclude(me, me.lfaExclude.map(rename).sort())
   })
-  return { ok: true, topology: { ...t, nodes, links } }
+  const renamed = { ...t, nodes, links }
+  if (next.id === id) return { ok: true, topology: renamed }
+  // LAN members follow the new id; their links are made again with new ids (D55).
+  return {
+    ok: true,
+    topology: withLans(
+      renamed,
+      (lan) => ({
+        ...lan,
+        members: lan.members
+          .map((m) => ({ ...m, node: rename(m.node) }))
+          .sort((a, b) => (a.node < b.node ? -1 : 1)),
+      }),
+      { ...renamed, links: renamed.links.filter((l) => l.lan === undefined) },
+    ),
+  }
 }
 
 export interface LinkPatch {
@@ -180,11 +227,33 @@ export interface LinkPatch {
   /** null removes the label (it is then auto-assigned, D18). */
   adjSidAB?: number | null
   adjSidBA?: number | null
+  /** Shared risk link group names; empty strings are dropped, an empty list removes it (D53). */
+  srlg?: string[]
 }
 
 export function updateLink(t: Topology, id: string, patch: LinkPatch): EditResult {
   const link = t.links.find((l) => l.id === id)
   if (!link) return { ok: false, error: `Link "${id}" does not exist.` }
+  if (link.lan !== undefined && (patch.metricAB !== undefined || patch.metricBA !== undefined)) {
+    // A LAN link's metrics are its members' metrics to the LAN (D55).
+    for (const m of [patch.metricAB, patch.metricBA])
+      if (m !== undefined && !isWhole(m, 1, MAX_METRIC))
+        return { ok: false, error: `Metric must be a whole number from 1 to ${fmt(MAX_METRIC)}.` }
+    const metricOf = (node: NodeId, m: number) =>
+      node === link.a ? (patch.metricAB ?? m) : node === link.b ? (patch.metricBA ?? m) : m
+    const rest: LinkPatch = { ...patch }
+    delete rest.metricAB
+    delete rest.metricBA
+    const t2 = withLans(t, (lan) =>
+      lan.id === link.lan
+        ? {
+            ...lan,
+            members: lan.members.map((x) => ({ ...x, metric: metricOf(x.node, x.metric) })),
+          }
+        : lan,
+    )
+    return Object.keys(rest).length === 0 ? { ok: true, topology: t2 } : updateLink(t2, id, rest)
+  }
   const next: Link = { ...link }
 
   for (const key of ['metricAB', 'metricBA'] as const) {
@@ -207,6 +276,17 @@ export function updateLink(t: Topology, id: string, patch: LinkPatch): EditResul
       return { ok: false, error: `Adj-SID must be a whole number from 0 to ${fmt(MAX_LABEL)}.` }
     next[key] = v
   }
+  if (patch.srlg !== undefined) {
+    const names = [...new Set(patch.srlg.map((x) => x.trim()).filter((x) => x !== ''))].sort()
+    const bad = names.find((x) => !SRLG_PATTERN.test(x))
+    if (bad !== undefined)
+      return {
+        ok: false,
+        error: `SRLG "${bad}": use letters, digits, "_", "." and "-" only.`,
+      }
+    if (names.length === 0) delete next.srlg
+    else next.srlg = names
+  }
   return { ok: true, topology: { ...t, links: t.links.map((l) => (l.id === id ? next : l)) } }
 }
 
@@ -217,6 +297,10 @@ export interface TopologyPatch {
   msd?: number | null
   /** Merged into the LFA policy; `prefer` is the default, so it is not stored (D45). */
   lfaPolicy?: LfaPolicy
+  /** What Remote LFA and TI-LFA protect against; `link` is the default, not stored (D51). */
+  protection?: ProtectionGoal
+  /** SR-MPLS (the default, not stored) or SRv6 (D59). */
+  dataplane?: 'mpls' | 'srv6'
 }
 
 export function updateTopology(t: Topology, patch: TopologyPatch): EditResult {
@@ -242,6 +326,10 @@ export function updateTopology(t: Topology, patch: TopologyPatch): EditResult {
     if (Object.keys(policy).length === 0) delete next.lfaPolicy
     else next.lfaPolicy = policy
   }
+  if (patch.dataplane === 'mpls') delete next.dataplane
+  else if (patch.dataplane === 'srv6') next.dataplane = 'srv6'
+  if (patch.protection === 'link') delete next.protection
+  else if (patch.protection !== undefined) next.protection = patch.protection
   return { ok: true, topology: next }
 }
 

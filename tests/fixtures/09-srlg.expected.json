@@ -1,0 +1,52 @@
+{
+  "$comment": "Expected engine results for Example 9 (docs/02-algorithms.md §18, D53). Only the fields listed here are checked. null means 'none'.",
+  "fixture": "09-srlg.yaml",
+  "source": "S",
+  "results": [
+    {
+      "dest": "D",
+      "cost": 2,
+      "nextHops": ["E"],
+      "protections": [
+        {
+          "protectedLink": { "from": "S", "to": "E", "id": "S-E" },
+          "ecmpProtected": false,
+          "srlg": ["A-B"],
+          "lfa": {
+            "candidates": [
+              {
+                "neighbor": "A",
+                "link": "S-A",
+                "loopFree": true,
+                "downstream": false,
+                "nodeProtecting": true,
+                "srlgDisjoint": false,
+                "cost": 3
+              },
+              {
+                "neighbor": "C",
+                "link": "S-C",
+                "loopFree": true,
+                "downstream": false,
+                "nodeProtecting": true,
+                "srlgDisjoint": true,
+                "cost": 6
+              }
+            ],
+            "best": "C"
+          },
+          "rlfa": { "needed": false, "best": null },
+          "tilfa": {
+            "path": ["S", "C", "D"],
+            "outLink": "S-C",
+            "segments": [{ "kind": "prefix", "node": "D", "label": 16006 }],
+            "labelStack": [16006],
+            "extraLabels": 0,
+            "protects": "srlg",
+            "fallback": null
+          }
+        }
+      ]
+    }
+  ]
+}

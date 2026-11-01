@@ -259,7 +259,7 @@ describe('parseTopology: errors that help fix the file', () => {
   it('lists the allowed keys when there is no close match', () => {
     const errors = errorsOf('name: t\nnodes: []\ncolour: red\n')
     expect(errors).toContainEqual(
-      'Unknown key "colour". Allowed keys: name, srgb_base, msd, lfa_policy, nodes, links.',
+      'Unknown key "colour". Allowed keys: name, srgb_base, msd, lfa_policy, protection, flex_algo, dataplane, lans, nodes, links.',
     )
   })
 

@@ -7,11 +7,14 @@ import { computeLfa, ecmpProtectorLinks, primaryLink } from './lfa'
 import { hopLinks, lfaPath, rlfaPath } from './paths'
 import { lfaPolicyOf } from './lfa-policy'
 import { isTooDeep, msdOf } from './msd'
-import { computeRlfa } from './rlfa'
+import { lanFate } from './lan'
+import { protectionOf } from './protection'
+import { hasNode, hasSrlg, rlfaAvoidsSrlg, sharedEdges, srlgShared } from './srlg'
+import { computeRlfa, nodeRlfa } from './rlfa'
 import type { Method } from './rows'
 import { allPairs, dist } from './spf'
-import { computeTilfa } from './tilfa'
-import type { NodeId, Segment, Topology } from './types'
+import { computeTilfa, tilfaFor } from './tilfa'
+import type { NodeId, Protects, Segment, Topology } from './types'
 
 export type CompareMethod = Exclude<Method, 'ecmp'>
 
@@ -55,6 +58,8 @@ export interface BackupOption {
   exitVia?: NodeId
   /** LFA: N's path to D also avoids E (RFC 5286 Inequality 3). */
   nodeProtecting?: boolean
+  /** Node mode (D51), Remote LFA and TI-LFA: does this backup avoid router E? */
+  protects?: Protects
 }
 
 export interface BackupComparison {
@@ -114,8 +119,13 @@ export function compareBackups(
   const primaryLinks = hopLinks(topology, primaryPath, { first: link }).map((l) => l!)
   const primary = { path: primaryPath, links: primaryLinks, cost: dist(table, s, d) }
 
-  const tilfa = computeTilfa(topology, s, d, e, link)
-  const final = tilfa.path && route(tilfa.path, tilfa.outLink)
+  // S's final path is the link post-convergence path; in node mode TI-LFA may take
+  // another one that also avoids router E (D51), so it can be longer than final.
+  const goal = protectionOf(topology)
+  const linkTilfa = computeTilfa(topology, s, d, e, link)
+  const final = linkTilfa.path && route(linkTilfa.path, linkTilfa.outLink)
+  const tilfa = goal !== 'link' ? tilfaFor(topology, s, d, e, link, goal) : linkTilfa
+  const tilfaRoute = tilfa === linkTilfa ? final : tilfa.path && route(tilfa.path, tilfa.outLink)
 
   const vsFinal = (r: RoutePath): VsFinal | undefined => {
     if (!final) return undefined
@@ -144,7 +154,17 @@ export function compareBackups(
         }
 
   // LFA (RFC 5286): S just sends to N, so the packet keeps D's own label.
-  const lfa = computeLfa(table, s, d, e, link, lfaPolicyOf(topology, s))
+  const lan = lanFate(topology, table.graph, link, s)
+  const lfa = computeLfa(
+    table,
+    s,
+    d,
+    e,
+    link,
+    lfaPolicyOf(topology, s),
+    hasSrlg(goal) ? sharedEdges(table.graph, srlgShared(topology, link)) : [],
+    lan.ids,
+  )
   const lfaCand = lfa.candidates.find((c) => c.link === lfa.bestLink)
   const lfaRoute =
     lfa.best === undefined ? undefined : route(lfaPath(table, s, lfa.best, d)!, lfa.bestLink)
@@ -154,25 +174,45 @@ export function compareBackups(
   })
 
   // Remote LFA (RFC 7490): the tunnel label is the PQ node's Prefix-SID (SR-MPLS, D35).
-  const rlfa = computeRlfa(table, s, e, { extended: options.extended ?? true, link })
-  const pq = rlfa.best
-  const exit = pq === undefined ? undefined : rlfa.exitVia[pq]
+  const rlfa = computeRlfa(table, s, e, {
+    extended: options.extended ?? true,
+    link,
+    lanEdges: lan.edges,
+  })
+  // What the tunnel protects in the goal: node (D51), and the SRLG (D53).
+  const sharedE = hasSrlg(goal) ? sharedEdges(table.graph, srlgShared(topology, link)) : []
+  const rlfaProtects = (pq: NodeId, exit: NodeId | undefined): Protects => {
+    const node = nodePq?.best !== undefined
+    const srlg = hasSrlg(goal) && rlfaAvoidsSrlg(table, s, pq, exit, d, sharedE)
+    return node ? (srlg ? 'node-srlg' : 'node') : srlg ? 'srlg' : 'link'
+  }
+  // Node mode: a node-protecting PQ node first (RFC 8102), else the link one (D51).
+  const nodePq = hasNode(goal) && d !== e ? nodeRlfa(table, rlfa, d) : undefined
+  const pq = nodePq?.best ?? rlfa.best
+  const exit =
+    pq === undefined
+      ? undefined
+      : nodePq?.best !== undefined
+        ? nodePq.exitVia[pq]
+        : rlfa.exitVia[pq]
   const rlfaNodes = pq === undefined ? undefined : rlfaPath(table, s, pq, exit, d)
   const rlfaRoute = rlfaNodes && route(rlfaNodes)
   const tunnel = pq === undefined || pq === d ? [prefix(d)] : [prefix(pq), prefix(d)]
   const rlfaOpt = option('rlfa', rlfaRoute, tunnel, {
     ...(pq !== undefined && { via: pq }),
     ...(exit !== undefined && { exitVia: exit }),
+    ...(goal !== 'link' && pq !== undefined && { protects: rlfaProtects(pq, exit) }),
   })
 
   // TI-LFA (RFC 9855): the post-convergence path, with its segment list.
   const msd = msdOf(topology, s)
-  const tiOpt = option('tilfa', final, tilfa.segments ?? [], {
+  const tiOpt = option('tilfa', tilfaRoute, tilfa.segments ?? [], {
     ...(msd !== undefined && { msd }),
     ...(isTooDeep(tilfa.labelStack ?? [], msd) && { tooDeep: true }),
+    ...(goal !== 'link' && tilfa.path !== undefined && { protects: tilfa.scope }),
   })
 
-  const ecmp = ecmpProtectorLinks(table, s, d, e, link).length > 0
+  const ecmp = ecmpProtectorLinks(table, s, d, e, link, lan.ids).length > 0
   const protectedBy: Method | null = ecmp
     ? 'ecmp'
     : lfaOpt.found

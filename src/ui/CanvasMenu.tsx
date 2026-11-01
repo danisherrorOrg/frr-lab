@@ -1,4 +1,5 @@
 import type { KeyboardEvent } from 'react'
+import { srlgGroups } from '../engine/srlg'
 import { useStore, type Selection } from '../state/store'
 import { bundles, linkName } from './format'
 
@@ -84,6 +85,13 @@ export function CanvasMenu({
         // Its router is down, so the link is down whatever this says.
         disabled: routerDown && !down,
       },
+      // D53: fail every link of the link's SRLG at once.
+      ...srlgGroups(topology)
+        .filter((g) => l?.srlg?.includes(g.group))
+        .map((g) => ({
+          text: `✕ Fail SRLG ${g.group} (${g.links.length} links)`,
+          act: () => st().failOnly({ links: g.links }),
+        })),
       { text: '✎ Edit metric…', act: () => onEditMetric(target.id) },
       { text: '🔍 What uses this link?', act: () => st().openLinkView(target.id) },
       { text: '⇄ What if the metric changes?', act: () => st().openWhatIf(target.id) },

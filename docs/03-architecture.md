@@ -58,12 +58,21 @@ LFA LAB/
 │   │   ├── what-if.ts       coverage before vs after one change, e.g. a new metric (§13 of 02)
 │   │   ├── msd.ts           max SID depth: each router's limit, and "is this stack too deep?" (§14 of 02)
 │   │   ├── lfa-policy.ts    LFA policy: each router's preferences and excluded neighbors (§15 of 02)
+│   │   ├── protection.ts    link or node protection for Remote LFA and TI-LFA (§3.1, §4.4 of 02)
+│   │   ├── flex-algo.ts     Flex-Algo topology: participation, constraints, metric, SIDs (§23 of 02)
+│   │   ├── lan.ts           broadcast LANs: member-to-member links, a router's LAN interface (§20 of 02)
+│   │   ├── levels.ts        multi-level IS-IS: level views, merging edits back (§21 of 02)
+│   │   ├── microloop.ts     loops some update order can make while the network converges (§22 of 02)
+│   │   ├── quiz.ts          quiz questions from the results, seeded (§19 of 02)
+│   │   ├── srlg.ts
+│   │   ├── srv6.ts          SRv6 locators, End / End.X SIDs, repair SID list (§24 of 02)          shared risk link groups: groups, shared links, SRLG-safe checks (§18 of 02)
 │   │   ├── weak-spots.ts    weakest spots: every link and router failed alone, ranked (§17 of 02)
 │   │   ├── simulate.ts      failure simulation, per source and for every router
 │   │   └── index.ts         computeForSource(), computeCoverage()
 │   ├── io/
 │   │   ├── yaml.ts          load/save + schema validation
 │   │   ├── csv.ts           coverage report → CSV text
+│   │   ├── frr.ts           FRR "show isis database detail" text → topology (§5.1)
 │   │   └── share-url.ts
 │   ├── worker/
 │   │   ├── engine.worker.ts thin worker: passes messages to protocol.ts
@@ -81,6 +90,7 @@ LFA LAB/
 │   │   ├── export-image.ts  Diagram as PNG (Cytoscape) or SVG (written from computed styles)
 │   │   ├── Sidebar.tsx      tools, source picker, settings
 │   │   ├── Toolbar.tsx      add node/link, fail mode, examples, import/export
+│   │   ├── FrrImportDialog.tsx  paste / open FRR output, preview, load (D52)
 │   │   ├── CanvasMenu.tsx   right-click menu on a router or link (D30)
 │   │   ├── MetricEditor.tsx double-click a link to edit its metric (D30)
 │   │   ├── ResultsTable.tsx one source's table (RowsTable, shared with AllResults)
@@ -94,6 +104,7 @@ LFA LAB/
 │   │   ├── LinkView.tsx     per-link view: pick a link, its traffic and repairs both ways
 │   │   ├── WhatIf.tsx       what-if diff: try a metric on a link or a router's overload bit, coverage before → after
 │   │   ├── WeakSpots.tsx    weakest spots: links and routers ranked by the traffic their failure leaves unprotected
+│   │   ├── Quiz.tsx         quiz mode: ten questions on this network, with the reasoning
 │   │   ├── CoverageReport.tsx
 │   │   └── PropertiesPanel.tsx  edit selected node/link
 │   ├── App.tsx  main.tsx
@@ -113,6 +124,11 @@ interface RouterNode {
   msd?: number;          // max SID depth of this router; overrides Topology.msd (D44)
   lfaExclude?: NodeId[]; // neighbors never used as an LFA (RFC 7916 §6.2.4.4, D45)
   overload?: boolean;    // IS-IS overload bit: never transit, never a backup (D47)
+  level?: '1' | '2';     // IS-IS level; none = L1/L2 (D56)
+  area?: string;         // IS-IS area, e.g. "49.0001" (D56)
+  algos?: number[];      // Flex-Algos it takes part in; none = all (D58)
+  algoSids?: Record<number, number>;  // Prefix-SID index per Flex-Algo; none = auto (D58)
+  locator?: string;      // SRv6 locator; none = fc00:0:<sid hex>::/48 (D59)
   pos?: { x: number; y: number };  // UI only, ignored by the engine
 }
 
@@ -123,6 +139,17 @@ interface Link {
   metricBA: number;      // cost b→a (defaults to metricAB)
   adjSidAB?: number;     // Adj-SID label a→b (optional; auto if missing)
   adjSidBA?: number;
+  srlg?: string[];       // shared risk link groups: links with a name in common fail together (D53)
+  lan?: string;          // set on the member-to-member links made from a LAN (D55)
+  level?: '1' | '2';     // circuit type; none = both levels (D56)
+  affinity?: string[];   // link colours for Flex-Algo constraints (D58)
+  teMetric?: number; delay?: number;  // other metrics a Flex-Algo can use (D58)
+}
+
+interface Lan {          // a broadcast LAN = an IS-IS pseudonode (D55)
+  id: string;
+  members: { node: NodeId; metric: number }[];  // metric = member → LAN; LAN → member is 0
+  level?: '1' | '2';
 }
 
 interface Topology {
@@ -131,8 +158,13 @@ interface Topology {
   msd?: number;          // max SID depth of every router (RFC 8491 §5); none = no limit (D44)
   lfaPolicy?: { nodeProtecting?: 'prefer' | 'require' | 'ignore';
                 downstream?: 'prefer' | 'require' | 'ignore' };  // RFC 7916 §6.2; none = prefer both (D45)
+  protection?: 'link' | 'node' | 'srlg' | 'node-srlg';  // what backups protect against; none = link (D51, D53)
   nodes: RouterNode[];
   links: Link[];         // point-to-point; parallel links allowed, each with its own id (D29)
+  lans?: Lan[];          // their member-to-member links are in `links` with `lan` set (D55)
+  flexAlgos?: { algo: number; metric?: 'igp' | 'te' | 'delay';
+                excludeAny?: string[]; includeAny?: string[]; includeAll?: string[] }[];  // D58
+  dataplane?: 'srv6';    // none = SR-MPLS (D59)
 }
 
 type Segment =
@@ -152,10 +184,13 @@ interface Protection {          // for one (S, D, protected link S–E)
   lfa:   { candidates: LfaCandidate[]; best?: NodeId; bestLink?: string };
   rlfa:  { pSpace: NodeId[]; extPSpace: NodeId[]; qSpace: NodeId[]; pq: NodeId[];
            exitVia: Record<NodeId, NodeId>;  // PQ node → neighbor to send through (D11)
-           extended: boolean; needed: boolean; best?: NodeId };  // needed = false when an LFA exists
+           extended: boolean; needed: boolean; best?: NodeId;  // needed = false when an LFA exists
+           node?: { pSpace: NodeId[]; pq: NodeId[]; best?: NodeId };   // RFC 8102, node mode, D ≠ E (D51)
+           protects?: 'link' | 'node'; fallback?: 'dest-is-next-hop' | 'none' };
   tilfa: { path?: NodeId[]; outLink?: string;  // outLink: outgoing interface, RFC 9855 §5
            segments?: Segment[]; labelStack?: number[]; extraLabels?: number;
-           msd?: number; tooDeep?: boolean };  // tooDeep: stack > S's MSD, not installed (D44)
+           msd?: number; tooDeep?: boolean;   // tooDeep: stack > S's MSD, not installed (D44)
+           protects?: 'link' | 'node'; fallback?: 'dest-is-next-hop' | 'none' };  // node mode (D51)
   explain: ExplainStep[];
 }
 
@@ -173,15 +208,22 @@ name: Five-node ring
 srgb_base: 16000          # optional, default 16000
 msd: 3                    # optional max SID depth of every router, 2 to 255 (D44)
 lfa_policy: { node_protecting: prefer, downstream: require }  # optional, prefer / require / ignore (D45)
+protection: node          # optional, link (default), node, srlg or node-srlg (D51, D53)
+dataplane: srv6           # optional, mpls (default) or srv6 (D59)
+flex_algo: [{ algo: 128, metric: delay, exclude_any: [red] }]  # optional Flex-Algos (D58)
 nodes:
   - { id: S, sid: 1 }
   - { id: E, sid: 2, msd: 2, lfa_exclude: [C] }               # msd optional, overrides the top one; lfa_exclude optional
   - { id: A, sid: 4, overload: true }                          # optional overload bit: no transit through A (D47)
+  - { id: B, sid: 5, level: 2, area: "49.0001" }               # optional IS-IS level (1, 2, 1-2) and area (D56)
   - { id: C, sid: 3, name: "Core-3", pos: { x: 120, y: 40 } }  # name, pos optional
 links:
   - { a: S, b: E, metric: 1 }                 # same metric both ways
   - { a: E, b: C, metric: 10, metric_ba: 20 } # different reverse metric
-  - { a: B, b: C, metric: 10, adj_sid_ab: 24005 }
+  - { a: B, b: C, metric: 10, adj_sid_ab: 24005, srlg: [duct-7] }  # srlg optional (D53)
+  - { a: S, b: B, metric: 20, level: 2 }      # level optional: circuit type (D56)
+lans:                                         # optional broadcast LANs (D55)
+  - { id: LAN1, metric: 10, members: [S, A, { node: C, metric: 20 }] }
 ```
 **Validation rules** (show clear errors in the UI):
 - Node ids are unique; SID indices are unique; links point to existing nodes.
@@ -194,6 +236,27 @@ links:
 - Keys the format doesn't list are errors with a "did you mean" hint (e.g. `metrc` → `metric`, `from` → `a`), so a typo can't silently change the network.
 - A YAML syntax error gives its line and column; an empty file says so.
 - The key lists live in `src/io/yaml-format.ts`. The loader and the in-app **YAML format** guide (toolbar button, and a link in the import error box) both read them, so the guide always matches what loads. The guide has a checker: paste a file, see every problem as you type, then load it (D40).
+
+### 5.1 Import from FRR (Later #2, D52)
+`importFrr(text, { level })` in `src/io/frr.ts` turns the output of FRR's `vtysh -c "show isis database detail"` into a topology. It is pure (text in, topology out), and nothing leaves the browser. The toolbar's **Import FRR…** opens a dialog: paste the text or open a file, see what was found and every warning, pick the level, then load (auto layout, one undo step).
+
+| From the output | Becomes |
+|---|---|
+| `IS-IS Level-N link-state database` | one database per level; Level-2 by default, else the first |
+| LSP ID `rt1.00-00` / `0000.0000.0001.00-00`, fragments `-01` … | one router; fragments merged |
+| `Hostname:` (RFC 5301) | router id, made safe (`pe-1` → `pe_1`, `name: pe-1`); else the system id |
+| `ATT/P/OL` = `…/1` in fragment 0 | `overload: true` |
+| `Extended Reachability: rt2.00 (Metric: 10)`, also narrow `IS Reachability` | one direction of a link and its metric |
+| `Adjacency-SID: 15001 … F:0 B:0` under it | that direction's Adj-SID: the IPv4 primary (F:0, B:0) wins over backup or IPv6 ones |
+| `Prefix-SID Index: 1, Algorithm: 0` (or `Label:`) under a /32 or /128 | `sid` (label − SRGB for a label) |
+| `SRGB Base: 16000` | `srgb_base` (the most common one; warns if routers differ, D9) |
+| `Node Maximum SID Depth: 16` | the router's `msd` (2 to 255) |
+
+- **Links need both ends:** a→b is paired with b→a in the order the LSPs list them, so two adjacencies each way give a bundle (D29). An entry only one side lists fails the IS-IS two-way check and is skipped with a warning.
+- **LANs (D55):** a pseudonode LSP (`rt2.01-00`) lists the routers on the LAN; each router lists the pseudonode with its metric. A router that both list is a member; the LAN's id is the DIS's id and the pseudonode number (`p_2.01`).
+- **Both levels (D56):** "Both levels" in the dialog (`level: 'all'`) imports Level-1 and Level-2 as one network: a router in one level's database only gets `level: 1` or `level: 2`, its `Area Address` becomes `area`; an adjacency or LAN the same in both levels is one, otherwise each gets its `level`.
+- **Skipped, with a warning:** multi-topology (MT) entries, links to routers with no LSP in this level, Flex-Algo SIDs (algorithm ≠ 0). A router with no Prefix-SID gets the lowest free index.
+- The result goes through the YAML rules (`parseTopology(serializeTopology(t))`), so it can't hold a value a file couldn't.
 
 ## 6. UI layout
 ```

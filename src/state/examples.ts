@@ -7,6 +7,10 @@ import isp from '../../examples/04-isp-core.yaml?raw'
 import leafSpine from '../../examples/05-leaf-spine.yaml?raw'
 import linkProtecting from '../../examples/06-link-protecting.yaml?raw'
 import parallel from '../../examples/07-parallel.yaml?raw'
+import nodeProtection from '../../examples/08-node-protection.yaml?raw'
+import srlg from '../../examples/09-srlg.yaml?raw'
+import lanLevels from '../../examples/10-lan-levels.yaml?raw'
+import flexAlgo from '../../examples/11-flex-algo.yaml?raw'
 import type { NodeId, Topology } from '../engine/types'
 import { parseTopology } from '../io/yaml'
 
@@ -36,6 +40,15 @@ export const EXAMPLES: Example[] = [
     yaml: linkProtecting,
   },
   { key: 'parallel', title: 'Parallel links: bundles S–E and E–D', source: 'S', yaml: parallel },
+  {
+    key: 'node-protection',
+    title: 'Node protection: avoid the next-hop router',
+    source: 'S',
+    yaml: nodeProtection,
+  },
+  { key: 'srlg', title: 'SRLG: one duct, two links', source: 'S', yaml: srlg },
+  { key: 'lan-levels', title: 'LAN and IS-IS levels', source: 'R2', yaml: lanLevels },
+  { key: 'flex-algo', title: 'Flex-Algo: low delay, avoid red', source: 'S', yaml: flexAlgo },
 ]
 
 /** The example's topology. The files are checked by tests, so a failure here is a bug. */

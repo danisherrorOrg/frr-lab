@@ -1,0 +1,72 @@
+Area CORE:
+IS-IS Level-1 link-state database:
+LSP ID                  PduLen  SeqNumber   Chksum  Holdtime  ATT/P/OL
+0000.0000.0001.00-00 *    120   0x00000002  0x1a2b     1100    1/0/0
+  Protocol Supported: IPv4
+  Area Address: 49.0001
+  Hostname: pe-1
+  Extended Reachability: 0000.0000.0002.00 (Metric: 10)
+  Extended IP Reachability: 192.0.2.1/32 (Metric: 0)
+    Prefix-SID Index: 101, Algorithm: 0, Flags:NO-PHP
+0000.0000.0002.00-00      120   0x00000002  0x1a2c     1100    0/0/0
+  Protocol Supported: IPv4
+  Area Address: 49.0001
+  Hostname: p-2
+  Extended Reachability: 0000.0000.0001.00 (Metric: 10)
+  Extended IP Reachability: 192.0.2.2/32 (Metric: 0)
+    Prefix-SID Index: 102, Algorithm: 0, Flags:NO-PHP
+
+IS-IS Level-2 link-state database:
+LSP ID                  PduLen  SeqNumber   Chksum  Holdtime  ATT/P/OL
+0000.0000.0001.00-00 *    300   0x00000009  0x2a2b     1100    0/0/0
+  Protocol Supported: IPv4, IPv6
+  Area Address: 49.0001
+  Hostname: pe-1
+  Router Capability: 192.0.2.1 , D:0, S:0
+    Segment Routing: I:1 V:1, SRGB Base: 20000 Range: 8000
+    Node Maximum SID Depth: 4
+  Extended Reachability: 0000.0000.0002.00 (Metric: 10)
+    Adjacency-SID: 24100, Weight: 0, Flags: F:1 B:0, V:1, L:1, S:0, P:0
+    Adjacency-SID: 24101, Weight: 0, Flags: F:0 B:0, V:1, L:1, S:0, P:0
+  Extended Reachability: 0000.0000.0002.00 (Metric: 20)
+  Extended Reachability: 0000.0000.0003.00 (Metric: 15)
+  Extended Reachability: 0000.0000.0009.00 (Metric: 5)
+  MT Reachability: 0000.0000.0002.00 (Metric: 10) IPv6 unicast
+  Extended IP Reachability: 192.0.2.1/32 (Metric: 0)
+    Prefix-SID Index: 1, Algorithm: 0, Flags:NO-PHP
+  Extended IP Reachability: 192.0.2.1/32 (Metric: 0)
+    Prefix-SID Index: 201, Algorithm: 128, Flags:NO-PHP
+0000.0000.0001.00-01 *     90   0x00000003  0x2a2c     1100    0/0/0
+  Extended Reachability: 0000.0000.0004.00 (Metric: 30)
+0000.0000.0002.00-00      300   0x00000009  0x3a2b     1100    0/0/1
+  Protocol Supported: IPv4
+  Hostname: p-2
+  Router Capability: 192.0.2.2 , D:0, S:0
+    Segment Routing: I:1 V:1, SRGB Base: 20000 Range: 8000
+  Extended Reachability: 0000.0000.0001.00 (Metric: 10)
+    Adjacency-SID: 24200, Weight: 0, Flags: F:0 B:0, V:1, L:1, S:0, P:0
+  Extended Reachability: 0000.0000.0001.00 (Metric: 25)
+  Extended Reachability: 0000.0000.0002.01 (Metric: 10)
+  Extended IP Reachability: 192.0.2.2/32 (Metric: 0)
+    Prefix-SID Label: 20002, Algorithm: 0
+0000.0000.0002.01-00      60   0x00000001  0x4a2b     1100    0/0/0
+  Extended Reachability: 0000.0000.0002.00 (Metric: 0)
+  Extended Reachability: 0000.0000.0003.00 (Metric: 0)
+0000.0000.0003.00-00      200   0x00000004  0x5a2b     1100    0/0/0
+  Protocol Supported: IPv4
+  Hostname: p-3
+  Router Capability: 192.0.2.3 , D:0, S:0
+    Segment Routing: I:1 V:1, SRGB Base: 20000 Range: 8000
+  Extended Reachability: 0000.0000.0001.00 (Metric: 15)
+  Extended Reachability: 0000.0000.0002.01 (Metric: 10)
+  Extended Reachability: 0000.0000.0004.00 (Metric: 30)
+  Extended IP Reachability: 192.0.2.3/32 (Metric: 0)
+0000.0000.0004.00-00      200   0x00000004  0x6a2b     1100    0/0/0
+  Protocol Supported: IPv4
+  Hostname: pe-4
+  Router Capability: 192.0.2.4 , D:0, S:0
+    Segment Routing: I:1 V:1, SRGB Base: 20000 Range: 8000
+  Extended Reachability: 0000.0000.0001.00 (Metric: 30)
+  Extended Reachability: 0000.0000.0003.00 (Metric: 30)
+  Extended IP Reachability: 192.0.2.4/32 (Metric: 0)
+    Prefix-SID Index: 4, Algorithm: 0, Flags:NO-PHP

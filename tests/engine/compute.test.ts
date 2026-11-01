@@ -13,6 +13,10 @@ const FIXTURES = [
   '05-leaf-spine.yaml',
   '06-link-protecting.yaml',
   '07-parallel.yaml',
+  '08-node-protection.yaml',
+  '09-srlg.yaml',
+  '10-lan-levels.yaml',
+  '11-flex-algo.yaml',
 ]
 
 /** JSON null means "none": drop it here, and list where it was so the test can check it's absent. */

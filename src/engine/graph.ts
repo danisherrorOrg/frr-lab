@@ -144,3 +144,32 @@ export function withoutLink(graph: Graph, linkId: string): Graph {
     overloaded: graph.overloaded,
   }
 }
+
+/**
+ * The same graph without router `node`'s links (both directions): the network once
+ * that router has failed (RFC 9855 §2.1, SPT_new(R, X) with X a node). The router
+ * stays in `nodes` but can't be reached.
+ */
+export function withoutNode(graph: Graph, node: NodeId): Graph {
+  const drop = (m: Map<NodeId, Edge[]>) =>
+    new Map([...m].map(([k, edges]) => [k, edges.filter((e) => e.from !== node && e.to !== node)]))
+  return {
+    nodes: graph.nodes,
+    out: drop(graph.out),
+    in: drop(graph.in),
+    overloaded: graph.overloaded,
+  }
+}
+
+/** The same graph without these links (both directions): an SRLG failing (D53). */
+export function withoutLinks(graph: Graph, ids: ReadonlySet<string>): Graph {
+  if (ids.size === 0) return graph
+  const drop = (m: Map<NodeId, Edge[]>) =>
+    new Map([...m].map(([k, edges]) => [k, edges.filter((e) => !ids.has(e.linkId))]))
+  return {
+    nodes: graph.nodes,
+    out: drop(graph.out),
+    in: drop(graph.in),
+    overloaded: graph.overloaded,
+  }
+}

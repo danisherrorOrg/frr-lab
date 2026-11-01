@@ -56,6 +56,23 @@ function Bars({ c }: { c: CoverageCounts }) {
       <p className="text-xs text-slate-500">
         {c.pairs} (destination, link) pairs; {c.ecmp} of them ECMP-protected (counted in LFA).
       </p>
+      {/* Node mode (D51): how many backups also survive the next-hop router failing. */}
+      {c.node !== undefined && (
+        <p className="text-xs" aria-label="Node protection">
+          Node protection: of {c.node.pairs} pairs whose next hop isn&apos;t the destination,{' '}
+          {c.node.rlfa} ({pct(c.node.rlfa, c.node.pairs)}) have an LFA or Remote LFA that avoids the
+          next-hop router, {c.node.tilfa} ({pct(c.node.tilfa, c.node.pairs)}) a TI-LFA repair that
+          does. The rest only protect the link.
+        </p>
+      )}
+      {/* SRLG modes (D53): backups that also survive the link's whole SRLG failing. */}
+      {c.srlg !== undefined && (
+        <p className="text-xs" aria-label="SRLG protection">
+          SRLG protection: of {c.srlg.pairs} pairs whose link shares an SRLG, {c.srlg.rlfa} (
+          {pct(c.srlg.rlfa, c.srlg.pairs)}) have an LFA or Remote LFA that avoids the whole SRLG,{' '}
+          {c.srlg.tilfa} ({pct(c.srlg.tilfa, c.srlg.pairs)}) a TI-LFA repair that does.
+        </p>
+      )}
       {c.tooDeep > 0 && (
         <p className="text-xs font-semibold text-red-700 dark:text-red-400">
           ⚠ {c.tooDeep} TI-LFA repair{c.tooDeep === 1 ? ' needs' : 's need'} more labels than the

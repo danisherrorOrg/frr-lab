@@ -79,11 +79,11 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 - [x] Results for every router as the DUT, with the failure view per DUT (D31)
 
 ## Later (v0.2+), in priority order
-1. Node protection (RLFA per RFC 8102, TI-LFA with node E removed)
-2. Import from FRR `show isis database detail`
-3. SRLG
-4. Quiz mode for students
-5. LAN links / pseudonodes, multi-level IS-IS
-6. Microloop view, Flex-Algo, SRv6
+1. [x] Node protection (RLFA per RFC 8102, TI-LFA with node E removed) *(D51)*
+2. [x] Import from FRR `show isis database detail` *(D52)*
+3. [x] SRLG *(D53)*
+4. [x] Quiz mode for students *(D54)*
+5. [x] LAN links / pseudonodes, multi-level IS-IS *(D55, D56)*
+6. [x] Microloop view, Flex-Algo, SRv6 *(D57–D59)*
 
 **Total MVP estimate:** about 3–4 weeks part-time.

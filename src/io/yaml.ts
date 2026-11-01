@@ -1,9 +1,25 @@
 import { CORE_SCHEMA, dump, load } from 'js-yaml'
-import type { LfaPolicy, LfaPreference, Link, NodeId, RouterNode, Topology } from '../engine/types'
+import { expandLans } from '../engine/lan'
+import type {
+  FlexAlgo,
+  LfaPolicy,
+  LfaPreference,
+  Link,
+  Lan,
+  NodeId,
+  ProtectionGoal,
+  RouterNode,
+  Topology,
+} from '../engine/types'
 import {
   DEFAULT_SRGB_BASE,
+  FLEX_ALGO_FIELDS,
+  FLEX_METRICS,
   ID_PATTERN,
   KEY_ALIASES,
+  LOCATOR_PATTERN,
+  LAN_FIELDS,
+  LAN_MEMBER_FIELDS,
   LFA_POLICY_FIELDS,
   LFA_PREFERENCES,
   LINK_FIELDS,
@@ -12,6 +28,9 @@ import {
   MAX_MSD,
   MIN_MSD,
   NODE_FIELDS,
+  ROUTER_LEVELS,
+  PROTECTION_GOALS,
+  SRLG_PATTERN,
   TOP_FIELDS,
 } from './yaml-format'
 
@@ -79,21 +98,48 @@ export function parseTopology(text: string): ParseResult {
   }
 
   const lfaPolicy = parseLfaPolicy(doc.lfa_policy, errors)
+  let protection: ProtectionGoal | undefined
+  if (doc.protection !== undefined) {
+    if ((PROTECTION_GOALS as readonly unknown[]).includes(doc.protection))
+      protection = doc.protection as ProtectionGoal
+    else
+      errors.push(
+        `"protection" must be one of ${PROTECTION_GOALS.join(', ')}, not "${shown(doc.protection)}".`,
+      )
+  }
   const { nodes, declared } = parseNodes(doc.nodes, errors)
   const links = parseLinks(doc.links, declared, errors)
+  const lans = parseLans(doc.lans, declared, errors)
+  const flexAlgos = parseFlexAlgos(doc.flex_algo, errors)
+  let dataplane: 'srv6' | undefined
+  if (doc.dataplane !== undefined) {
+    if (doc.dataplane === 'srv6') dataplane = 'srv6'
+    else if (doc.dataplane !== 'mpls')
+      errors.push(`"dataplane" must be mpls or srv6, not "${shown(doc.dataplane)}".`)
+  }
+  flexChecks(nodes, flexAlgos, errors)
 
   if (errors.length > 0) return { ok: false, errors }
   return {
     ok: true,
-    topology: {
+    // LAN member-to-member links come from `lans` (D55).
+    topology: expandLans({
       name,
       srgbBase,
       ...(msd !== undefined && { msd }),
       ...(lfaPolicy !== undefined && { lfaPolicy }),
+      // Only a non-default goal is stored (D51).
+      ...(protection !== undefined && protection !== 'link' && { protection }),
+      ...(flexAlgos.length > 0 && { flexAlgos }),
+      ...(dataplane !== undefined && { dataplane }),
       nodes,
       links,
-    },
-    warnings: [...connectivityWarnings(nodes, links), ...excludeWarnings(nodes, links)],
+      ...(lans.length > 0 && { lans }),
+    }),
+    warnings: [
+      ...connectivityWarnings(nodes, [...links, ...lans.flatMap(lanPairs)]),
+      ...excludeWarnings(nodes, [...links, ...lans.flatMap(lanPairs)]),
+    ],
   }
 }
 
@@ -141,6 +187,181 @@ function excludeWarnings(nodes: RouterNode[], links: Link[]): string[] {
           `${n.id}'s lfa_exclude lists ${stray.join(', ')}, not a neighbor of ${n.id}: it has no effect.`,
         ]
   })
+}
+
+/** A LAN's members as point-to-point pairs, for the connectivity and neighbor checks. */
+const lanPairs = (lan: Lan): Link[] =>
+  lan.members.slice(1).map((m) => ({
+    id: '',
+    a: lan.members[0]!.node,
+    b: m.node,
+    metricAB: 1,
+    metricBA: 1,
+  }))
+
+/**
+ * `lans: [{ id: LAN1, metric: 10, members: [A, B, { node: C, metric: 20 }] }]` (D55).
+ * Ids share one namespace with routers: the canvas draws a LAN as its own shape.
+ */
+function parseLans(raw: unknown, routers: Set<NodeId>, errors: string[]): Lan[] {
+  if (raw === undefined || raw === null) return []
+  if (!Array.isArray(raw)) {
+    errors.push('"lans" must be a list of LANs.')
+    return []
+  }
+  const lans: Lan[] = []
+  const ids = new Set<string>()
+  raw.forEach((item, i) => {
+    const where = `LAN #${i + 1}`
+    if (!isMap(item)) {
+      errors.push(`${where}: must be a mapping like { id: LAN1, metric: 10, members: [A, B] }.`)
+      return
+    }
+    const { id, metric, members, level } = item
+    const named = typeof id === 'string' ? `${where} (${id})` : where
+    const lvl = level === undefined ? undefined : String(level)
+    if (lvl !== undefined && lvl !== '1' && lvl !== '2') {
+      errors.push(`${named}: "level" must be 1 or 2.`)
+      return
+    }
+    unknownKeys(item, LAN_FIELDS, (key, hint) =>
+      errors.push(`${named}: unknown field "${key}". ${hint}`),
+    )
+    if (typeof id !== 'string' || !ID_PATTERN.test(id)) {
+      errors.push(`${where}: "id" must use letters, digits, "_" and "." only, e.g. LAN1.`)
+      return
+    }
+    if (routers.has(id) || ids.has(id)) {
+      errors.push(`${named}: id "${id}" is already used by a router or LAN.`)
+      return
+    }
+    ids.add(id)
+    const metricRule = `must be a whole number from 1 to ${fmt(MAX_METRIC)}.`
+    if (metric !== undefined && !isWhole(metric, 1, MAX_METRIC)) {
+      errors.push(`${named}: "metric" ${metricRule}`)
+      return
+    }
+    if (!Array.isArray(members) || members.length < 2) {
+      errors.push(`${named}: "members" must list at least two routers.`)
+      return
+    }
+    const out: Lan['members'] = []
+    let valid = true
+    for (const m of members) {
+      const node = typeof m === 'string' ? m : isMap(m) ? m.node : undefined
+      const own = isMap(m) ? m.metric : undefined
+      if (isMap(m))
+        unknownKeys(m, LAN_MEMBER_FIELDS, (key, hint) =>
+          errors.push(`${named}: member: unknown field "${key}". ${hint}`),
+        )
+      if (typeof node !== 'string' || !routers.has(node)) {
+        errors.push(`${named}: member "${shown(node ?? m)}" is not a router in nodes.`)
+        valid = false
+        continue
+      }
+      if (out.some((x) => x.node === node)) {
+        errors.push(`${named}: ${node} is listed twice.`)
+        valid = false
+        continue
+      }
+      const value = own ?? metric
+      if (!isWhole(value, 1, MAX_METRIC)) {
+        errors.push(
+          own === undefined
+            ? `${named}: ${node} has no metric: give the LAN a "metric" or the member its own.`
+            : `${named}: ${node}'s metric ${metricRule}`,
+        )
+        valid = false
+        continue
+      }
+      out.push({ node, metric: value })
+    }
+    if (valid)
+      lans.push({
+        id,
+        members: out.sort((a, b) => (a.node < b.node ? -1 : 1)),
+        ...((lvl === '1' || lvl === '2') && { level: lvl }),
+      })
+  })
+  return lans
+}
+
+const isNames = (v: unknown): v is string[] =>
+  Array.isArray(v) && v.every((x) => typeof x === 'string' && SRLG_PATTERN.test(x))
+
+/** `flex_algo: [{ algo: 128, metric: delay, exclude_any: [red] }]` (RFC 9350, D58). */
+function parseFlexAlgos(raw: unknown, errors: string[]): FlexAlgo[] {
+  if (raw === undefined || raw === null) return []
+  if (!Array.isArray(raw)) {
+    errors.push('"flex_algo" must be a list like [{ algo: 128, metric: delay }].')
+    return []
+  }
+  const out: FlexAlgo[] = []
+  raw.forEach((item, i) => {
+    const where = `Flex-Algo #${i + 1}`
+    if (!isMap(item)) {
+      errors.push(`${where}: must be a mapping like { algo: 128, metric: delay }.`)
+      return
+    }
+    unknownKeys(item, FLEX_ALGO_FIELDS, (key, hint) =>
+      errors.push(`${where}: unknown field "${key}". ${hint}`),
+    )
+    const { algo, metric, exclude_any, include_any, include_all } = item
+    if (!isWhole(algo, 128, 255)) {
+      errors.push(`${where}: "algo" must be a whole number from 128 to 255 (RFC 9350 §4).`)
+      return
+    }
+    if (out.some((f) => f.algo === algo)) {
+      errors.push(`${where}: algorithm ${algo} is defined twice.`)
+      return
+    }
+    if (metric !== undefined && !(FLEX_METRICS as readonly unknown[]).includes(metric)) {
+      errors.push(`${where}: "metric" must be igp, te or delay.`)
+      return
+    }
+    const fa: FlexAlgo = { algo }
+    if (metric !== undefined && metric !== 'igp') fa.metric = metric as 'te' | 'delay'
+    for (const [key, field, v] of [
+      ['exclude_any', 'excludeAny', exclude_any],
+      ['include_any', 'includeAny', include_any],
+      ['include_all', 'includeAll', include_all],
+    ] as const) {
+      if (v === undefined) continue
+      if (!isNames(v)) {
+        errors.push(`${where}: "${key}" must be a list of affinity names, like [red].`)
+        return
+      }
+      if (v.length > 0) fa[field] = [...new Set(v)].sort()
+    }
+    out.push(fa)
+  })
+  return out.sort((a, b) => a.algo - b.algo)
+}
+
+/** Routers name only defined algorithms, and Prefix-SIDs stay unique per algorithm. */
+function flexChecks(nodes: RouterNode[], algos: FlexAlgo[], errors: string[]) {
+  const defined = new Set(algos.map((f) => f.algo))
+  for (const n of nodes) {
+    for (const a of n.algos ?? [])
+      if (!defined.has(a))
+        errors.push(`Node ${n.id}: "algos" lists ${a}, which flex_algo doesn't define.`)
+    for (const a of Object.keys(n.algoSids ?? {}).map(Number))
+      if (!defined.has(a))
+        errors.push(`Node ${n.id}: "algo_sids" gives ${a}, which flex_algo doesn't define.`)
+  }
+  // One SRGB for every algorithm: an index can only mean one (router, algorithm) (RFC 8667 §2.1).
+  const owner = new Map<number, string>(nodes.map((n) => [n.sidIndex, n.id]))
+  for (const [k, fa] of algos.entries()) {
+    for (const n of nodes) {
+      if (n.algos !== undefined && !n.algos.includes(fa.algo)) continue
+      const sid = n.algoSids?.[fa.algo] ?? n.sidIndex + 1000 * (k + 1)
+      const other = owner.get(sid)
+      const me = `${n.id} in Flex-Algo ${fa.algo}`
+      if (other !== undefined)
+        errors.push(`Prefix-SID index ${sid} is used by both ${other} and ${me}; set algo_sids.`)
+      else owner.set(sid, me)
+    }
+  }
 }
 
 const msdRule = `(max SID depth) must be a whole number from ${MIN_MSD} to ${MAX_MSD}.`
@@ -230,7 +451,20 @@ function parseNodes(
       errors.push(`${where}: must be a mapping like { id: S, sid: 1 }, not "${shown(item)}".`)
       return
     }
-    const { id, sid, name, pos, msd, overload, lfa_exclude: exclude } = item
+    const {
+      id,
+      sid,
+      name,
+      pos,
+      msd,
+      overload,
+      lfa_exclude: exclude,
+      level,
+      area,
+      algos,
+      algo_sids: algoSids,
+      locator,
+    } = item
     const named = typeof id === 'string' && id !== '' ? `${where} (${id})` : where
     unknownKeys(item, NODE_FIELDS, (key, hint) =>
       errors.push(`${named}: unknown field "${key}". ${hint}`),
@@ -291,6 +525,34 @@ function parseNodes(
       errors.push(`${label}: "lfa_exclude" can't list the router itself.`)
       valid = false
     }
+    // YAML reads `level: 2` as a number and `level: 1-2` as text.
+    const lvl = level === undefined ? undefined : String(level)
+    if (lvl !== undefined && !(ROUTER_LEVELS as readonly string[]).includes(lvl)) {
+      errors.push(`${label}: "level" must be 1, 2 or 1-2.`)
+      valid = false
+    }
+    if (area !== undefined && (typeof area !== 'string' || area.trim() === '')) {
+      errors.push(`${label}: "area" must be text in quotes, like "49.0001".`)
+      valid = false
+    }
+    const isAlgos = Array.isArray(algos) && algos.every((a) => isWhole(a, 128, 255))
+    if (algos !== undefined && !isAlgos) {
+      errors.push(`${label}: "algos" must be a list of algorithm numbers 128 to 255.`)
+      valid = false
+    }
+    const isAlgoSids =
+      isMap(algoSids) &&
+      Object.entries(algoSids).every(
+        ([k, v]) => isWhole(Number(k), 128, 255) && isWhole(v, 0, MAX_LABEL),
+      )
+    if (algoSids !== undefined && !isAlgoSids) {
+      errors.push(`${label}: "algo_sids" must look like { 128: 101 }.`)
+      valid = false
+    }
+    if (locator !== undefined && (typeof locator !== 'string' || !LOCATOR_PATTERN.test(locator))) {
+      errors.push(`${label}: "locator" must be an IPv6 prefix like "fc00:0:1::/48" (in quotes).`)
+      valid = false
+    }
     const isPos = isMap(pos) && Number.isFinite(pos.x) && Number.isFinite(pos.y)
     if (pos !== undefined && !isPos) {
       errors.push(`${label}: "pos" must look like { x: 10, y: 20 }.`)
@@ -303,6 +565,15 @@ function parseNodes(
     if (msd !== undefined) node.msd = msd as number
     if (isExclude && exclude.length > 0) node.lfaExclude = [...new Set(exclude as string[])].sort()
     if (overload === true) node.overload = true
+    if (lvl === '1' || lvl === '2') node.level = lvl
+    if (typeof area === 'string' && area.trim() !== '') node.area = area.trim()
+    if (isAlgos && algos.length > 0)
+      node.algos = [...new Set(algos as number[])].sort((a, b) => a - b)
+    if (isAlgoSids)
+      node.algoSids = Object.fromEntries(
+        Object.entries(algoSids).map(([k, v]) => [Number(k), v as number]),
+      )
+    if (typeof locator === 'string') node.locator = locator.toLowerCase()
     if (isPos) node.pos = { x: pos.x as number, y: pos.y as number }
     nodes.push(node)
   })
@@ -331,7 +602,19 @@ function parseLinks(raw: unknown, nodeIds: Set<NodeId>, errors: string[]): Link[
       )
       return
     }
-    const { a, b, metric, metric_ba, adj_sid_ab, adj_sid_ba } = item
+    const {
+      a,
+      b,
+      metric,
+      metric_ba,
+      adj_sid_ab,
+      adj_sid_ba,
+      srlg,
+      level,
+      affinity,
+      te_metric,
+      delay,
+    } = item
     const named = typeof a === 'string' && typeof b === 'string' ? `${where} (${a}–${b})` : where
     unknownKeys(item, LINK_FIELDS, (key, hint) =>
       errors.push(`${named}: unknown field "${key}". ${hint}`),
@@ -363,6 +646,19 @@ function parseLinks(raw: unknown, nodeIds: Set<NodeId>, errors: string[]): Link[
     if (adj_sid_ba !== undefined && !isWhole(adj_sid_ba, 0, MAX_LABEL))
       fail(`"adj_sid_ba" ${labelRule}`)
 
+    const isSrlg =
+      Array.isArray(srlg) && srlg.every((x) => typeof x === 'string' && SRLG_PATTERN.test(x))
+    if (srlg !== undefined && !isSrlg)
+      fail('"srlg" must be a list of names (letters, digits, "_", "." and "-"), like [duct-7].')
+
+    const lvl = level === undefined ? undefined : String(level)
+    if (lvl !== undefined && lvl !== '1' && lvl !== '2') fail('"level" must be 1 or 2.')
+    if (affinity !== undefined && !isNames(affinity))
+      fail('"affinity" must be a list of names, like [red].')
+    if (te_metric !== undefined && !isWhole(te_metric, 1, MAX_METRIC))
+      fail(`"te_metric" ${metricRule}`)
+    if (delay !== undefined && !isWhole(delay, 1, MAX_METRIC)) fail(`"delay" ${metricRule}`)
+
     if (!valid) return
     const metricAB = metric as number
     // Parallel links are allowed (D29): the second S–E link gets id "S-E#2", and so on.
@@ -377,6 +673,11 @@ function parseLinks(raw: unknown, nodeIds: Set<NodeId>, errors: string[]): Link[
     }
     if (adj_sid_ab !== undefined) link.adjSidAB = adj_sid_ab as number
     if (adj_sid_ba !== undefined) link.adjSidBA = adj_sid_ba as number
+    if (isSrlg && srlg.length > 0) link.srlg = [...new Set(srlg as string[])].sort()
+    if (lvl === '1' || lvl === '2') link.level = lvl
+    if (isNames(affinity) && affinity.length > 0) link.affinity = [...new Set(affinity)].sort()
+    if (te_metric !== undefined) link.teMetric = te_metric as number
+    if (delay !== undefined) link.delay = delay as number
     links.push(link)
   })
   return links
@@ -417,6 +718,24 @@ function connectivityWarnings(nodes: RouterNode[], links: Link[]): string[] {
   return [`The network is not connected: ${first.id} can't reach ${unreachable.join(', ')}.`]
 }
 
+/** One LAN as written: a shared metric when every member has the same one. */
+function lanDoc(lan: Lan) {
+  const metrics = new Set(lan.members.map((m) => m.metric))
+  const level = lan.level === undefined ? {} : { level: Number(lan.level) }
+  return metrics.size === 1
+    ? {
+        id: lan.id,
+        metric: lan.members[0]!.metric,
+        members: lan.members.map((m) => m.node),
+        ...level,
+      }
+    : {
+        id: lan.id,
+        members: lan.members.map((m) => ({ node: m.node, metric: m.metric })),
+        ...level,
+      }
+}
+
 /** Write a topology in the same format `parseTopology` reads. */
 export function serializeTopology(topology: Topology): string {
   const doc = {
@@ -434,6 +753,18 @@ export function serializeTopology(topology: Topology): string {
           }),
         },
       }),
+    ...(topology.protection !== undefined &&
+      topology.protection !== 'link' && { protection: topology.protection }),
+    ...(topology.dataplane !== undefined && { dataplane: topology.dataplane }),
+    ...((topology.flexAlgos ?? []).length > 0 && {
+      flex_algo: topology.flexAlgos!.map((f) => ({
+        algo: f.algo,
+        ...(f.metric !== undefined && { metric: f.metric }),
+        ...(f.excludeAny !== undefined && { exclude_any: f.excludeAny }),
+        ...(f.includeAny !== undefined && { include_any: f.includeAny }),
+        ...(f.includeAll !== undefined && { include_all: f.includeAll }),
+      })),
+    }),
     nodes: topology.nodes.map((n) => ({
       id: n.id,
       sid: n.sidIndex,
@@ -441,16 +772,30 @@ export function serializeTopology(topology: Topology): string {
       ...(n.msd !== undefined && { msd: n.msd }),
       ...(n.lfaExclude !== undefined && n.lfaExclude.length > 0 && { lfa_exclude: n.lfaExclude }),
       ...(n.overload === true && { overload: true }),
+      ...(n.level !== undefined && { level: Number(n.level) }),
+      ...(n.area !== undefined && { area: n.area }),
+      ...(n.algos !== undefined && { algos: n.algos }),
+      ...(n.algoSids !== undefined && { algo_sids: n.algoSids }),
+      ...(n.locator !== undefined && { locator: n.locator }),
       ...(n.pos !== undefined && { pos: { x: n.pos.x, y: n.pos.y } }),
     })),
-    links: topology.links.map((l) => ({
-      a: l.a,
-      b: l.b,
-      metric: l.metricAB,
-      ...(l.metricBA !== l.metricAB && { metric_ba: l.metricBA }),
-      ...(l.adjSidAB !== undefined && { adj_sid_ab: l.adjSidAB }),
-      ...(l.adjSidBA !== undefined && { adj_sid_ba: l.adjSidBA }),
-    })),
+    // LAN links are written as the LAN (D55).
+    links: topology.links
+      .filter((l) => l.lan === undefined)
+      .map((l) => ({
+        a: l.a,
+        b: l.b,
+        metric: l.metricAB,
+        ...(l.metricBA !== l.metricAB && { metric_ba: l.metricBA }),
+        ...(l.adjSidAB !== undefined && { adj_sid_ab: l.adjSidAB }),
+        ...(l.adjSidBA !== undefined && { adj_sid_ba: l.adjSidBA }),
+        ...(l.srlg !== undefined && l.srlg.length > 0 && { srlg: l.srlg }),
+        ...(l.level !== undefined && { level: Number(l.level) }),
+        ...(l.affinity !== undefined && { affinity: l.affinity }),
+        ...(l.teMetric !== undefined && { te_metric: l.teMetric }),
+        ...(l.delay !== undefined && { delay: l.delay }),
+      })),
+    ...((topology.lans ?? []).length > 0 && { lans: topology.lans!.map(lanDoc) }),
   }
   // flowLevel 2 writes one router or link per line, like the example files.
   return dump(doc, { schema: CORE_SCHEMA, flowLevel: 2, lineWidth: -1 })

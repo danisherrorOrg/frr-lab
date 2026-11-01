@@ -1,0 +1,26 @@
+# Example 8 (docs/02-algorithms.md §3.1 and §4.4, D51): node protection.
+# Source S, destination D, primary next hop E. protection: node asks Remote LFA and
+# TI-LFA for backups that also survive router E failing.
+# No LFA: dist(N,D)=6 is not < dist(N,S)+dist(S,D) = 2+4.
+# Link-protecting Remote LFA picks PQ node B (via N, cost 5), but B's path to D is B→E→D.
+# Node-protecting Remote LFA (RFC 8102): B fails dist(B,D)=3 < dist(B,E)+dist(E,D) = 1+2;
+# C passes 3 < 4+2, so the PQ node is C (via N, cost 8).
+# TI-LFA with router E removed: S→N→B→C→D (11), segments [Prefix-SID(C), Prefix-SID(D)].
+name: Node protection - avoid the next-hop router
+srgb_base: 16000
+protection: node
+nodes:
+  - { id: S, sid: 1, pos: { x: 0, y: 220 } }
+  - { id: E, sid: 2, pos: { x: 250, y: 220 } }
+  - { id: N, sid: 3, pos: { x: 0, y: 0 } }
+  - { id: B, sid: 4, pos: { x: 250, y: 0 } }
+  - { id: C, sid: 5, pos: { x: 500, y: 0 } }
+  - { id: D, sid: 6, pos: { x: 500, y: 220 } }
+links:
+  - { a: S, b: E, metric: 2 }
+  - { a: S, b: N, metric: 2 }
+  - { a: E, b: B, metric: 1 }
+  - { a: E, b: D, metric: 2 }
+  - { a: N, b: B, metric: 3 }
+  - { a: B, b: C, metric: 3 }
+  - { a: C, b: D, metric: 3 }

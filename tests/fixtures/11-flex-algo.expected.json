@@ -1,0 +1,24 @@
+{
+  "$comment": "Expected engine results for Example 11 (docs/02-algorithms.md §23, D58), algorithm 0. tests/engine/flex-srv6.test.ts checks Flex-Algo 128. null means 'none'.",
+  "fixture": "11-flex-algo.yaml",
+  "source": "S",
+  "results": [
+    {
+      "dest": "D",
+      "cost": 20,
+      "nextHops": ["E"],
+      "protections": [
+        {
+          "protectedLink": { "from": "S", "to": "E", "id": "S-E" },
+          "lfa": { "best": "B" },
+          "tilfa": {
+            "path": ["S", "B", "D"],
+            "segments": [{ "kind": "prefix", "node": "D", "label": 16005 }],
+            "labelStack": [16005],
+            "extraLabels": 0
+          }
+        }
+      ]
+    }
+  ]
+}

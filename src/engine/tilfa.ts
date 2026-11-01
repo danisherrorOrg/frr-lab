@@ -1,8 +1,26 @@
-import { cheapestEdge, edgeOf, linkMetric, withoutLink, type Edge, type Graph } from './graph'
+import {
+  cheapestEdge,
+  edgeOf,
+  linkMetric,
+  withoutLink,
+  withoutLinks,
+  withoutNode,
+  type Edge,
+  type Graph,
+} from './graph'
 import { adjLabel, prefixLabel } from './labels'
 import { isTooDeep } from './msd'
-import { allPairs, avoidsLink, dist, linkPathCost, spf } from './spf'
-import type { NodeId, Protection, Segment, Topology } from './types'
+import { allPairs, avoidsLink, dist, linkPathCost, spf, viaCost } from './spf'
+import { lanShared } from './lan'
+import { hasNode, hasSrlg, sharedEdges, srlgShared } from './srlg'
+import type { NodeFallback, NodeId, Protection, ProtectionGoal, Segment, Topology } from './types'
+
+/**
+ * What the post-convergence SPF removes (RFC 9855 §2.1, SPT_new(S, X)): the link
+ * S–E, router E with all its links (node protection, 02-algorithms.md §4.4, D51),
+ * and with `srlg` every link sharing an SRLG with S–E (§18, D53).
+ */
+export type TilfaScope = ProtectionGoal
 
 /** SPF from S with link S–E removed (both directions): docs/02-algorithms.md §4.1. */
 export interface PostConvergence {
@@ -29,7 +47,8 @@ function protectedEdge(graph: Graph, s: NodeId, e: NodeId, linkId?: string): Edg
 
 /**
  * Post-convergence SPF from S after link S–E fails (RFC 9855 §3: SPT_new(S, X)).
- * Only that one link is removed: another link of a bundle stays up (D29).
+ * Only that one link is removed: another link of a bundle stays up (D29). With
+ * `scope` = `node`, router E and every link of it are removed instead (D51).
  * Equal-cost paths are compared router by router from S; the lowest ID at the
  * first difference wins. Built in settle order, since every predecessor of Y
  * is settled before Y.
@@ -39,16 +58,24 @@ export function postConvergence(
   s: NodeId,
   e: NodeId,
   linkId?: string,
+  scope: TilfaScope = 'link',
 ): PostConvergence {
   const full = allPairs(topology).graph
   const link = protectedEdge(full, s, e, linkId).linkId
-  const key = `${s}>${link}`
+  const key = `${s}>${link}>${scope}`
   const forTopo = cache.get(topology) ?? new Map<string, PostConvergence>()
   cache.set(topology, forTopo)
   const cached = forTopo.get(key)
   if (cached !== undefined) return cached
 
-  const graph = withoutLink(full, link)
+  const base = hasNode(scope) ? withoutNode(full, e) : withoutLink(full, link)
+  // S's interface to a LAN fails as a whole (RFC 5286 §3.6, D55); an SRLG fails together
+  // (D53). Node protection plans for E failing instead, so S's interface stays up.
+  const fate = new Set([
+    ...(hasNode(scope) ? [] : lanShared(topology, link, s)),
+    ...(hasSrlg(scope) ? srlgShared(topology, link) : []),
+  ])
+  const graph = withoutLinks(base, fate)
   const tree = spf(graph, s)
 
   const settleOrder = [...tree.dist.keys()].sort((x, y) => {
@@ -97,7 +124,17 @@ export interface SegmentCheck {
    * and would be transit, so no normal path uses the link (RFC 7490 §5.4).
    */
   viaLink: number
-  /** (b) all normal shortest paths from→node avoid S–E (§1.5). */
+  /**
+   * Node scope only: dist(from,E) and dist(from,E) + dist(E,node), Infinity when E
+   * has the overload bit (no transit). (b) then reads "avoid router E" (§4.4).
+   */
+  distXE?: number
+  viaNode?: number
+  /** SRLG scope: a link of S–E's SRLGs that some normal path from→node may use (§18). */
+  srlgHit?: string
+  /** A LAN link: another of S's links on S–E's LAN that some normal path may use (§20). */
+  lanHit?: string
+  /** (b) all normal shortest paths from→node avoid S–E (§1.5), or router E in node scope. */
   avoids: boolean
 }
 
@@ -115,6 +152,16 @@ export interface TilfaResult {
   s: NodeId
   d: NodeId
   e: NodeId
+  /** What the post-convergence SPF removed: the link, or router E (D51), plus the SRLG (D53). */
+  scope: TilfaScope
+  /** What the network asked for, when it is more than this repair has (set with `fallback`). */
+  goal?: ProtectionGoal
+  /** SRLG scope: the other links of S–E's SRLGs, also removed (D53). */
+  srlgLinks?: string[]
+  /** On a LAN: S's other links on that LAN, also removed (D55). */
+  lanLinks?: string[]
+  /** Node protection was asked for but this is the link-protecting repair: why (D51). */
+  fallback?: NodeFallback
   /** The protected link's id. */
   link: string
   cSE: number
@@ -151,16 +198,29 @@ export function computeTilfa(
   d: NodeId,
   e: NodeId,
   linkId?: string,
+  scope: TilfaScope = 'link',
 ): TilfaResult {
   if (s === d) throw new Error(`Source ${s} can't be its own destination.`)
+  // RFC 9855 §1 node protection assumes E has failed; E can't then be the destination.
+  if (hasNode(scope) && d === e)
+    throw new Error(`Node protection doesn't apply when the destination ${d} is the next hop.`)
   const table = allPairs(topology)
   const failed = protectedEdge(table.graph, s, e, linkId)
   const link = failed.linkId
   const cSE = failed.metric
 
-  const pc = postConvergence(topology, s, e, link)
+  const pc = postConvergence(topology, s, e, link, scope)
+  const shared = hasSrlg(scope) ? sharedEdges(table.graph, srlgShared(topology, link)) : []
+  const lanLinks = hasNode(scope) ? [] : lanShared(topology, link, s)
+  const lanE = sharedEdges(table.graph, lanLinks)
   const path = pc.path.get(d)
-  if (path === undefined) return { s, d, e, link, cSE, partitioned: true, walk: [] }
+  const srlgLinks = hasSrlg(scope) ? srlgShared(topology, link) : []
+  const extra = {
+    ...(srlgLinks.length > 0 && { srlgLinks }),
+    ...(lanLinks.length > 0 && { lanLinks }),
+  }
+  if (path === undefined)
+    return { s, d, e, scope, ...extra, link, cSE, partitioned: true, walk: [] }
 
   // Cost along the path from S to each position, over the cheapest links still up.
   const at = [0]
@@ -173,7 +233,7 @@ export function computeTilfa(
     const node = path[j]!
     const distXY = dist(table, from, node)
     const pathCost = at[j]! - at[i]!
-    return {
+    const base = {
       from,
       node,
       pathCost,
@@ -182,7 +242,32 @@ export function computeTilfa(
       distXS: dist(table, from, s),
       distEY: dist(table, e, node),
       viaLink: linkPathCost(table, from, s, e, cSE, node),
-      avoids: avoidsLink(table, from, node, s, e, cSE),
+    }
+    // SRLG scope: every normal path also avoids each link of S–E's SRLGs, both ways (§18);
+    // on a LAN, S's other links on it, which fail with its interface (§20).
+    const bad = (x: Edge) => !(distXY < linkPathCost(table, from, x.from, x.to, x.metric, node))
+    const lanBad = lanE.find(bad)
+    const srlgBad = shared.find(bad)
+    const hit = lanBad ?? srlgBad
+    const srlg = {
+      ...(srlgBad !== undefined && { srlgHit: srlgBad.linkId }),
+      ...(lanBad !== undefined && { lanHit: lanBad.linkId }),
+    }
+    if (!hasNode(scope))
+      return {
+        ...base,
+        ...srlg,
+        avoids: avoidsLink(table, from, node, s, e, cSE) && hit === undefined,
+      }
+    // Node protection: every normal path from→node avoids router E (§4.4). E is not on
+    // the post-convergence path, so it is never an end of the segment.
+    const viaNode = viaCost(table, from, e, node)
+    return {
+      ...base,
+      ...srlg,
+      distXE: dist(table, from, e),
+      viaNode,
+      avoids: distXY < viaNode && hit === undefined,
     }
   }
 
@@ -252,6 +337,8 @@ export function computeTilfa(
     s,
     d,
     e,
+    scope,
+    ...extra,
     link,
     cSE,
     partitioned: false,
@@ -268,11 +355,57 @@ export function computeTilfa(
 }
 
 /**
+ * The TI-LFA repair the network's protection goal asks for (D51). Link protection is
+ * computeTilfa as before. Node protection removes router E; when D is E, or nothing
+ * avoids E, the repair falls back to link protection and says why (`fallback`).
+ */
+export function tilfaFor(
+  topology: Topology,
+  s: NodeId,
+  d: NodeId,
+  e: NodeId,
+  linkId: string | undefined,
+  goal: ProtectionGoal,
+): TilfaResult {
+  if (goal === 'link') return computeTilfa(topology, s, d, e, linkId)
+  // Try the whole goal, then without the SRLG, then without the node (D53, D51).
+  const tries: TilfaScope[] =
+    goal === 'node-srlg' ? ['node-srlg', 'node', 'srlg', 'link'] : [goal, 'link']
+  const destIsE = d === e
+  let last: TilfaResult | undefined
+  for (const scope of tries) {
+    // Node protection can't apply when D is E itself (§4.4).
+    if (destIsE && hasNode(scope)) continue
+    const r = computeTilfa(topology, s, d, e, linkId, scope)
+    last = r
+    if (r.partitioned) continue
+    if (scope === goal) return r
+    const fallback: NodeFallback =
+      destIsE && hasNode(goal) && hasSrlg(scope) === hasSrlg(goal) ? 'dest-is-next-hop' : 'none'
+    return { ...r, fallback, goal }
+  }
+  return last ?? computeTilfa(topology, s, d, e, linkId)
+}
+
+/**
  * The TI-LFA part of a Protection. Empty when the network is partitioned. `msd` is
  * S's max SID depth: a longer stack is kept but marked `tooDeep` (§14, D44).
  */
-export function tilfaForProtection(result: TilfaResult, msd?: number): Protection['tilfa'] {
+export function tilfaForProtection(
+  result: TilfaResult,
+  msd?: number,
+  goal: ProtectionGoal = 'link',
+  srv6?: string[],
+): Protection['tilfa'] {
   const { path, outLink, segments, labelStack, extraLabels } = result
+  // In node mode, say what the repair protects (D51); link mode stays as it was.
+  const protects: Partial<Protection['tilfa']> =
+    goal !== 'link' && path !== undefined
+      ? {
+          protects: result.scope,
+          ...(result.fallback !== undefined && { fallback: result.fallback }),
+        }
+      : {}
   if (
     result.partitioned ||
     !path ||
@@ -290,6 +423,9 @@ export function tilfaForProtection(result: TilfaResult, msd?: number): Protectio
     labelStack,
     extraLabels,
     ...(msd !== undefined && { msd }),
-    ...(isTooDeep(labelStack, msd) && { tooDeep: true }),
+    // SRv6 counts the SIDs S pushes; SR-MPLS the whole stack (RFC 8491 §1.1, D44, D59).
+    ...(isTooDeep(srv6 ?? labelStack, msd) && { tooDeep: true }),
+    ...(srv6 !== undefined && { srv6 }),
+    ...protects,
   }
 }

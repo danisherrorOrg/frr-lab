@@ -104,9 +104,12 @@ function octagon(c: Pt, rad: number): string {
 
 /** The router's outline at radius `rad`, with the given paint. */
 function shapeAt(node: cytoscape.NodeSingular, c: Pt, rad: number, paint: string): string {
-  return str(node, 'shape') === 'octagon'
-    ? `<polygon points="${octagon(c, rad)}" ${paint}/>`
-    : `<circle cx="${r(c.x)}" cy="${r(c.y)}" r="${r(rad)}" ${paint}/>`
+  const shape = str(node, 'shape')
+  if (shape === 'octagon') return `<polygon points="${octagon(c, rad)}" ${paint}/>`
+  // A LAN's pseudonode (D55).
+  if (shape === 'round-rectangle')
+    return `<rect x="${r(c.x - rad)}" y="${r(c.y - rad)}" width="${r(2 * rad)}" height="${r(2 * rad)}" rx="3" ${paint}/>`
+  return `<circle cx="${r(c.x)}" cy="${r(c.y)}" r="${r(rad)}" ${paint}/>`
 }
 
 /** Mid-line arrow (triangle or chevron) at `at`, pointing along `dir`. */

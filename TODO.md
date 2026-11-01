@@ -310,15 +310,15 @@ Things that fit the "learn and check FRR" goal and stay offline / no backend.
 - [x] YAML format guide in the app (fields, rules, common mistakes, a live checker) and clearer import errors: unknown keys with "did you mean", line and column for syntax errors *(D40)*
 - [x] Export the diagram as PNG / SVG for slides and docs *(D49: "⤓ PNG" / "⤓ SVG" on the diagram, whole network as it looks now, white background)*
 - [x] Random topology generator (ring, grid, leaf-spine, random mesh) with a size slider *(D50: "Generate…" in the top bar; seeded, so the same settings give the same network)*
-- [ ] Vendor CLI import (see Later #2)
+- [x] Vendor CLI import (see Later #2) *(D52: FRR `show isis database detail`, "Import FRR…" in the top bar)*
 
 ---
 
 ## Later (v0.2+), in priority order
 
-1. [ ] Node protection: RLFA per RFC 8102, TI-LFA with node E removed (`02-algorithms.md` §4.4)
-2. [ ] Import from FRR `show isis database detail`
-3. [ ] SRLG (links that fail together; builds on 9.2 multi-failure)
-4. [ ] Quiz mode for students
-5. [ ] LAN links / pseudonodes, multi-level IS-IS
-6. [ ] Microloop view, Flex-Algo, SRv6
+1. [x] Node protection: RLFA per RFC 8102, TI-LFA with node E removed (`02-algorithms.md` §3.1, §4.4) *(D51: `protection: node` in the topology properties; Example 8)*
+2. [x] Import from FRR `show isis database detail` *(D52, `docs/03-architecture.md` §5.1)*
+3. [x] SRLG (links that fail together; builds on 9.2 multi-failure) *(D53, `02-algorithms.md` §18; Example 9)*
+4. [x] Quiz mode for students *(D54, `02-algorithms.md` §19)*
+5. [x] LAN links / pseudonodes, multi-level IS-IS *(D55, D56, `02-algorithms.md` §20–21; Example 10; FRR import reads LANs and both levels)*
+6. [x] Microloop view, Flex-Algo, SRv6 *(D57, D58, D59, `02-algorithms.md` §22–24; Example 11)*

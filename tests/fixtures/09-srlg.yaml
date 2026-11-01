@@ -1,0 +1,24 @@
+# Example 9 (docs/02-algorithms.md §18, D53): a shared risk link group.
+# Links S–E and A–B run in the same fibre duct (SRLG duct-1): one backhoe cuts both.
+# Source S, destination D, primary next hop E. protection: srlg asks backups to avoid
+# every link that shares an SRLG with the failed one.
+# Link protection: LFA A (cost 3), but A's path to D is A→B→D, through the duct.
+# SRLG protection: LFA C (cost 6) is SRLG-disjoint; TI-LFA removes S–E and A–B: S→C→D.
+name: SRLG - one duct, two links
+srgb_base: 16000
+protection: srlg
+nodes:
+  - { id: S, sid: 1, pos: { x: 0, y: 150 } }
+  - { id: E, sid: 2, pos: { x: 250, y: 0 } }
+  - { id: A, sid: 3, pos: { x: 150, y: 150 } }
+  - { id: B, sid: 4, pos: { x: 350, y: 150 } }
+  - { id: C, sid: 5, pos: { x: 250, y: 300 } }
+  - { id: D, sid: 6, pos: { x: 500, y: 150 } }
+links:
+  - { a: S, b: E, metric: 1, srlg: [duct-1] }
+  - { a: E, b: D, metric: 1 }
+  - { a: S, b: A, metric: 1 }
+  - { a: A, b: B, metric: 1, srlg: [duct-1] }
+  - { a: B, b: D, metric: 1 }
+  - { a: S, b: C, metric: 3 }
+  - { a: C, b: D, metric: 3 }

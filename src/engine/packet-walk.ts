@@ -6,7 +6,8 @@ import { prefixLabel } from './labels'
 import { shortestPath } from './paths'
 import type { Drop, Flow, FlowStatus, RepairStep } from './simulate'
 import { allPairs, dist, type AllPairs } from './spf'
-import { computeTilfa, postConvergence } from './tilfa'
+import { protectionOf } from './protection'
+import { postConvergence, tilfaFor } from './tilfa'
 import type { NodeId, Segment, Topology } from './types'
 
 type PrefixSegment = Extract<Segment, { kind: 'prefix' }>
@@ -106,12 +107,13 @@ export function packetWalk(
   options: PacketWalkOptions = {},
 ): PacketWalk | undefined {
   const php = options.php ?? true
-  const r = computeTilfa(topology, s, d, e, options.link)
+  // The repair the network installs: link- or node-protecting (D51).
+  const r = tilfaFor(topology, s, d, e, options.link, protectionOf(topology))
   if (r.partitioned || !r.path || !r.segments || !r.outLink) return undefined
   const { path, segments } = r
   const table = allPairs(topology)
-  // Links still up after S–E fails: the repair never uses the failed one (D29).
-  const graph = postConvergence(topology, s, e, r.link).graph
+  // Links still up after S–E (or router E) fails: the repair never uses them (D29).
+  const graph = postConvergence(topology, s, e, r.link, r.scope).graph
 
   // The packet arrives at S with D's label on top; S pushes the rest (RFC 9855 §7.1).
   let stack: Segment[] = [segments.at(-1)!]

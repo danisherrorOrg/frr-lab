@@ -1,7 +1,7 @@
 import { hopText, isBundle, linkText, type Graph } from './graph'
 import { MAX_METRIC, type LfaCheck, type LfaResult } from './lfa'
 import { isDefaultLfaPolicy, type ResolvedLfaPolicy } from './lfa-policy'
-import type { RlfaResult } from './rlfa'
+import type { NodeRlfaResult, RlfaResult } from './rlfa'
 import type { SegmentCheck, TilfaResult } from './tilfa'
 import type { ExplainStep, LfaCandidate, NodeId, Segment } from './types'
 
@@ -53,19 +53,26 @@ export function explainLfa(result: LfaResult, ctx: LfaContext): ExplainStep[] {
             ok: false,
             rfc: 'RFC 5286 §3.5',
           }
-        : skip.reason === 'excluded'
+        : skip.reason === 'same-lan'
           ? {
               rule: 'LFA skipped',
-              text: `Via ${via}: skipped, ${s}'s policy never uses ${skip.neighbor} as an alternate`,
+              text: `Via ${via}: skipped, it is on the same LAN as the protected link, so it fails with ${s}’s interface to that LAN`,
               ok: false,
-              rfc: 'RFC 7916 §6.2.4.4',
+              rfc: 'RFC 5286 §3.6',
             }
-          : {
-              rule: 'LFA skipped',
-              text: `Via ${via}: skipped, link ${linkText(graph, s, skip.neighbor, skip.link)} has the maximum metric ${MAX_METRIC}`,
-              ok: false,
-              rfc: 'RFC 5286 §3.5',
-            },
+          : skip.reason === 'excluded'
+            ? {
+                rule: 'LFA skipped',
+                text: `Via ${via}: skipped, ${s}'s policy never uses ${skip.neighbor} as an alternate`,
+                ok: false,
+                rfc: 'RFC 7916 §6.2.4.4',
+              }
+            : {
+                rule: 'LFA skipped',
+                text: `Via ${via}: skipped, link ${linkText(graph, s, skip.neighbor, skip.link)} has the maximum metric ${MAX_METRIC}`,
+                ok: false,
+                rfc: 'RFC 5286 §3.5',
+              },
     )
   }
 
@@ -73,6 +80,13 @@ export function explainLfa(result: LfaResult, ctx: LfaContext): ExplainStep[] {
     const cand = result.candidates[i]
     if (cand === undefined) return
     steps.push(...candidateSteps(c, { s, d, e, graph }, cand))
+    if (cand.srlgDisjoint !== undefined)
+      steps.push({
+        rule: 'LFA SRLG-disjoint',
+        text: `Via ${via(graph, s, cand)}: ${cand.srlgDisjoint ? 'the link and its path to ' + d + ' avoid every link of the protected link’s SRLG ✓' : `the link or its path to ${d} may use a link of the protected link’s SRLG ✗`}`,
+        ok: cand.srlgDisjoint,
+        rfc: 'RFC 7916 §6.2.4.1',
+      })
     if (cand.policyRejected !== undefined) steps.push(rejectedStep(cand, via(graph, s, cand)))
   })
 
@@ -213,9 +227,11 @@ export function explainRlfa(result: RlfaResult, ctx: RlfaContext): ExplainStep[]
 
   for (const skip of result.skipped) {
     const why =
-      skip.reason === 'overload'
-        ? `${skip.neighbor} has the overload bit set`
-        : `link ${linkText(graph, s, skip.neighbor, skip.link)} has the maximum metric ${MAX_METRIC}`
+      skip.reason === 'same-lan'
+        ? `it is on the same LAN as the protected link (RFC 5286 §3.6)`
+        : skip.reason === 'overload'
+          ? `${skip.neighbor} has the overload bit set`
+          : `link ${linkText(graph, s, skip.neighbor, skip.link)} has the maximum metric ${MAX_METRIC}`
     steps.push({
       rule: 'Extended P-space skipped',
       text: `Via ${hopText(graph, s, skip.neighbor, skip.link)}: not used as a tunnel exit, ${why}`,
@@ -228,7 +244,10 @@ export function explainRlfa(result: RlfaResult, ctx: RlfaContext): ExplainStep[]
     const y = c.node
     steps.push({
       rule: 'P-space',
-      text: `P-space: ${y}: dist(${s},${y})=${num(c.distSY)} < c(${s},${e})+dist(${e},${y}) ${sumText([cSE, c.distEY], c.viaLink, [e], graph)} ${mark(c.inP)}`,
+      text:
+        c.lanBlocked !== undefined
+          ? `P-space: ${y}: ${s}’s path to ${y} may use ${c.lanBlocked}, which fails with ${s}’s LAN interface ✗`
+          : `P-space: ${y}: dist(${s},${y})=${num(c.distSY)} < c(${s},${e})+dist(${e},${y}) ${sumText([cSE, c.distEY], c.viaLink, [e], graph)} ${mark(c.inP)}`,
       ok: c.inP,
       rfc: 'RFC 7490 §5.2.1.1',
     })
@@ -328,25 +347,47 @@ export function explainTilfa(result: TilfaResult, graph?: Graph, msd?: number): 
   const { s, d, e } = result
   const sE = linkText(graph, s, e, result.link)
   const name = (x: Segment) => segmentName(x, graph)
+  const steps: ExplainStep[] = []
+  // Node protection fell back to link protection (D51): say why first.
+  if (result.fallback !== undefined) {
+    steps.push({
+      rule: 'TI-LFA node protection',
+      text:
+        result.fallback === 'dest-is-next-hop'
+          ? `${d} is the next hop ${e} itself, so router ${e} can’t be avoided: ${scopeName(result.scope)} only`
+          : `${d} can’t be reached once ${lostText(result)}: no repair for that, ${scopeName(result.scope)} only ✗`,
+      ok: false,
+      rfc: 'RFC 9855 §1',
+    })
+  }
   if (result.partitioned || result.path === undefined || result.segments === undefined) {
-    return [
-      {
-        rule: 'Post-convergence path',
-        text: `${d} can’t be reached once ${sE} fails: unprotected (the network is partitioned)`,
-        ok: false,
-        rfc: 'RFC 9855 §3',
-      },
-    ]
+    steps.push({
+      rule: 'Post-convergence path',
+      text: `${d} can’t be reached once ${sE} fails: unprotected (the network is partitioned)`,
+      ok: false,
+      rfc: 'RFC 9855 §3',
+    })
+    return steps
   }
 
-  const steps: ExplainStep[] = [
-    {
-      rule: 'Post-convergence path',
-      text: `Post-convergence path with ${sE} removed: ${result.path.join(' → ')} (cost ${num(result.cost ?? Infinity)})`,
-      ok: true,
-      rfc: 'RFC 9855 §3',
-    },
-  ]
+  const node = result.scope === 'node' || result.scope === 'node-srlg'
+  const shared =
+    result.scope === 'srlg' || result.scope === 'node-srlg' ? (result.srlgLinks ?? []) : []
+  const lan = node ? [] : (result.lanLinks ?? [])
+  const removed =
+    (node ? `router ${e} (and all its links)` : sE) +
+    (lan.length > 0
+      ? ` and ${s}’s other ${lan.length === 1 ? 'link' : 'links'} on the same LAN (${lan.join(', ')})`
+      : '') +
+    (shared.length > 0
+      ? ` and ${shared.length === 1 ? 'link' : 'links'} ${shared.join(', ')} (same SRLG)`
+      : '')
+  steps.push({
+    rule: 'Post-convergence path',
+    text: `Post-convergence path with ${removed} removed: ${result.path.join(' → ')} (cost ${num(result.cost ?? Infinity)})`,
+    ok: true,
+    rfc: result.scope === 'link' ? 'RFC 9855 §3' : 'RFC 9855 §2.1',
+  })
 
   for (const w of result.walk) {
     // The algorithm tries the furthest router first, so the failed check comes first.
@@ -417,8 +458,50 @@ export function explainTilfa(result: TilfaResult, graph?: Graph, msd?: number): 
 }
 
 /** "(a) same cost as the repair path; (b) all normal paths avoid S–E" with the numbers. */
-function checkText(c: SegmentCheck, { s, e, cSE }: TilfaResult, sE: string, graph?: Graph): string {
+function checkText(c: SegmentCheck, r: TilfaResult, sE: string, graph?: Graph): string {
+  const hit =
+    c.lanHit !== undefined
+      ? `; may use ${c.lanHit}, which fails with ${r.s}’s LAN interface ✗`
+      : c.srlgHit === undefined
+        ? ''
+        : `; may use ${c.srlgHit} of the same SRLG ✗`
+  return baseCheckText(c, r, sE, graph) + hit
+}
+
+/** "link protection", "node protection", … for the scope a repair really has. */
+const scopeName = (scope: TilfaResult['scope']) =>
+  ({
+    link: 'link protection',
+    node: 'node protection',
+    srlg: 'link + SRLG protection',
+    'node-srlg': 'node + SRLG protection',
+  })[scope]
+
+/** What the goal also wanted to survive but couldn't: "router E", "the SRLG links", or both. */
+function lostText(r: TilfaResult): string {
+  const goalNode = r.goal === 'node' || r.goal === 'node-srlg'
+  const goalSrlg = r.goal === 'srlg' || r.goal === 'node-srlg'
+  const node = goalNode && r.scope !== 'node' && r.scope !== 'node-srlg'
+  const srlg = goalSrlg && r.scope !== 'srlg' && r.scope !== 'node-srlg'
+  if (node && srlg) return `router ${r.e} and the links of its SRLG fail`
+  return node ? `router ${r.e} fails` : 'the links of its SRLG fail'
+}
+
+function baseCheckText(
+  c: SegmentCheck,
+  { s, e, cSE }: TilfaResult,
+  sE: string,
+  graph?: Graph,
+): string {
   const xy = `dist(${c.from},${c.node})=${num(c.distXY)}`
+  if (c.viaNode !== undefined) {
+    // Node scope (§4.4): every normal path avoids router E.
+    return (
+      `${xy} matches path cost ${num(c.pathCost)} ${mark(c.onPath)}; ` +
+      `avoids router ${e}: ${xy} < dist(${c.from},${e})+dist(${e},${c.node}) ` +
+      `${sumText([c.distXE ?? Infinity, c.distEY], c.viaNode, [e], graph)} ${mark(c.avoids)}`
+    )
+  }
   // S is only transit when the segment starts elsewhere, E only when it ends elsewhere.
   const middle = [...(c.from !== s ? [s] : []), ...(c.node !== e ? [e] : [])]
   return (
@@ -426,4 +509,102 @@ function checkText(c: SegmentCheck, { s, e, cSE }: TilfaResult, sE: string, grap
     `avoids ${sE}: ${xy} < dist(${c.from},${s})+c(${s},${e})+dist(${e},${c.node}) ` +
     `${sumText([c.distXS, cSE, c.distEY], c.viaLink, middle, graph)} ${mark(c.avoids)}`
   )
+}
+
+/**
+ * Node-protecting Remote LFA steps (RFC 8102, D51): for every Q-space router, how
+ * it gets into the node-protecting P-space (or why not), whether its own path to D
+ * avoids E, then the choice. `used` = the result really uses this PQ node.
+ */
+export function explainNodeRlfa(
+  result: NodeRlfaResult,
+  ctx: { lfaBest?: NodeId | undefined; linkBest?: NodeId | undefined; graph?: Graph },
+): ExplainStep[] {
+  const { s, e, d } = result
+  const { graph } = ctx
+  const steps: ExplainStep[] = []
+  for (const c of result.pChecks) {
+    const y = c.node
+    const x = c.via ?? s
+    const how = c.via === null ? `${s}’s own path` : `via ${c.via}`
+    steps.push({
+      rule: 'Node-protecting P-space',
+      text: `Node-protecting P-space: ${y} ${how}: dist(${x},${y})=${num(c.distXY)} < dist(${x},${e})+dist(${e},${y}) ${sumText([c.distXE, c.distEY], c.viaE, [e], graph)} ${mark(c.inP)}`,
+      ok: c.inP,
+      rfc: 'RFC 8102 §2.2.2',
+    })
+  }
+  for (const c of result.destChecks) {
+    steps.push({
+      rule: 'Node-protecting PQ',
+      text: `${c.node}’s path to ${d} avoids ${e}: dist(${c.node},${d})=${num(c.distYD)} < dist(${c.node},${e})+dist(${e},${d}) ${sumText([c.distYE, c.distED], c.viaE, [e], graph)} ${mark(c.ok)}`,
+      ok: c.ok,
+      rfc: 'RFC 8102 §2.3.2',
+    })
+  }
+  const rfc = 'RFC 8102 §2.3.4'
+  if (ctx.lfaBest !== undefined) {
+    steps.push({
+      rule: 'Node-protecting PQ',
+      text: `Remote LFA not needed: LFA ${ctx.lfaBest} already protects ${d}`,
+      ok: true,
+      rfc,
+    })
+    return steps
+  }
+  const best = result.costs.find((c) => c.node === result.best)
+  if (best === undefined) {
+    steps.push({
+      rule: 'Node-protecting PQ',
+      text:
+        ctx.linkBest !== undefined
+          ? `No node-protecting PQ node for ${d}: falls back to link protection, PQ node ${ctx.linkBest} ✗`
+          : `No node-protecting PQ node for ${d} ✗`,
+      ok: false,
+      rfc,
+    })
+    return steps
+  }
+  const via = best.exitVia === undefined ? '' : ` via ${best.exitVia}`
+  const lowest = result.costs.length > 1 ? ', lowest' : ''
+  steps.push({
+    rule: 'Node-protecting PQ',
+    text: `Best node-protecting PQ node: ${best.node}${via} (cost ${best.cost}${lowest}). The tunnel and ${best.node}’s path to ${d} both avoid router ${e}`,
+    ok: true,
+    rfc,
+  })
+  return steps
+}
+
+/**
+ * SRv6 (D59): the repair list as SIDs (RFC 9855 §7.2), and the max SID depth check on
+ * the SIDs S pushes. D stays the inner packet's address, so it is not in the list.
+ */
+export function explainSrv6(
+  sids: string[],
+  d: NodeId,
+  msd: number | undefined,
+  s: NodeId,
+): ExplainStep[] {
+  const steps: ExplainStep[] = [
+    {
+      rule: 'SRv6 SID list',
+      text:
+        sids.length === 0
+          ? `SRv6: no SIDs needed: sending out of the repair interface reaches ${d} on normal routing`
+          : `SRv6: S encapsulates with SID list [${sids.join(', ')}] (${sids.length} SID${sids.length === 1 ? '' : 's'}); ${d} stays the inner destination`,
+      ok: true,
+      rfc: 'RFC 9855 §7.2',
+    },
+  ]
+  if (msd !== undefined) {
+    const fits = sids.length <= msd
+    steps.push({
+      rule: 'TI-LFA max SID depth',
+      text: `${sids.length} SID${sids.length === 1 ? '' : 's'} ${fits ? '≤' : '>'} MSD ${msd} of ${s} ${mark(fits)}${fits ? '' : `: ${s} can’t push this list, so no TI-LFA backup is installed`}`,
+      ok: fits,
+      rfc: 'RFC 9352 §4',
+    })
+  }
+  return steps
 }

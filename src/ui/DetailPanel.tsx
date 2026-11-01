@@ -10,6 +10,7 @@ import {
   lfaTags,
   linkName,
   METHOD_NAME,
+  protectsText,
   segmentText,
   spaceSet,
   tooDeepText,
@@ -113,6 +114,13 @@ export function DetailPanel({
       </div>
       <p className="text-slate-600 dark:text-slate-300">
         Primary path <Path ids={paths.primary} /> (cost {result.cost}).
+        {/* SRLG modes (D53): what fails together with the protected link. */}
+        {p.srlg !== undefined && (
+          <span className="block text-xs">
+            Shares an SRLG with {p.srlg.join(', ')}: backups should avoid{' '}
+            {p.srlg.length === 1 ? 'it' : 'them'} too.
+          </span>
+        )}
       </p>
 
       <fieldset className="mt-2 flex flex-wrap items-center gap-3">
@@ -234,6 +242,27 @@ export function DetailPanel({
               ? 'none'
               : `★ ${p.rlfa.best}${p.rlfa.exitVia[p.rlfa.best] ? ` (sent out via ${p.rlfa.exitVia[p.rlfa.best]})` : ''}`}
         </dd>
+        {/* Node mode (RFC 8102, D51): the node-protecting sets for this destination. */}
+        {p.rlfa.node && (
+          <>
+            <dt className="text-slate-500">Node-protecting P</dt>
+            <dd>{set(p.rlfa.node.pSpace)}</dd>
+            <dt className="text-slate-500">Node-protecting PQ</dt>
+            <dd>{set(p.rlfa.node.pq)}</dd>
+          </>
+        )}
+        {p.rlfa.needed && p.rlfa.best !== undefined && p.rlfa.protects !== undefined && (
+          <>
+            <dt className="text-slate-500">Protects</dt>
+            <dd
+              className={
+                p.rlfa.protects === 'node' ? '' : 'font-semibold text-amber-700 dark:text-amber-400'
+              }
+            >
+              {protectsText(p.rlfa.protects, p.rlfa.fallback, p.protectedLink.to)}
+            </dd>
+          </>
+        )}
       </dl>
 
       <h3 className={h3}>TI-LFA (RFC 9855)</h3>
@@ -243,6 +272,20 @@ export function DetailPanel({
           <dd>
             <Path ids={p.tilfa.path} />
           </dd>
+          {p.tilfa.protects !== undefined && (
+            <>
+              <dt className="text-slate-500">Protects</dt>
+              <dd
+                className={
+                  p.tilfa.protects === 'node'
+                    ? ''
+                    : 'font-semibold text-amber-700 dark:text-amber-400'
+                }
+              >
+                {protectsText(p.tilfa.protects, p.tilfa.fallback, p.protectedLink.to)}
+              </dd>
+            </>
+          )}
           <dt className="text-slate-500">Segment list</dt>
           <dd>[{p.tilfa.segments.map((x) => segmentText(x, b)).join(', ')}]</dd>
           {out !== undefined && isBundled(b, source, out) && (
@@ -251,8 +294,25 @@ export function DetailPanel({
               <dd>link {p.tilfa.outLink}</dd>
             </>
           )}
-          <dt className="text-slate-500">Label stack (top first)</dt>
-          <dd className="font-mono">{p.tilfa.labelStack.join(', ')}</dd>
+          {p.tilfa.srv6 !== undefined ? (
+            <>
+              <dt className="text-slate-500">SRv6 SID list</dt>
+              <dd className="font-mono">
+                {p.tilfa.srv6.length === 0
+                  ? 'none: the outgoing interface is enough'
+                  : p.tilfa.srv6.join(', ')}
+                <span className="block font-sans text-xs text-slate-500">
+                  {result.dest} stays the inner destination (RFC 9855 §7.2). The packet walk below
+                  shows the same repair with SR-MPLS labels.
+                </span>
+              </dd>
+            </>
+          ) : (
+            <>
+              <dt className="text-slate-500">Label stack (top first)</dt>
+              <dd className="font-mono">{p.tilfa.labelStack.join(', ')}</dd>
+            </>
+          )}
           <dt className="text-slate-500">Extra labels</dt>
           <dd>{p.tilfa.extraLabels}</dd>
           {p.tilfa.msd !== undefined && (

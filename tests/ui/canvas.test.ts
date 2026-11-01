@@ -254,3 +254,44 @@ describe('canvas heat map', () => {
     expect(cy.getElementById('B').data('display')).toBe('B')
   })
 })
+
+describe('canvas: LAN as a pseudonode (D55)', () => {
+  it('draws the LAN as a square in the middle of its members, with a spoke each', () => {
+    const { cy } = draw('10-lan-levels.yaml')
+    const lan = cy.getElementById('lan:LAN1')
+    expect(lan.hasClass('lan')).toBe(true)
+    // Centre of R2 (200,-120), R3 (200,120), R4 (500,0).
+    expect(lan.position()).toEqual({ x: 300, y: 0 })
+    expect(
+      cy
+        .edges()
+        .map((e) => e.id())
+        .filter((id) => id.startsWith('lan:'))
+        .sort(),
+    ).toEqual(['lan:LAN1:R2', 'lan:LAN1:R3', 'lan:LAN1:R4'])
+    // The LAN's member-to-member links are not drawn themselves.
+    expect(cy.getElementById('LAN1:R2-R4').empty()).toBe(true)
+    expect(cy.getElementById('lan:LAN1:R2').data()).toMatchObject({
+      metricAB: 10,
+      metricBA: 0,
+      rep: 'LAN1:R2-R3',
+    })
+  })
+
+  it('a path over the LAN lights both spokes; a failed interface marks the spoke', () => {
+    const { cy, t } = draw('10-lan-levels.yaml')
+    decorate(
+      cy,
+      t,
+      { source: 'R3', dest: 'R2', primary: ['R3', 'R2'], primaryLinks: ['LAN1:R2-R3'] },
+      { ...none, failed: ['LAN1:R2-R3', 'LAN1:R2-R4'] },
+    )
+    // R3 → LAN → R2: R3's spoke forwards, R2's spoke runs back to R2.
+    expect(cy.getElementById('lan:LAN1:R3').hasClass('primary-fwd')).toBe(true)
+    expect(cy.getElementById('lan:LAN1:R2').hasClass('primary-rev')).toBe(true)
+    // All of R2's LAN links are down: its spoke is failed; R3's is not.
+    expect(cy.getElementById('lan:LAN1:R2').hasClass('failed')).toBe(true)
+    expect(cy.getElementById('lan:LAN1:R3').hasClass('failed')).toBe(false)
+    expect(cy.getElementById('lan:LAN1').data('display')).toBe('LAN1')
+  })
+})

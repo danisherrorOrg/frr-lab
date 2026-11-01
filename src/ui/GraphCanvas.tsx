@@ -26,7 +26,12 @@ function targetOf(ev: cytoscape.EventObject, cy: cytoscape.Core): Target | null 
   if (hit === cy) return null
   const el = hit as cytoscape.SingularElementReturnValue
   const id = el.id()
-  return el.isNode() ? { kind: 'node', id } : { kind: 'link', id }
+  // A LAN (D55): the pseudonode isn't a router; a spoke stands for its member's LAN link.
+  const node = el.isNode()
+  const lanRep = el.data('lan') === undefined ? undefined : (el.data('rep') as string)
+  if (lanRep !== undefined || el.data('lan') !== undefined)
+    return node || lanRep === undefined ? null : { kind: 'link', id: lanRep }
+  return node ? { kind: 'node', id } : { kind: 'link', id }
 }
 
 /** The heat map's numbers for a hovered router or link (any mode, so the colour can be checked). */
@@ -98,7 +103,10 @@ export function GraphCanvas({
           onTap.current?.(id)
         }
       } else if (st.tool === 'fail-link') {
-        st.toggleFailedLink(id)
+        const el = ev.target as cytoscape.EdgeSingular
+        // A spoke: the member's whole interface to the LAN goes down (RFC 5286 §3.6, D55).
+        if (el.data('lan') !== undefined) st.toggleLanInterface(el.data('lan'), el.data('member'))
+        else st.toggleFailedLink(id)
       } else {
         st.select({ kind: 'link', id })
       }
@@ -107,6 +115,8 @@ export function GraphCanvas({
     // fail-link tool, where the two clicks already failed and restored it.
     cy.on('dbltap', 'edge', (ev) => {
       if (useStore.getState().tool === 'fail-link') return
+      // A LAN's metrics are edited on its link in the properties panel.
+      if ((ev.target as cytoscape.EdgeSingular).data('lan') !== undefined) return
       const p = ev.renderedPosition
       setMenu(null)
       setEditor({ link: (ev.target as cytoscape.EdgeSingular).id(), x: p.x, y: p.y })

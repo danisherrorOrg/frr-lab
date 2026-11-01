@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { RepairMode } from '../engine/simulate'
 import { freePosition } from '../state/edit'
+import { flexAlgoText } from '../engine/flex-algo'
+import { isMultiLevel, levelViews } from '../engine/levels'
 import { useStore, type Tool } from '../state/store'
 import { bundles, HEAT_MODE_NAME, linkName as nameOf } from './format'
 import { PropertiesPanel } from './PropertiesPanel'
@@ -255,6 +257,8 @@ export function Sidebar({ className = '' }: { className?: string }) {
         <KeyboardTool key={tool} tool={tool} />
       </fieldset>
 
+      <LevelPicker />
+      <AlgoPicker />
       <div>
         <label htmlFor="source" className="mb-1 block text-sm font-semibold">
           Source router (S)
@@ -340,5 +344,84 @@ export function Sidebar({ className = '' }: { className?: string }) {
         </ul>
       </details>
     </aside>
+  )
+}
+
+/**
+ * Multi-level IS-IS (D56): each level runs its own SPF and FRR, so pick one to see its
+ * results. Only shown when the network has levels or areas.
+ */
+function LevelPicker() {
+  const level = useStore((s) => s.level)
+  const topology = useStore((s) => s.topology)
+  const setLevel = useStore((s) => s.setLevel)
+  const full = level === null ? topology : level.full
+  if (level === null && !isMultiLevel(topology)) return null
+  const views = levelViews(full)
+  return (
+    <div>
+      <label htmlFor="isis-level" className="mb-1 block text-sm font-semibold">
+        IS-IS level
+      </label>
+      <select
+        id="isis-level"
+        className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
+        value={level?.key ?? ''}
+        onChange={(e) => setLevel(e.target.value === '' ? null : e.target.value)}
+      >
+        <option value="">Whole network, as one level</option>
+        {views.map((v) => (
+          <option key={v.key} value={v.key}>
+            {v.title} ({v.routers} routers)
+          </option>
+        ))}
+      </select>
+      <p className="mt-1 text-xs text-slate-500">
+        {level === null
+          ? 'This network has IS-IS levels. Each level runs its own SPF and FRR: pick one to see its own results.'
+          : `Showing ${views.find((v) => v.key === level.key)?.title ?? 'one level'} only. Edits here are kept when you switch back; undo starts afresh.`}
+      </p>
+    </div>
+  )
+}
+
+/**
+ * Flex-Algo (D58): each algorithm is its own topology with its own metric, so its
+ * results (and backups, RFC 9350 §6.1) are computed in it. Only shown when defined.
+ */
+function AlgoPicker() {
+  const algo = useStore((s) => s.algo)
+  const topology = useStore((s) => s.topology)
+  const setAlgo = useStore((s) => s.setAlgo)
+  const full = algo === null ? topology : algo.full
+  const defs = full.flexAlgos ?? []
+  if (defs.length === 0) return null
+  const shown = defs.find((f) => f.algo === algo?.algo)
+  return (
+    <div>
+      <label htmlFor="flex-algo" className="mb-1 block text-sm font-semibold">
+        Algorithm
+      </label>
+      <select
+        id="flex-algo"
+        className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
+        value={algo?.algo ?? ''}
+        onChange={(e) => setAlgo(e.target.value === '' ? null : Number(e.target.value))}
+      >
+        <option value="">Algorithm 0 (SPF, IGP metric)</option>
+        {defs.map((f) => (
+          <option key={f.algo} value={f.algo}>
+            {flexAlgoText(f)}
+          </option>
+        ))}
+      </select>
+      {shown && (
+        <p className="mt-1 text-xs text-slate-500">
+          {topology.nodes.length} routers and {topology.links.filter((l) => !l.lan).length} links
+          take part; links are costed by the algorithm&apos;s metric. Backups stay inside the
+          algorithm (RFC 9350 §6.1). Read-only: pick Algorithm 0 to edit.
+        </p>
+      )}
+    </div>
   )
 }

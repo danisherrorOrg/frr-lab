@@ -1,7 +1,7 @@
-import { cheapestEdge, edgeOf } from './graph'
+import { cheapestEdge, edgeOf, type Edge } from './graph'
 import { MAX_METRIC } from './lfa'
 import { dist, linkPathCost, reverseSpf, viaCost, type AllPairs } from './spf'
-import type { NodeId, Protection } from './types'
+import type { NodeFallback, NodeId, Protection } from './types'
 
 /** Y ∈ P(S) ⇔ dist(S,Y) < c(S,E) + dist(E,Y). RFC 7490 §5.2.1.1. */
 export const inPSpace = (distSY: number, cSE: number, distEY: number): boolean =>
@@ -29,6 +29,8 @@ export interface PCheck {
   distEY: number
   /** c(S,E) + dist(E,Y); Infinity when E has the overload bit (never transit, RFC 7490 §5.4). */
   viaLink: number
+  /** On a LAN: another of S's links on it that S's path to Y may use (D55). */
+  lanBlocked?: string
   inP: boolean
 }
 
@@ -67,6 +69,11 @@ export interface RlfaOptions {
   extended?: boolean
   /** The protected link S→E, by id. Default: the cheapest link S→E (D29). */
   link?: string
+  /**
+   * S's other links on the protected link's LAN, both directions (D55): they fail with
+   * S's interface, so P(S) avoids them and they are never a tunnel exit (RFC 5286 §3.6).
+   */
+  lanEdges?: readonly Edge[]
 }
 
 export interface RlfaResult {
@@ -91,8 +98,10 @@ export interface RlfaResult {
   /** Neighbor N ≠ E × router outside P(S). Routers in P(S) are always in some P(N). */
   extChecks: ExtPCheck[]
   qChecks: QCheck[]
+  /** The neighbors a tunnel may leave through and the cost of their cheapest link, by id. */
+  exits: { n: NodeId; cSN: number }[]
   /** Links never used as an exit, and why (RFC 7490 §5.4). */
-  skipped: { neighbor: NodeId; link: string; reason: 'max-metric' | 'overload' }[]
+  skipped: { neighbor: NodeId; link: string; reason: 'max-metric' | 'overload' | 'same-lan' }[]
   /**
    * Routers in both spaces left out of `pq` because they have the overload bit:
    * "the PLR MUST NOT use a repair tunnel endpoint with the IS-IS overload bit set"
@@ -122,6 +131,8 @@ export function computeRlfa(
     throw new Error(`There is no link ${s}→${e}${which} to protect.`)
   }
   const cSE = protectedEdge.metric
+  const lanEdges = options.lanEdges ?? []
+  const lanIds = new Set(lanEdges.map((x) => x.linkId))
 
   const others = table.graph.nodes.filter((y) => y !== s && y !== e)
 
@@ -129,8 +140,18 @@ export function computeRlfa(
     const distSY = dist(table, s, node)
     const distEY = dist(table, e, node)
     const viaLink = linkPathCost(table, s, s, e, cSE, node)
-    // inPSpace() with an overloaded E never transit.
-    return { node, distSY, distEY, viaLink, inP: distSY < viaLink }
+    // inPSpace() with an overloaded E never transit; on a LAN, S's other links on it too.
+    const blocked = lanEdges.find(
+      (x) => !(distSY < linkPathCost(table, s, x.from, x.to, x.metric, node)),
+    )
+    return {
+      node,
+      distSY,
+      distEY,
+      viaLink,
+      ...(blocked !== undefined && { lanBlocked: blocked.linkId }),
+      inP: distSY < viaLink && blocked === undefined,
+    }
   })
   const pSet = new Set(pChecks.filter((c) => c.inP).map((c) => c.node))
 
@@ -142,6 +163,10 @@ export function computeRlfa(
   for (const edge of table.graph.out.get(s) ?? []) {
     const n = edge.to
     if (n === e) continue
+    if (lanIds.has(edge.linkId)) {
+      skipped.push({ neighbor: n, link: edge.linkId, reason: 'same-lan' })
+      continue
+    }
     // RFC 7490 §5.4 (and RFC 5286 §3.5): never repair over a max-metric first hop.
     if (edge.metric === MAX_METRIC || edge.back === MAX_METRIC) {
       skipped.push({ neighbor: n, link: edge.linkId, reason: 'max-metric' })
@@ -227,10 +252,133 @@ export function computeRlfa(
     pChecks,
     extChecks,
     qChecks,
+    exits: [...exitLinks].map(([n, x]) => ({ n, cSN: x.metric })),
     skipped,
     ...(overloadedPq.length > 0 && { overloadedPq }),
   }
   return best === undefined ? result : { ...result, best }
+}
+
+/** How router Y gets into the node-protecting P-space (RFC 8102 §2.2.2). */
+export interface NodePCheck {
+  node: NodeId
+  /** Through S's own normal path (null) or neighbor N, and the numbers. */
+  via: NodeId | null
+  /** dist(S,Y) or dist(N,Y). */
+  distXY: number
+  distXE: number
+  distEY: number
+  /** dist(X,E) + dist(E,Y): Infinity when E has the overload bit (no transit). */
+  viaE: number
+  /** Cost from S: dist(S,Y), or c(S,N) + dist(N,Y). */
+  cost: number
+  inP: boolean
+}
+
+/** RFC 8102 §2.3.2: the PQ node's own path to D must avoid E. */
+export interface NodeDestCheck {
+  node: NodeId
+  distYD: number
+  distYE: number
+  distED: number
+  /** dist(Y,E) + dist(E,D); Infinity when E has the overload bit. */
+  viaE: number
+  ok: boolean
+}
+
+export interface NodeRlfaResult {
+  s: NodeId
+  e: NodeId
+  d: NodeId
+  /** Node-protecting P-space: S's own and its neighbors' (RFC 8102 §2.2.2), sorted. */
+  pSpace: NodeId[]
+  /** One per Q-space router (the candidates), with the cheapest way in. */
+  pChecks: NodePCheck[]
+  /** One per router in both spaces that isn't overloaded. */
+  destChecks: NodeDestCheck[]
+  /** Node-protecting PQ nodes for D, sorted. */
+  pq: NodeId[]
+  /** PQ node → the neighbor the tunnel leaves through; left out = S's own path. */
+  exitVia: Record<NodeId, NodeId>
+  costs: PqCost[]
+  best?: NodeId
+}
+
+/**
+ * Remote LFA node protection for (S, D, link S–E) (RFC 8102, docs/02-algorithms.md §3.1,
+ * D51). Unlike link protection it depends on D. A PQ node Y needs:
+ * 1. a tunnel that avoids E (node-protecting extended P-space, §2.2.2): S's own normal
+ *    path, `dist(S,Y) < dist(S,E) + dist(E,Y)`, or through a neighbor N ≠ E with
+ *    `dist(N,Y) < dist(N,E) + dist(E,Y)` (and, as for link protection, the tunnel
+ *    never comes back through S: `dist(N,Y) < dist(N,S) + dist(S,Y)`, D17);
+ * 2. Y in E's Q-space for the link (§2.2.3, the same set as link protection);
+ * 3. Y's own path to D avoids E: `dist(Y,D) < dist(Y,E) + dist(E,D)` (§2.3.2).
+ * The best is the closest by metric, then the lowest id (§2.3.4).
+ */
+export function nodeRlfa(table: AllPairs, link: RlfaResult, d: NodeId): NodeRlfaResult {
+  const { s, e } = link
+  if (d === e) throw new Error(`Node protection doesn't apply when ${d} is the next hop.`)
+  const exits = link.exits
+  const pChecks: NodePCheck[] = []
+  for (const y of link.qSpace) {
+    const own: NodePCheck = {
+      node: y,
+      via: null,
+      distXY: dist(table, s, y),
+      distXE: dist(table, s, e),
+      distEY: dist(table, e, y),
+      viaE: viaCost(table, s, e, y),
+      cost: dist(table, s, y),
+      inP: false,
+    }
+    own.inP = own.distXY < own.viaE
+    let best: NodePCheck | undefined = own.inP ? own : undefined
+    // RFC 8102 §2.3.1 SHOULD try every neighbor; plain P-space only (no `extended`) skips them.
+    if (link.extended) {
+      for (const { n, cSN } of exits) {
+        const distNY = dist(table, n, y)
+        const viaE = viaCost(table, n, e, y)
+        const c: NodePCheck = {
+          node: y,
+          via: n,
+          distXY: distNY,
+          distXE: dist(table, n, e),
+          distEY: dist(table, e, y),
+          viaE,
+          cost: cSN + distNY,
+          inP: distNY < viaE && distNY < viaCost(table, n, s, y),
+        }
+        if (c.inP && (best === undefined || c.cost < best.cost)) best = c
+      }
+    }
+    pChecks.push(best ?? own)
+  }
+  const pSpace = pChecks.filter((c) => c.inP).map((c) => c.node)
+  const destChecks = pSpace
+    .filter((y) => !table.graph.overloaded.has(y)) // RFC 7490 §5.4, as for link protection
+    .map((y): NodeDestCheck => {
+      const distYD = dist(table, y, d)
+      const viaE = viaCost(table, y, e, d)
+      return {
+        node: y,
+        distYD,
+        distYE: dist(table, y, e),
+        distED: dist(table, e, d),
+        viaE,
+        ok: distYD < viaE,
+      }
+    })
+  const pq = destChecks.filter((c) => c.ok).map((c) => c.node)
+  const exitVia: Record<NodeId, NodeId> = {}
+  const costs = pq.map((node): PqCost => {
+    const c = pChecks.find((x) => x.node === node)!
+    if (c.via === null) return { node, cost: c.cost }
+    exitVia[node] = c.via
+    return { node, cost: c.cost, exitVia: c.via, cSN: c.cost - c.distXY, distNY: c.distXY }
+  })
+  const best = chooseBestPq(costs)
+  const out: NodeRlfaResult = { s, e, d, pSpace, pChecks, destChecks, pq, exitVia, costs }
+  return best === undefined ? out : { ...out, best }
 }
 
 /** RFC 7490 §5.2.2: lowest cost S->PQ (RECOMMENDED), then lowest node id (SHOULD). */
@@ -262,4 +410,38 @@ export function rlfaForProtection(
     needed,
   }
   return needed && result.best !== undefined ? { ...out, best: result.best } : out
+}
+
+/**
+ * The RLFA part of a Protection in node mode (D51): a node-protecting PQ node when
+ * there is one, else the link-protecting one, marked with why. `node` is undefined
+ * when D is E (node protection can't apply).
+ */
+export function rlfaForNodeProtection(
+  result: RlfaResult,
+  node: NodeRlfaResult | undefined,
+  lfaBest: NodeId | undefined,
+): Protection['rlfa'] {
+  const out = rlfaForProtection(result, lfaBest)
+  const spaces =
+    node === undefined
+      ? {}
+      : {
+          node: {
+            pSpace: node.pSpace,
+            pq: node.pq,
+            ...(node.best !== undefined && { best: node.best }),
+          },
+        }
+  if (!out.needed) return { ...out, ...spaces }
+  if (node?.best !== undefined) {
+    const exitVia = { ...out.exitVia }
+    const exit = node.exitVia[node.best]
+    if (exit === undefined) delete exitVia[node.best]
+    else exitVia[node.best] = exit
+    return { ...out, ...spaces, exitVia, best: node.best, protects: 'node' }
+  }
+  if (out.best === undefined) return { ...out, ...spaces }
+  const fallback: NodeFallback = node === undefined ? 'dest-is-next-hop' : 'none'
+  return { ...out, ...spaces, protects: 'link', fallback }
 }

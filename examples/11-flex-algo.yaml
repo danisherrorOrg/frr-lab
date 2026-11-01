@@ -1,0 +1,22 @@
+# Example 11 (docs/02-algorithms.md §23, D58): Flex-Algo 128 = lowest delay, never over red links.
+# Algorithm 0 (IGP metric): S → D is S-E-D (20).
+# Flex-Algo 128 leaves out S–E (red) and costs links by delay: S → D is S-A-D (20 µs).
+# Its backup stays inside the algorithm (RFC 9350 §6.1): protecting S–A, LFA B
+# (dist(B,D)=50 < dist(B,S)+dist(S,D) = 50+20); TI-LFA S-B-D, [Prefix-SID(D) in 128] = 17005.
+name: Flex-Algo - low delay, avoid red
+srgb_base: 16000
+flex_algo:
+  - { algo: 128, metric: delay, exclude_any: [red] }
+nodes:
+  - { id: S, sid: 1, pos: { x: 0, y: 150 } }
+  - { id: E, sid: 2, pos: { x: 250, y: 0 } }
+  - { id: A, sid: 3, pos: { x: 250, y: 150 } }
+  - { id: B, sid: 4, pos: { x: 250, y: 300 } }
+  - { id: D, sid: 5, pos: { x: 500, y: 150 } }
+links:
+  - { a: S, b: E, metric: 10, delay: 100, affinity: [red] }
+  - { a: E, b: D, metric: 10, delay: 100 }
+  - { a: S, b: A, metric: 10, delay: 10 }
+  - { a: A, b: D, metric: 30, delay: 10 }
+  - { a: S, b: B, metric: 15, delay: 50 }
+  - { a: B, b: D, metric: 15, delay: 50 }

@@ -1,6 +1,14 @@
 import { useId } from 'react'
 import { adjLabel } from '../engine/labels'
-import type { LfaPreference, Link, NodeId, RouterNode, Topology } from '../engine/types'
+import type {
+  LfaPreference,
+  Link,
+  NodeId,
+  ProtectionGoal,
+  RouterNode,
+  Topology,
+} from '../engine/types'
+import { srlgGroups } from '../engine/srlg'
 import { useStore } from '../state/store'
 import { Field } from './Field'
 import { usePolicyEffect } from './usePolicyEffect'
@@ -55,6 +63,11 @@ function TopologyForm({ topology: t }: { topology: Topology }) {
         hint="Most labels a router can push. Deeper TI-LFA repairs are flagged."
         onCommit={(v) => update({ msd: v.trim() === '' ? null : toNumber(v) })}
       />
+      <ProtectionSelect
+        value={t.protection ?? 'link'}
+        onChange={(v) => update({ protection: v })}
+      />
+      <DataplaneSelect value={t.dataplane ?? 'mpls'} onChange={(v) => update({ dataplane: v })} />
       <h3 className="mt-3 mb-1 text-xs font-semibold">LFA policy (RFC 7916)</h3>
       <PolicySelect
         label="Node-protecting LFAs"
@@ -75,6 +88,31 @@ function TopologyForm({ topology: t }: { topology: Topology }) {
         {t.nodes.length} routers, {t.links.length} links. Click a router or link to edit it.
       </p>
     </section>
+  )
+}
+
+/**
+ * "Fail SRLG duct-7 (3 links)": takes down every link of the group at once, the
+ * failure an SRLG stands for (D53). Replaces whatever was down.
+ */
+function SrlgButtons({ link, topology }: { link: Link; topology: Topology }) {
+  const failOnly = useStore((s) => s.failOnly)
+  const groups = srlgGroups(topology).filter((g) => (link.srlg ?? []).includes(g.group))
+  if (groups.length === 0) return null
+  return (
+    <div className="mb-2 flex flex-wrap gap-2">
+      {groups.map((g) => (
+        <button
+          key={g.group}
+          type="button"
+          title={`Links: ${g.links.join(', ')}`}
+          className="rounded border border-red-300 px-2 py-0.5 text-xs text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950"
+          onClick={() => failOnly({ links: g.links })}
+        >
+          ✕ Fail SRLG {g.group} ({g.links.length} link{g.links.length === 1 ? '' : 's'})
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -108,6 +146,76 @@ function PolicyEffect({ topology, source }: { topology: Topology; source: NodeId
     >
       {text}
     </p>
+  )
+}
+
+/** SR-MPLS or SRv6 (D59): how TI-LFA repairs are written. */
+function DataplaneSelect({
+  value,
+  onChange,
+}: {
+  value: 'mpls' | 'srv6'
+  onChange: (v: 'mpls' | 'srv6') => void
+}) {
+  const id = useId()
+  return (
+    <div className="mb-2 flex items-center justify-between gap-2">
+      <label htmlFor={id} className="text-xs font-medium text-slate-600 dark:text-slate-300">
+        Data plane
+      </label>
+      <select
+        id={id}
+        value={value}
+        className="rounded border border-slate-300 px-1 py-0.5 text-sm dark:border-slate-600 dark:bg-slate-800"
+        onChange={(e) => onChange(e.target.value as 'mpls' | 'srv6')}
+      >
+        <option value="mpls">SR-MPLS (labels)</option>
+        <option value="srv6">SRv6 (SIDs)</option>
+      </select>
+    </div>
+  )
+}
+
+const GOAL_HINT: Record<ProtectionGoal, string> = {
+  link: 'Remote LFA and TI-LFA only avoid the failed link. Pick node to survive a router failure.',
+  node: 'Remote LFA and TI-LFA avoid the next-hop router too (RFC 8102, RFC 9855); link protection when they can’t.',
+  srlg: 'Backups also avoid every link that shares an SRLG with the failed one (RFC 9855). Set SRLGs on links.',
+  'node-srlg':
+    'Backups avoid the next-hop router and the failed link’s SRLG; they fall back one step at a time.',
+}
+
+/**
+ * Link, node or SRLG protection for Remote LFA and TI-LFA (D51, D53). A network setting, like
+ * the MSD, so it is saved in the file and the share link.
+ */
+function ProtectionSelect({
+  value,
+  onChange,
+}: {
+  value: ProtectionGoal
+  onChange: (v: ProtectionGoal) => void
+}) {
+  const id = useId()
+  return (
+    <div className="mb-2">
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={id} className="text-xs font-medium text-slate-600 dark:text-slate-300">
+          Backups protect against
+        </label>
+        <select
+          id={id}
+          value={value}
+          className="rounded border border-slate-300 px-1 py-0.5 text-sm dark:border-slate-600 dark:bg-slate-800"
+          onChange={(e) => onChange(e.target.value as ProtectionGoal)}
+        >
+          <option value="link">Link failure</option>
+          <option value="node">Node failure</option>
+          <option value="srlg">Link + SRLG</option>
+          <option value="node-srlg">Node + SRLG</option>
+        </select>
+      </div>
+      <p className="mt-1 text-xs text-slate-500">{GOAL_HINT[value]}</p>
+    </div>
   )
 }
 
@@ -250,6 +358,13 @@ function LinkForm({ link, topology: t }: { link: Link; topology: Topology }) {
           <span className="ml-1 font-normal text-slate-500">({link.id})</span>
         )}
       </h2>
+      {link.lan !== undefined && (
+        <p className="mb-2 text-xs text-slate-600 dark:text-slate-300">
+          On LAN {link.lan} (a pseudonode): {a}→{b} costs {a}&apos;s metric to the LAN and {b}→{a}{' '}
+          costs {b}&apos;s. Changing one changes it for every neighbor of that router on the LAN. A
+          failure of a router&apos;s interface takes down all its links on the LAN.
+        </p>
+      )}
       <Field
         key={`mab:${link.id}:${link.metricAB}`}
         label={`Metric ${a}→${b}`}
@@ -266,6 +381,15 @@ function LinkForm({ link, topology: t }: { link: Link; topology: Topology }) {
       />
       {adj('adjSidAB', a, b)}
       {adj('adjSidBA', b, a)}
+      <Field
+        key={`srlg:${link.id}:${(link.srlg ?? []).join(',')}`}
+        label="SRLGs"
+        value={(link.srlg ?? []).join(', ')}
+        placeholder="none"
+        hint="Shared risk groups, comma-separated. Links with a name in common fail together."
+        onCommit={(v) => update(link.id, { srlg: v.split(/[\s,]+/) })}
+      />
+      <SrlgButtons link={link} topology={t} />
       <button
         type="button"
         className="mt-1 mr-2 rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
@@ -281,7 +405,7 @@ function LinkForm({ link, topology: t }: { link: Link; topology: Topology }) {
         What if the metric changes?
       </button>
       <button type="button" className={danger} onClick={remove}>
-        Delete link
+        {link.lan === undefined ? 'Delete link' : `Delete LAN ${link.lan}`}
       </button>
     </section>
   )

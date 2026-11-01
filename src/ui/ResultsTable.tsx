@@ -1,12 +1,14 @@
 import { useMemo } from 'react'
 import { toRows, type ResultRow } from '../engine/rows'
-import type { DestinationResult, NodeId } from '../engine/types'
+import type { DestinationResult, NodeFallback, NodeId, Protects } from '../engine/types'
 import { useStore, type RowKey } from '../state/store'
 import {
   bundles,
   hopName,
   isBundled,
   METHOD_NAME,
+  protectsTag,
+  protectsText,
   segmentsShort,
   tooDeepText,
   type Bundles,
@@ -29,6 +31,27 @@ function LfaCell({ r, b }: { r: ResultRow; b: Bundles }) {
   )
 }
 
+/** Beyond link protection (D51, D53): what the backup survives, full reason in the tooltip. */
+function ProtectsTag({
+  r,
+  x,
+}: {
+  r: ResultRow
+  x: { protects?: Protects; fallback?: NodeFallback }
+}) {
+  if (x.protects === undefined) return null
+  // A fallback is set whenever the backup protects less than the network asked for.
+  const full = x.fallback === undefined
+  return (
+    <span
+      title={protectsText(x.protects, x.fallback, r.via)}
+      className={`ml-1 text-xs ${full ? 'text-slate-500' : 'font-semibold text-amber-700 dark:text-amber-400'}`}
+    >
+      ({protectsTag(x.protects, x.fallback)})
+    </span>
+  )
+}
+
 function RlfaCell({ r }: { r: ResultRow }) {
   if (!r.rlfa.needed) return <span className="text-xs text-slate-400">not needed</span>
   if (r.rlfa.pq === undefined) return <span className="text-slate-400">none</span>
@@ -36,6 +59,7 @@ function RlfaCell({ r }: { r: ResultRow }) {
     <span>
       ★ {r.rlfa.pq}
       {r.rlfa.via && <span className="ml-1 text-xs text-slate-500">(via {r.rlfa.via})</span>}
+      <ProtectsTag r={r} x={r.rlfa} />
     </span>
   )
 }
@@ -46,13 +70,21 @@ function TilfaCell({ r, b }: { r: ResultRow; b: Bundles }) {
   return (
     <span className={tooDeep ? 'text-slate-500' : ''}>
       {segmentsShort(segments, b)}
+      <ProtectsTag r={r} x={r.tilfa} />
       {/* With a bundle, the outgoing link is part of the repair (RFC 9855 §5, D29). */}
       {isBundled(b, r.source, out) && (
         <span className="ml-1 text-xs text-slate-500">
           (out {hopName(b, r.source, out, outLink)})
         </span>
       )}
-      <span className="block font-mono text-xs text-slate-500">{labelStack.join(' ')}</span>
+      {/* SRv6 (D59): the SID list S pushes; D stays the inner destination. */}
+      {r.tilfa.srv6 !== undefined ? (
+        <span className="block font-mono text-xs text-slate-500">
+          {r.tilfa.srv6.length === 0 ? 'no SIDs' : r.tilfa.srv6.join(' ')}
+        </span>
+      ) : (
+        <span className="block font-mono text-xs text-slate-500">{labelStack.join(' ')}</span>
+      )}
       {/* RFC 8491 §5: the PLR can't impose more labels than its MSD (D44). */}
       {tooDeep && msd !== undefined && (
         <span className="block text-xs font-semibold text-red-700 dark:text-red-400">

@@ -17,6 +17,7 @@ import { bundles, drawnFlow, pickBackup, spaceMarks, walkMarks, type SpaceKind }
 import { GraphCanvas } from './ui/GraphCanvas'
 import { Legend } from './ui/Legend'
 import { LinkView } from './ui/LinkView'
+import { Quiz } from './ui/Quiz'
 import { NoticeBox } from './ui/NoticeBox'
 import type { WalkPath } from './ui/PacketWalk'
 import { ResultsTable } from './ui/ResultsTable'
@@ -26,6 +27,7 @@ import { Tour } from './ui/Tour'
 import { WeakSpots } from './ui/WeakSpots'
 import { WhatIf } from './ui/WhatIf'
 import { YamlGuide } from './ui/YamlGuide'
+import { FrrImportDialog } from './ui/FrrImportDialog'
 import { GenerateDialog } from './ui/GenerateDialog'
 import { isFirstVisit, markTourSeen } from './ui/tour-steps'
 import { useHeatMap } from './ui/useHeatMap'
@@ -420,12 +422,14 @@ export function App() {
           />
           <WhatIf />
           <WeakSpots />
+          <Quiz />
           <CoverageReport source={source} />
         </main>
       </div>
       <Tour />
       <YamlGuide />
       <GenerateDialog />
+      <FrrImportDialog />
     </div>
   )
 }

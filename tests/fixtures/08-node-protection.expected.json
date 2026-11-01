@@ -1,0 +1,80 @@
+{
+  "$comment": "Expected engine results for Example 8 (docs/02-algorithms.md §3.1, §4.4, D51). Only the fields listed here are checked. null means 'none'.",
+  "fixture": "08-node-protection.yaml",
+  "source": "S",
+  "results": [
+    {
+      "dest": "D",
+      "cost": 4,
+      "nextHops": ["E"],
+      "protections": [
+        {
+          "protectedLink": { "from": "S", "to": "E", "id": "S-E" },
+          "ecmpProtected": false,
+          "lfa": {
+            "candidates": [
+              {
+                "neighbor": "N",
+                "link": "S-N",
+                "loopFree": false,
+                "downstream": false,
+                "nodeProtecting": false,
+                "cost": 8
+              }
+            ],
+            "best": null
+          },
+          "rlfa": {
+            "pq": ["B", "C"],
+            "needed": true,
+            "best": "C",
+            "exitVia": { "B": "N", "C": "N" },
+            "node": { "pSpace": ["B", "C"], "pq": ["C"], "best": "C" },
+            "protects": "node",
+            "fallback": null
+          },
+          "tilfa": {
+            "path": ["S", "N", "B", "C", "D"],
+            "outLink": "S-N",
+            "segments": [
+              { "kind": "prefix", "node": "C", "label": 16005 },
+              { "kind": "prefix", "node": "D", "label": 16006 }
+            ],
+            "labelStack": [16005, 16006],
+            "extraLabels": 1,
+            "protects": "node",
+            "fallback": null
+          }
+        }
+      ]
+    },
+    {
+      "dest": "E",
+      "cost": 2,
+      "nextHops": ["E"],
+      "protections": [
+        {
+          "protectedLink": { "from": "S", "to": "E", "id": "S-E" },
+          "lfa": { "best": null },
+          "rlfa": {
+            "best": "B",
+            "node": null,
+            "protects": "link",
+            "fallback": "dest-is-next-hop"
+          },
+          "tilfa": {
+            "path": ["S", "N", "B", "E"],
+            "segments": [
+              { "kind": "prefix", "node": "B", "label": 16004 },
+              { "kind": "prefix", "node": "E", "label": 16002 }
+            ],
+            "labelStack": [16004, 16002],
+            "extraLabels": 1,
+            "protects": "link",
+            "fallback": "dest-is-next-hop"
+          }
+        }
+      ]
+    }
+  ]
+}

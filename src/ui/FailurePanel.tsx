@@ -1,4 +1,5 @@
 import { createContext, useContext, useMemo, useState } from 'react'
+import { microloops } from '../engine/microloop'
 import type { PacketWalk as Walk } from '../engine/packet-walk'
 import {
   meetsDownRouter,
@@ -388,8 +389,20 @@ export function FailurePanel({
         {routers.length > 0 && (
           <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
             When a router fails, all its links go down at once. Its neighbors only see their own
-            link fail, so they use their <em>link-protecting</em> backups, and some of those still
-            go through the failed router. That is why node protection exists.
+            link fail and use the backup they built for that link.{' '}
+            {topology.protection === 'node' ? (
+              <>
+                This network uses <em>node protection</em>: Remote LFA and TI-LFA backups avoid the
+                next-hop router where they can, so most of them survive (LFAs follow the LFA
+                policy).
+              </>
+            ) : (
+              <>
+                These are <em>link-protecting</em> backups, and some still go through the failed
+                router. To plan around routers, set &quot;Backups protect against&quot; to Node
+                failure in the topology properties.
+              </>
+            )}
           </p>
         )}
         {down.length > 1 && (
@@ -564,7 +577,86 @@ export function FailurePanel({
             </p>
           </>
         )}
+        <Microloops failedLinks={failedLinks} failedNodes={failedNodes} />
       </section>
     </BundleContext.Provider>
+  )
+}
+
+const LOOPS_SHOWN = 20
+
+/**
+ * Microloops (Later #6, D57): loops some update order can make while the routers
+ * converge, per destination. The FRR repair itself is loop-free; these come after it.
+ */
+function Microloops({
+  failedLinks,
+  failedNodes,
+}: {
+  failedLinks: string[]
+  failedNodes: NodeId[]
+}) {
+  const topology = useStore((s) => s.topology)
+  const [open, setOpen] = useState(false)
+  const report = useMemo(
+    () => (open ? microloops(topology, { links: failedLinks, nodes: failedNodes }) : undefined),
+    [open, topology, failedLinks, failedNodes],
+  )
+  return (
+    <div className="mt-3 border-t border-slate-200 pt-2 dark:border-slate-700">
+      <button
+        type="button"
+        aria-expanded={open}
+        className="text-sm font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
+        onClick={() => setOpen(!open)}
+      >
+        {open ? '▾' : '▸'} Microloops while the network converges
+      </button>
+      {report && (
+        <div aria-label="Microloops" className="mt-1 text-xs">
+          <p className="text-slate-600 dark:text-slate-300">
+            After the failure each router updates its table on its own time (RFC 5715). While some
+            use the new table and others the old one, traffic can go round between them for a
+            moment. {report.changes} router–destination next hops change.
+          </p>
+          {report.loops.length === 0 ? (
+            <p className="mt-1 font-medium text-green-700 dark:text-green-400">
+              ✓ No microloop: no update order sends traffic round in a circle.
+            </p>
+          ) : (
+            <>
+              <p className="mt-1 font-medium text-amber-700 dark:text-amber-400">
+                ⚠ {report.loops.length} possible microloop{report.loops.length === 1 ? '' : 's'}
+                {report.loops.every((l) => l.plrEarly)
+                  ? ', all avoided by local convergence delay (RFC 8333)'
+                  : ''}
+                .
+              </p>
+              <ul className="mt-1 list-disc pl-5">
+                {report.loops.slice(0, LOOPS_SHOWN).map((l) => (
+                  <li key={`${l.dest}|${l.cycle.join()}`}>
+                    To <b>{l.dest}</b>: {l.cycle.join(' → ')}, if {l.updated.join(', ')}{' '}
+                    {l.updated.length === 1 ? 'updates' : 'update'} before{' '}
+                    {l.waiting.length > 0 ? l.waiting.join(', ') : 'the others'}.
+                    {l.plrEarly && (
+                      <span className="text-slate-500">
+                        {' '}
+                        The router next to the failure left its FRR repair early: local convergence
+                        delay (RFC 8333) keeps it on the repair, so this loop doesn&apos;t form.
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {report.loops.length > LOOPS_SHOWN && (
+                <p className="mt-1 text-slate-500">
+                  … and {report.loops.length - LOOPS_SHOWN} more.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
   )
 }

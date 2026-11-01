@@ -1,6 +1,6 @@
 import type { Edge } from './graph'
 import { DEFAULT_LFA_POLICY, type ResolvedLfaPolicy } from './lfa-policy'
-import { avoidsLink, dist, firstLinks, viaCost, type AllPairs } from './spf'
+import { avoidsLink, dist, firstLinks, linkPathCost, viaCost, type AllPairs } from './spf'
 import type { LfaCandidate, NodeId } from './types'
 
 /** Highest IS-IS wide metric. RFC 5286 §3.5: never use an alternate over such a link. */
@@ -46,7 +46,11 @@ export interface LfaResult {
    * Links left out before any check, and why: a maximum metric or a neighbor with
    * the overload bit (RFC 5286 §3.5), or a neighbor S's policy never uses (RFC 7916 §6.2.4.4).
    */
-  skipped: { neighbor: NodeId; link: string; reason: 'max-metric' | 'overload' | 'excluded' }[]
+  skipped: {
+    neighbor: NodeId
+    link: string
+    reason: 'max-metric' | 'overload' | 'excluded' | 'same-lan'
+  }[]
   /** The policy the choice used (docs/02-algorithms.md §15). */
   policy: ResolvedLfaPolicy
   best?: NodeId
@@ -81,6 +85,8 @@ export function primaryLink(
  * out of S, other ECMP next hops included (§3.4). Another link to E itself passes
  * Inequality 1 and protects the link but never the node (§3.6 steps 7–8, D29).
  * `policy` is S's LFA policy (RFC 7916 §6.2, §15 of 02); left out = the D7 order.
+ * `shared` holds both directions of the links that share an SRLG with S–E, in the
+ * SRLG modes (D53): then each candidate gets `srlgDisjoint`, and those rank first.
  */
 export function computeLfa(
   table: AllPairs,
@@ -89,7 +95,10 @@ export function computeLfa(
   e: NodeId,
   linkId?: string,
   policy: ResolvedLfaPolicy = DEFAULT_LFA_POLICY,
+  shared: readonly Edge[] = [],
+  sameLan: ReadonlySet<string> = new Set(),
 ): LfaResult {
+  const sharedIds = new Set(shared.map((x) => x.linkId))
   if (s === d) throw new Error(`Source ${s} can't be its own destination.`)
   if (!table.from.has(s)) throw new Error(`Unknown source router "${s}".`)
   const primary = primaryLink(table, s, d, e, linkId)
@@ -101,6 +110,11 @@ export function computeLfa(
   for (const edge of table.graph.out.get(s) ?? []) {
     const n = edge.to
     if (edge.linkId === primary.linkId) continue
+    // RFC 5286 §3.6: an alternate across the same LAN fails with S's interface to it (D55).
+    if (sameLan.has(edge.linkId)) {
+      result.skipped.push({ neighbor: n, link: edge.linkId, reason: 'same-lan' })
+      continue
+    }
     // RFC 5286 §3.5: MUST NOT use a link whose cost or reverse cost is the maximum.
     if (edge.metric === MAX_METRIC || edge.back === MAX_METRIC) {
       result.skipped.push({ neighbor: n, link: edge.linkId, reason: 'max-metric' })
@@ -139,6 +153,12 @@ export function computeLfa(
       nodeProtecting: check.distND < check.viaE,
       cost: check.cSN + check.distND,
     }
+    // RFC 7916 §6.2.4.1: an alternate whose link or path shares an SRLG with S–E may
+    // fail with it. A tie counts as "may use it", as in §1.5.
+    if (shared.length > 0)
+      cand.srlgDisjoint =
+        !sharedIds.has(edge.linkId) &&
+        shared.every((x) => check.distND < linkPathCost(table, n, x.from, x.to, x.metric, d))
     const rejected = cand.loopFree ? policyRejection(cand, policy, d === e) : undefined
     result.candidates.push(rejected === undefined ? cand : { ...cand, policyRejected: rejected })
   }
@@ -188,6 +208,8 @@ function bestLfaCandidate(
 }
 
 function betterLfa(a: LfaCandidate, b: LfaCandidate, policy: ResolvedLfaPolicy): boolean {
+  // SRLG modes (D53): SRLG-disjoint first (RFC 7916 §6.2.4.1), then the D7 order.
+  if (a.srlgDisjoint !== undefined && a.srlgDisjoint !== b.srlgDisjoint) return a.srlgDisjoint
   if (policy.nodeProtecting !== 'ignore' && a.nodeProtecting !== b.nodeProtecting)
     return a.nodeProtecting
   if (policy.downstream !== 'ignore' && a.downstream !== b.downstream) return a.downstream
@@ -208,10 +230,15 @@ export function ecmpProtectorLinks(
   d: NodeId,
   e: NodeId,
   linkId?: string,
+  sameLan: ReadonlySet<string> = new Set(),
 ): Edge[] {
   const primary = primaryLink(table, s, d, e, linkId)
+  // Another next hop on the same LAN goes down with S's interface (RFC 5286 §3.6, D55).
   return firstLinks(table, s, d).filter(
-    (x) => x.linkId !== primary.linkId && avoidsLink(table, x.to, d, s, e, primary.metric),
+    (x) =>
+      x.linkId !== primary.linkId &&
+      !sameLan.has(x.linkId) &&
+      avoidsLink(table, x.to, d, s, e, primary.metric),
   )
 }
 

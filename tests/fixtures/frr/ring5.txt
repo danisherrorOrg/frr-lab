@@ -1,0 +1,117 @@
+Area 1:
+IS-IS Level-2 link-state database:
+LSP ID                  PduLen  SeqNumber   Chksum  Holdtime  ATT/P/OL
+A.00-00                  268   0x00000003  0x0fd3     1171    0/0/0
+  Protocol Supported: IPv4
+  Area Address: 49.0000
+  Hostname: A
+  TE Router ID: 10.0.0.3
+  Router Capability: 10.0.0.3 , D:0, S:0
+    Segment Routing: I:1 V:0, SRGB Base: 16000 Range: 8000
+    SR Local Block Base: 15000 Range: 1000
+    SR Algorithm:
+      0: SPF
+    Node Maximum SID Depth: 16
+  Extended Reachability: B.00 (Metric: 1)
+    Adjacency-SID: 15001, Weight: 0, Flags: F:0 B:1, V:1, L:1, S:0, P:0
+    Adjacency-SID: 15000, Weight: 0, Flags: F:0 B:0, V:1, L:1, S:0, P:0
+  Extended Reachability: S.00 (Metric: 1)
+    Adjacency-SID: 15003, Weight: 0, Flags: F:0 B:1, V:1, L:1, S:0, P:0
+    Adjacency-SID: 15002, Weight: 0, Flags: F:0 B:0, V:1, L:1, S:0, P:0
+  IPv4 Interface Address: 10.0.0.3
+  Extended IP Reachability: 10.0.0.3/32 (Metric: 0)
+    Prefix-SID Index: 3, Algorithm: 0, Flags:NO-PHP
+  Extended IP Reachability: 10.3.4.0/24 (Metric: 1)
+  Extended IP Reachability: 10.1.3.0/24 (Metric: 1)
+
+B.00-00                  268   0x00000004  0x0fe4     1171    0/0/0
+  Protocol Supported: IPv4
+  Area Address: 49.0000
+  Hostname: B
+  TE Router ID: 10.0.0.4
+  Router Capability: 10.0.0.4 , D:0, S:0
+    Segment Routing: I:1 V:0, SRGB Base: 16000 Range: 8000
+    SR Local Block Base: 15000 Range: 1000
+    SR Algorithm:
+      0: SPF
+    Node Maximum SID Depth: 16
+  Extended Reachability: A.00 (Metric: 1)
+    Adjacency-SID: 15001, Weight: 0, Flags: F:0 B:1, V:1, L:1, S:0, P:0
+    Adjacency-SID: 15000, Weight: 0, Flags: F:0 B:0, V:1, L:1, S:0, P:0
+  Extended Reachability: C.00 (Metric: 1)
+    Adjacency-SID: 15003, Weight: 0, Flags: F:0 B:1, V:1, L:1, S:0, P:0
+    Adjacency-SID: 15002, Weight: 0, Flags: F:0 B:0, V:1, L:1, S:0, P:0
+  IPv4 Interface Address: 10.0.0.4
+  Extended IP Reachability: 10.0.0.4/32 (Metric: 0)
+    Prefix-SID Index: 4, Algorithm: 0, Flags:NO-PHP
+  Extended IP Reachability: 10.3.4.0/24 (Metric: 1)
+  Extended IP Reachability: 10.4.5.0/24 (Metric: 1)
+
+C.00-00                  268   0x00000005  0x0ff5     1171    0/0/0
+  Protocol Supported: IPv4
+  Area Address: 49.0000
+  Hostname: C
+  TE Router ID: 10.0.0.5
+  Router Capability: 10.0.0.5 , D:0, S:0
+    Segment Routing: I:1 V:0, SRGB Base: 16000 Range: 8000
+    SR Local Block Base: 15000 Range: 1000
+    SR Algorithm:
+      0: SPF
+    Node Maximum SID Depth: 16
+  Extended Reachability: B.00 (Metric: 1)
+    Adjacency-SID: 15001, Weight: 0, Flags: F:0 B:1, V:1, L:1, S:0, P:0
+    Adjacency-SID: 15000, Weight: 0, Flags: F:0 B:0, V:1, L:1, S:0, P:0
+  Extended Reachability: E.00 (Metric: 1)
+    Adjacency-SID: 15003, Weight: 0, Flags: F:0 B:1, V:1, L:1, S:0, P:0
+    Adjacency-SID: 15002, Weight: 0, Flags: F:0 B:0, V:1, L:1, S:0, P:0
+  IPv4 Interface Address: 10.0.0.5
+  Extended IP Reachability: 10.0.0.5/32 (Metric: 0)
+    Prefix-SID Index: 5, Algorithm: 0, Flags:NO-PHP
+  Extended IP Reachability: 10.4.5.0/24 (Metric: 1)
+  Extended IP Reachability: 10.2.5.0/24 (Metric: 1)
+
+E.00-00                  268   0x00000002  0x0fc2     1171    0/0/0
+  Protocol Supported: IPv4
+  Area Address: 49.0000
+  Hostname: E
+  TE Router ID: 10.0.0.2
+  Router Capability: 10.0.0.2 , D:0, S:0
+    Segment Routing: I:1 V:0, SRGB Base: 16000 Range: 8000
+    SR Local Block Base: 15000 Range: 1000
+    SR Algorithm:
+      0: SPF
+    Node Maximum SID Depth: 16
+  Extended Reachability: C.00 (Metric: 1)
+    Adjacency-SID: 15001, Weight: 0, Flags: F:0 B:1, V:1, L:1, S:0, P:0
+    Adjacency-SID: 15000, Weight: 0, Flags: F:0 B:0, V:1, L:1, S:0, P:0
+  Extended Reachability: S.00 (Metric: 1)
+    Adjacency-SID: 15003, Weight: 0, Flags: F:0 B:1, V:1, L:1, S:0, P:0
+    Adjacency-SID: 15002, Weight: 0, Flags: F:0 B:0, V:1, L:1, S:0, P:0
+  IPv4 Interface Address: 10.0.0.2
+  Extended IP Reachability: 10.0.0.2/32 (Metric: 0)
+    Prefix-SID Index: 2, Algorithm: 0, Flags:NO-PHP
+  Extended IP Reachability: 10.2.5.0/24 (Metric: 1)
+  Extended IP Reachability: 10.1.2.0/24 (Metric: 1)
+
+S.00-00             *    268   0x00000001  0x0fb1     1171    0/0/0
+  Protocol Supported: IPv4
+  Area Address: 49.0000
+  Hostname: S
+  TE Router ID: 10.0.0.1
+  Router Capability: 10.0.0.1 , D:0, S:0
+    Segment Routing: I:1 V:0, SRGB Base: 16000 Range: 8000
+    SR Local Block Base: 15000 Range: 1000
+    SR Algorithm:
+      0: SPF
+    Node Maximum SID Depth: 16
+  Extended Reachability: A.00 (Metric: 1)
+    Adjacency-SID: 15001, Weight: 0, Flags: F:0 B:1, V:1, L:1, S:0, P:0
+    Adjacency-SID: 15000, Weight: 0, Flags: F:0 B:0, V:1, L:1, S:0, P:0
+  Extended Reachability: E.00 (Metric: 1)
+    Adjacency-SID: 15003, Weight: 0, Flags: F:0 B:1, V:1, L:1, S:0, P:0
+    Adjacency-SID: 15002, Weight: 0, Flags: F:0 B:0, V:1, L:1, S:0, P:0
+  IPv4 Interface Address: 10.0.0.1
+  Extended IP Reachability: 10.0.0.1/32 (Metric: 0)
+    Prefix-SID Index: 1, Algorithm: 0, Flags:NO-PHP
+  Extended IP Reachability: 10.1.3.0/24 (Metric: 1)
+  Extended IP Reachability: 10.1.2.0/24 (Metric: 1)
