@@ -1,4 +1,4 @@
-import { buildGraph, linkMetric, type Edge, type Graph } from './graph'
+import { buildGraph, linkMetric, noTransit, type Edge, type Graph } from './graph'
 import type { NodeId, Topology } from './types'
 
 /** Shortest paths from one root. Routers that can't be reached have no entries. */
@@ -97,7 +97,34 @@ export function avoidsLink(
   cSE: number | undefined = linkMetric(table.graph, s, e),
 ): boolean {
   if (cSE === undefined) throw new Error(`There is no link ${s}→${e}.`)
-  return dist(table, x, y) < dist(table, x, s) + cSE + dist(table, e, y)
+  return dist(table, x, y) < linkPathCost(table, x, s, e, cSE, y)
+}
+
+/**
+ * Cost of the cheapest path x → … → s → e → … → y over the link s→e:
+ * dist(x,s) + c(s,e) + dist(e,y). Infinity when s or e has the overload bit and
+ * would be transit on it: no router builds such a path (RFC 7490 §5.4).
+ */
+export function linkPathCost(
+  table: AllPairs,
+  x: NodeId,
+  s: NodeId,
+  e: NodeId,
+  cSE: number,
+  y: NodeId,
+): number {
+  if (noTransit(table.graph, s, x, y) || noTransit(table.graph, e, x, y)) return Infinity
+  return dist(table, x, s) + cSE + dist(table, e, y)
+}
+
+/**
+ * Cost of the cheapest path x → … → m → … → y: dist(x,m) + dist(m,y). Infinity
+ * when m has the overload bit and would be transit (RFC 7490 §5.4), so the RFC 5286
+ * and RFC 7490 inequalities read "is it cheaper than any path through m?".
+ */
+export function viaCost(table: AllPairs, x: NodeId, m: NodeId, y: NodeId): number {
+  if (noTransit(table.graph, m, x, y)) return Infinity
+  return dist(table, x, m) + dist(table, m, y)
 }
 
 /**
@@ -125,6 +152,30 @@ export function firstLinks(table: AllPairs, x: NodeId, y: NodeId): Edge[] {
 const firstLinkCache = new WeakMap<AllPairs, Map<string, Edge[]>>()
 
 /**
+ * Every router `root` can reach when the links `down` says are down, with the same
+ * overload rule as SPF (never transit, RFC 7490 §5.4). The routers SPF on the
+ * reduced network would reach, without the distances.
+ */
+export function reachable(
+  graph: Graph,
+  root: NodeId,
+  down: (linkId: string) => boolean,
+): Set<NodeId> {
+  const seen = new Set<NodeId>([root])
+  const queue = [root]
+  for (let i = 0; i < queue.length; i++) {
+    const u = queue[i]!
+    if (u !== root && graph.overloaded.has(u)) continue
+    for (const e of graph.out.get(u) ?? []) {
+      if (seen.has(e.to) || down(e.linkId)) continue
+      seen.add(e.to)
+      queue.push(e.to)
+    }
+  }
+  return seen
+}
+
+/**
  * Shared Dijkstra. Forward follows edges leaving each router; reverse follows
  * edges arriving, so "predecessors" in reverse are next hops towards the root.
  */
@@ -145,6 +196,11 @@ function dijkstra(graph: Graph, root: NodeId, direction: 'forward' | 'reverse') 
     if (done.has(u) || d !== dist.get(u)) continue
     done.add(u)
     settled.push(u)
+    // An overloaded router is reached but never passed through: it is the end of a
+    // path, never transit (ISO 10589 overload bit; RFC 7490 §5.4). The root still
+    // uses its own links. Reverse SPF: u's edges lead further away from the root, so
+    // the same rule applies.
+    if (u !== root && graph.overloaded.has(u)) continue
 
     for (const edge of edges.get(u) ?? []) {
       const v = direction === 'forward' ? edge.to : edge.from

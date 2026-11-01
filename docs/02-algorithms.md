@@ -575,3 +575,68 @@ Links: S–E 10, E–D 1, S–A 10, A–E 1, S–B 2, B–D 11. S → D: `dist(S
 | `node_protecting: require`, S → E (D = E) | **A**: node protection doesn't apply to E itself |
 
 Property tests (random networks and policies) check that the chosen LFA is always loop-free, passes every `require` and is never excluded; that `prefer` / `ignore` never change the LFA count and `require` only lowers it; and that the TI-LFA count never changes.
+
+---
+
+## 16. Overload bit (TODO backlog, D47)
+An IS-IS router with the **overload bit** set (ISO 10589) tells the others not to send transit traffic through it, e.g. while it boots or during maintenance. It is still a destination, and it still forwards its own traffic. In YAML: `overload: true` on the router. Checked against RFC 5286 §3.5 and RFC 7490 §5.4 on 2026-11-01.
+
+**SPF (§1):** an overloaded router is reached but never passed through: Dijkstra doesn't relax its links unless it is the root. Reverse SPF (§1.2) uses the same rule. So `dist(X,Y)` is the cheapest path with no overloaded router *inside* it; the ends may be overloaded. RFC 7490 §5.4: "normal link state routing takes into account the IS-IS overload bit".
+
+**The inequalities.** With an overloaded router, `dist(X,M) + dist(M,Y)` is no longer the cost of a real path through M, because no router builds a path through M. So every right-hand side "path through M" counts as **∞** when M is overloaded and in the middle (`viaCost`, `linkPathCost` in `spf.ts`):
+
+| Check | Right-hand side | ∞ when |
+|---|---|---|
+| §1.5 avoids link S→E | `dist(X,S) + c(S,E) + dist(E,Y)` | S overloaded and X ≠ S, or E overloaded and Y ≠ E |
+| LFA loop-free (Inequality 1) | `dist(N,S) + dist(S,D)` | S overloaded: N never sends it back through S |
+| LFA node-protecting (Inequality 3) | `dist(N,E) + dist(E,D)` | E overloaded and D ≠ E |
+| P-space | `c(S,E) + dist(E,Y)` | E overloaded |
+| Extended P-space | `dist(N,S) + dist(S,Y)` | S overloaded |
+| Q-space | `dist(Y,S) + c(S,E)` | S overloaded |
+
+The explain steps say so: `dist(N,D)=10 < dist(N,S)+dist(S,D) = ∞ (S has the overload bit: no transit through it) ✓`.
+
+**Never a backup:**
+- **LFA:** "if N_i has the overload bit set, then S MUST NOT consider using N_i as an alternate" (RFC 5286 §3.5). Its links are skipped with reason `overload`, even for N's own address (the RFC makes no exception).
+- **Remote LFA:** never a tunnel exit (a repair "whose first hop has the overload bit set") and never a PQ node ("the PLR MUST NOT use a repair tunnel endpoint with the IS-IS overload bit set", RFC 7490 §5.4). An overloaded router can still be listed in P- and Q-space (S reaches it, it reaches E); it is left out of PQ and listed in `overloadedPq` for the explain step.
+- **TI-LFA:** the post-convergence SPF follows the SPF rule, so an overloaded router is never inside the repair path; every prefix segment follows normal paths, which avoid it too. If the only path left goes through it, D is cut off: no TI-LFA.
+- **ECMP:** unchanged. An overloaded router is only a primary next hop for its own address.
+
+**Failure simulation (§8):** nothing new. Normal paths, backups and the converged SPF all follow the rules above.
+
+**What-if (§13):** the what-if diff can also flip one router's overload bit and compare coverage before and after, every router as the source.
+
+### Worked checks
+- **Example 2, B overloaded:** `dist(A,C) = 3` (A-S-E-C; A-B-C would pass through B). B is still reached (`dist(S,B) = 2`) and B's own `dist(B,C) = 1`.
+- **Example 1, N overloaded, S → D over S–E:** N is skipped as an LFA and as a tunnel exit. `P(S) = {N}` (`15 < 10+20`), `Q(E) = {D, N}`, but N is overloaded, so no PQ node. TI-LFA: the only path left, S-N-D, passes through N: D is cut off. With S–E down, the simulation shows D and E unreachable.
+- **Kite N–S 1, S–E 1, E–D 1, N–D 10, S overloaded, S → D:** without the bit `dist(N,D) = 3` (N-S-E-D) and N is not loop-free (`3 < 1+2` ✗). With it, `dist(N,D) = 10 < ∞` ✓: N is an LFA (node-protecting, not downstream). TI-LFA: S-N-D, `[PrefixSID(D)]`.
+- **Example 2, C overloaded, S → E:** extended P = {A, B, C}; Q(E) = {C} (B: `dist(B,E) = 3` via A-S-E, not `< 2+1`). C is overloaded: no PQ node.
+- **Example 4, P1 overloaded (what-if):** pairs 35 → 31; LFA 27 → 13, LFA + Remote LFA 35 → 15, TI-LFA 35 → 21. 16 destinations worse, 2 rerouted.
+
+Property tests (random networks, about one router in four overloaded, with and without bundles) check that `dist(X,Y) = min over X's links X→N with N = Y or N not overloaded of c(X,N) + dist(N,Y)`; that no drawn path, TI-LFA path or repaired flow (one failed link) has an overloaded router inside it; that no LFA, PQ node or exit is overloaded; that a chosen LFA's path never comes back through S; and that the packet walk of every TI-LFA repair works on normal tables.
+
+---
+
+## 17. Weakest spots (TODO backlog, D48)
+`weakSpots(topology, mode)` (`src/engine/weak-spots.ts`) fails **each link and each router on its own** and counts, for every router as the source, the traffic that the routers' backups don't get through in that repair mode. It decides nothing new: the counts are the failure simulation's (§8, §8.2).
+
+- **A flow** is (source W, destination D), D reachable from W. `flows` = all of them.
+- For each link or router X: **affected** = flows whose normal path (the one the simulation draws, lowest-id ties) crosses X. Then, as in §8 step 5: `repaired`, `dropped`, `looped`, `unreachable` (cut off: no path is left at all). For a router, flows to the router itself (`destDown`) and from it are left out: no backup can save them (D27).
+- **unprotected** = dropped + looped + unreachable. The list is sorted by unprotected, then affected (more first), then links before routers, then id.
+- These are link failures *and* router failures, so they measure something the heat map (§12) does not: the heat map counts the pairs each router plans for its own links; this counts the traffic of every router that crosses the failure, and what really happens to it.
+
+**How it is counted (speed).** One failure at a time, every router as the source, is `simulateAllSources` per link and router; on 200 routers / 600 links that took 13 s. Instead:
+- Backups are planned once per router (`backupsAt`, cached per topology; they don't depend on what fails).
+- **Links:** with one link down at most one router repairs and traffic never loops (§8). So a flow over link X→Y is `repaired` when X has a backup for (D, that link) in the mode (`hasBackup`: ECMP, then TI-LFA in TI-LFA mode unless too deep, else the LFA, else the PQ node in LFA + Remote LFA mode), `unreachable` when X's TI-LFA finds no path (X is cut off from D, and so is W, unless W has the overload bit, §16: then it is checked with an SPF), else `dropped`.
+- **Routers:** only the flows whose path passes the router are followed, with the simulation's own hop-by-hop walk (`routerFailureCounts`). "Cut off" is a reachability search from the router before the failed one (W reaches D exactly when it does, since W reached it without the failure), not a full SPF of the reduced network.
+
+A test checks every example, every mode, and random networks (with bundles and overloaded routers): each link's and router's counts equal `simulateAllSources` for that one failure, added up over the sources. 200 routers / 600 links takes about 2 s on a laptop (the speed test allows 4 s).
+
+### Worked checks
+| Network, mode | Weakest first |
+|---|---|
+| Example 3, LFA only | link A–S 12 of 12 dropped, link S–E 12 of 12, router S 8 of 8, link B–A 4 of 8, link E–C 4 of 8. C–B carries nothing. |
+| Example 3, TI-LFA | nothing unprotected; ties: A–S 12, S–E 12, B–A 8, E–C 8, router S 8 affected |
+| Example 6, TI-LFA | **router E**: 2 of 4 flows loop (the §8.1 lesson: link-protecting TI-LFA with a router down) |
+| Example 6, LFA only | link E–D 5 of 8 dropped; router E: 0 of 4 (N's node-protecting LFA M takes over) |
+| Example 1, N overloaded, TI-LFA | link E–D first: it cuts N off from E and S |

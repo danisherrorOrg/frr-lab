@@ -101,6 +101,13 @@ export const NODE_FIELDS: FieldDoc[] = [
     example: 'lfa_exclude: [B]',
   },
   {
+    key: 'overload',
+    required: false,
+    what: 'IS-IS overload bit: no transit traffic through this router',
+    rule: 'true or false. Default false. Still a destination; never an LFA or PQ node.',
+    example: 'overload: true',
+  },
+  {
     key: 'pos',
     required: false,
     what: 'Place on the diagram',
@@ -202,6 +209,9 @@ export const KEY_ALIASES: Record<string, string> = {
   lfa: 'lfa_policy',
   exclude: 'lfa_exclude',
   lfa_excludes: 'lfa_exclude',
+  overloaded: 'overload',
+  overload_bit: 'overload',
+  ol: 'overload',
   node_protection: 'node_protecting',
   node_protect: 'node_protecting',
 }

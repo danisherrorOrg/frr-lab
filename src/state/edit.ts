@@ -105,6 +105,8 @@ export interface RouterPatch {
   msd?: number | null
   /** Neighbors never used as an LFA (RFC 7916 §6.2.4.4, D45); [] removes the list. */
   lfaExclude?: NodeId[]
+  /** IS-IS overload bit: no transit through this router (D47). false removes it. */
+  overload?: boolean
 }
 
 /** Change a router. Renaming also updates its links (ends and ids) and other routers' exclude lists. */
@@ -146,6 +148,9 @@ export function updateRouter(t: Topology, id: NodeId, patch: RouterPatch): EditR
     if (list.length === 0) delete next.lfaExclude
     else next.lfaExclude = list.sort()
   }
+
+  if (patch.overload === true) next.overload = true
+  else if (patch.overload === false) delete next.overload
 
   const rename = (x: NodeId) => (x === id ? next.id : x)
   // Renamed links get new ids; parallel ones are numbered again in file order (D29).

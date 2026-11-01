@@ -44,6 +44,10 @@ export interface Notice {
   yamlHelp?: boolean
 }
 
+/** What the what-if diff tries: a link's metric, or a router's overload bit (D47). */
+export type WhatIfTarget =
+  { kind: 'metric'; link: string | null } | { kind: 'overload'; node: NodeId | null }
+
 const HISTORY_LIMIT = 100
 
 export interface AppState {
@@ -92,10 +96,11 @@ export interface AppState {
    */
   heatMap: RepairMode | null
   /**
-   * What-if diff (TODO backlog): null = closed, else the link whose metric is tried
-   * (null = none picked yet). The try is not an edit until "Apply".
+   * What-if diff (TODO backlog): null = closed, else what is tried: a new metric on a
+   * link, or flipping a router's overload bit (D47). The link or router is null when
+   * none is picked yet. The try is not an edit until "Apply".
    */
-  whatIf: { link: string | null } | null
+  whatIf: WhatIfTarget | null
 
   loadTopology: (t: Topology, source?: NodeId, warnings?: string[]) => void
   loadExample: (key: string) => void
@@ -132,6 +137,8 @@ export interface AppState {
   toggleFailedNode: (id: NodeId) => void
   /** Bring every failed link and router back up. */
   restoreAll: () => void
+  /** Make exactly these links and routers the ones down (weakest spots: "Fail it"). */
+  failOnly: (failed: { links?: string[]; nodes?: NodeId[] }) => void
   setSimMode: (m: RepairMode) => void
   setConverged: (on: boolean) => void
   setSimDest: (d: NodeId | null) => void
@@ -145,6 +152,8 @@ export interface AppState {
   setHeatMap: (mode: RepairMode | null) => void
   /** Open the what-if diff on this link (null = open with none picked) and select it. */
   openWhatIf: (link: string | null) => void
+  /** Open the what-if diff on this router's overload bit (null = none picked) and select it. */
+  openOverloadWhatIf: (node: NodeId | null) => void
   closeWhatIf: () => void
 }
 
@@ -173,7 +182,12 @@ function tidy(s: AppState, t: Topology): Partial<AppState> {
     simDest: s.simDest !== null && nodes.has(s.simDest) ? s.simDest : null,
     linkStart: s.linkStart !== null && nodes.has(s.linkStart) ? s.linkStart : null,
     linkView: s.linkView?.link != null && !links.has(s.linkView.link) ? { link: null } : s.linkView,
-    whatIf: s.whatIf?.link != null && !links.has(s.whatIf.link) ? { link: null } : s.whatIf,
+    whatIf:
+      s.whatIf?.kind === 'metric' && s.whatIf.link !== null && !links.has(s.whatIf.link)
+        ? { kind: 'metric', link: null }
+        : s.whatIf?.kind === 'overload' && s.whatIf.node !== null && !nodes.has(s.whatIf.node)
+          ? { kind: 'overload', node: null }
+          : s.whatIf,
   }
 }
 
@@ -189,7 +203,7 @@ function backUpNotice(ids: NodeId[]): Notice {
     title: `${many ? 'Routers' : 'Router'} ${ids.join(', ')} ${many ? 'are' : 'is'} back up`,
     lines: [
       `${many ? 'Their' : 'Its'} links are up again, so traffic goes back to the normal paths in the results table.`,
-      'A router that has just rebooted may set the IS-IS overload bit (ISO 10589, RFC 3787) so others keep transit traffic away from it until it is ready. LFA Lab does not model that wait.',
+      "A router that has just rebooted may set the IS-IS overload bit (ISO 10589, RFC 3787) so others keep transit traffic away from it until it is ready. LFA Lab does not model that wait; to see its effect, tick the router's overload bit in its properties.",
     ],
   }
 }
@@ -364,7 +378,8 @@ export const useStore = create<AppState>()((set, get) => {
     setAllSources: (allSources) => set({ allSources, row: null, backup: 'auto' }),
     pickRow: (source, row) => set({ source, row, backup: 'auto' }),
     // A link clicked on the canvas while the per-link view or the what-if diff is
-    // open becomes its link.
+    // open becomes its link; a router clicked while the overload what-if is open
+    // becomes its router.
     select: (selection) =>
       set({
         selection,
@@ -373,8 +388,12 @@ export const useStore = create<AppState>()((set, get) => {
             linkView: { link: selection.id },
           }),
         ...(selection?.kind === 'link' &&
-          get().whatIf !== null && {
-            whatIf: { link: selection.id },
+          get().whatIf?.kind === 'metric' && {
+            whatIf: { kind: 'metric', link: selection.id },
+          }),
+        ...(selection?.kind === 'node' &&
+          get().whatIf?.kind === 'overload' && {
+            whatIf: { kind: 'overload', node: selection.id },
           }),
       }),
     selectRow: (row) => set({ row, backup: 'auto' }),
@@ -428,6 +447,8 @@ export const useStore = create<AppState>()((set, get) => {
         ...(routers.length > 0 && { notice: backUpNotice(routers) }),
       })
     },
+    failOnly: ({ links = [], nodes = [] }) =>
+      set({ failedLinks: links, failedNodes: nodes, converged: false, simDest: null }),
     setSimMode: (simMode) => set({ simMode, converged: false }),
     setConverged: (converged) => set({ converged }),
     setSimDest: (simDest) => set({ simDest }),
@@ -440,7 +461,15 @@ export const useStore = create<AppState>()((set, get) => {
     closeLinkView: () => set({ linkView: null }),
     setHeatMap: (heatMap) => set({ heatMap }),
     openWhatIf: (link) =>
-      set({ whatIf: { link }, ...(link !== null && { selection: { kind: 'link', id: link } }) }),
+      set({
+        whatIf: { kind: 'metric', link },
+        ...(link !== null && { selection: { kind: 'link', id: link } }),
+      }),
+    openOverloadWhatIf: (node) =>
+      set({
+        whatIf: { kind: 'overload', node },
+        ...(node !== null && { selection: { kind: 'node', id: node } }),
+      }),
     closeWhatIf: () => set({ whatIf: null }),
   }
 })

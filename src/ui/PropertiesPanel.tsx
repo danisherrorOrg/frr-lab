@@ -150,6 +150,7 @@ function PolicySelect({
 
 function RouterForm({ node, topology: t }: { node: RouterNode; topology: Topology }) {
   const update = useStore((s) => s.updateRouter)
+  const openOverloadWhatIf = useStore((s) => s.openOverloadWhatIf)
   const remove = useStore((s) => s.deleteSelection)
   const neighbors = [
     ...new Set(t.links.flatMap((l) => (l.a === node.id ? [l.b] : l.b === node.id ? [l.a] : []))),
@@ -195,6 +196,25 @@ function RouterForm({ node, topology: t }: { node: RouterNode; topology: Topolog
         onCommit={(v) => update(node.id, { lfaExclude: v.split(/[\s,]+/) })}
       />
       <PolicyEffect topology={t} source={node.id} />
+      <label className="mb-1 flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={node.overload === true}
+          onChange={(e) => update(node.id, { overload: e.target.checked })}
+        />
+        Overload bit (no transit)
+      </label>
+      <p className="mb-2 text-xs text-slate-500">
+        Other routers send {node.id} only traffic for {node.id} itself: never through it, and never
+        use it as a backup (RFC 5286 §3.5, RFC 7490 §5.4).
+      </p>
+      <button
+        type="button"
+        className="mt-1 mr-2 rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
+        onClick={() => openOverloadWhatIf(node.id)}
+      >
+        {node.overload ? 'What if the overload bit is cleared?' : 'What if it is overloaded?'}
+      </button>
       <button type="button" className={danger} onClick={remove}>
         Delete router
       </button>

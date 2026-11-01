@@ -1,7 +1,7 @@
 import { cheapestEdge, edgeOf, linkMetric, withoutLink, type Edge, type Graph } from './graph'
 import { adjLabel, prefixLabel } from './labels'
 import { isTooDeep } from './msd'
-import { allPairs, avoidsLink, dist, spf } from './spf'
+import { allPairs, avoidsLink, dist, linkPathCost, spf } from './spf'
 import type { NodeId, Protection, Segment, Topology } from './types'
 
 /** SPF from S with link S–E removed (both directions): docs/02-algorithms.md §4.1. */
@@ -92,6 +92,11 @@ export interface SegmentCheck {
   /** For (b): dist(from,S) and dist(E,node). */
   distXS: number
   distEY: number
+  /**
+   * dist(from,S) + c(S,E) + dist(E,node); Infinity when S or E has the overload bit
+   * and would be transit, so no normal path uses the link (RFC 7490 §5.4).
+   */
+  viaLink: number
   /** (b) all normal shortest paths from→node avoid S–E (§1.5). */
   avoids: boolean
 }
@@ -176,6 +181,7 @@ export function computeTilfa(
       onPath: distXY === pathCost,
       distXS: dist(table, from, s),
       distEY: dist(table, e, node),
+      viaLink: linkPathCost(table, from, s, e, cSE, node),
       avoids: avoidsLink(table, from, node, s, e, cSE),
     }
   }

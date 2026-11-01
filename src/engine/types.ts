@@ -20,6 +20,13 @@ export interface RouterNode {
    * alternate). Every link to them is skipped. Ids of routers, sorted, no duplicates.
    */
   lfaExclude?: NodeId[]
+  /**
+   * IS-IS overload bit (ISO 10589): other routers never send transit traffic through
+   * this router. It is still a destination and still forwards its own traffic. It is
+   * never an LFA (RFC 5286 §3.5), a Remote LFA tunnel exit or PQ node (RFC 7490 §5.4).
+   * Only `true` is stored.
+   */
+  overload?: boolean
   /** UI only; the engine ignores it. */
   pos?: { x: number; y: number }
 }

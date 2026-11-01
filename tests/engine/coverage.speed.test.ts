@@ -3,6 +3,7 @@ import { coverageMap } from '../../src/engine/heat-map'
 import { computeAllSources, computeCoverage } from '../../src/engine/index'
 import { whatIf } from '../../src/engine/what-if'
 import { simulateAllSources } from '../../src/engine/simulate'
+import { weakSpots } from '../../src/engine/weak-spots'
 import type { Link, Topology } from '../../src/engine/types'
 
 /**
@@ -100,4 +101,25 @@ describe('all routers as the DUT: speed', () => {
     expect(all.filter((x) => 'down' in x).map((x) => x.source)).toEqual(['R005'])
     expect(ms).toBeLessThan(budget(2000))
   })
+})
+
+// TODO backlog: weakest spots fail all 600 links and 200 routers in turn, every router as
+// the source. The backups are planned once (the coverage run, 2 s), then each failure is
+// counted from them.
+describe('weakest spots: speed', () => {
+  for (const mode of ['lfa', 'rlfa', 'tilfa'] as const) {
+    it(
+      `200 routers, 600 links, every failure, ${mode}: under 4 s`,
+      () => {
+        const topo = bigTopology()
+        const start = performance.now()
+        const w = weakSpots(topo, mode)
+        const ms = performance.now() - start
+        expect(w.spots).toHaveLength(800)
+        expect(w.flows).toBe(200 * 199)
+        expect(ms).toBeLessThan(budget(4000))
+      },
+      budget(10_000),
+    )
+  }
 })

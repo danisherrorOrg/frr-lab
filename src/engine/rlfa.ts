@@ -1,6 +1,6 @@
 import { cheapestEdge, edgeOf } from './graph'
 import { MAX_METRIC } from './lfa'
-import { dist, reverseSpf, type AllPairs } from './spf'
+import { dist, linkPathCost, reverseSpf, viaCost, type AllPairs } from './spf'
 import type { NodeId, Protection } from './types'
 
 /** Y ∈ P(S) ⇔ dist(S,Y) < c(S,E) + dist(E,Y). RFC 7490 §5.2.1.1. */
@@ -27,6 +27,8 @@ export interface PCheck {
   node: NodeId
   distSY: number
   distEY: number
+  /** c(S,E) + dist(E,Y); Infinity when E has the overload bit (never transit, RFC 7490 §5.4). */
+  viaLink: number
   inP: boolean
 }
 
@@ -37,6 +39,8 @@ export interface ExtPCheck {
   distNY: number
   distNS: number
   distSY: number
+  /** dist(N,S) + dist(S,Y); Infinity when S has the overload bit (RFC 7490 §5.4). */
+  viaS: number
   inP: boolean
 }
 
@@ -44,6 +48,8 @@ export interface QCheck {
   node: NodeId
   distYE: number
   distYS: number
+  /** dist(Y,S) + c(S,E); Infinity when S has the overload bit (RFC 7490 §5.4). */
+  viaLink: number
   inQ: boolean
 }
 
@@ -86,7 +92,13 @@ export interface RlfaResult {
   extChecks: ExtPCheck[]
   qChecks: QCheck[]
   /** Links never used as an exit, and why (RFC 7490 §5.4). */
-  skipped: { neighbor: NodeId; link: string; reason: 'max-metric' }[]
+  skipped: { neighbor: NodeId; link: string; reason: 'max-metric' | 'overload' }[]
+  /**
+   * Routers in both spaces left out of `pq` because they have the overload bit:
+   * "the PLR MUST NOT use a repair tunnel endpoint with the IS-IS overload bit set"
+   * (RFC 7490 §5.4). Left out when none.
+   */
+  overloadedPq?: NodeId[]
 }
 
 /**
@@ -116,7 +128,9 @@ export function computeRlfa(
   const pChecks = others.map((node): PCheck => {
     const distSY = dist(table, s, node)
     const distEY = dist(table, e, node)
-    return { node, distSY, distEY, inP: inPSpace(distSY, cSE, distEY) }
+    const viaLink = linkPathCost(table, s, s, e, cSE, node)
+    // inPSpace() with an overloaded E never transit.
+    return { node, distSY, distEY, viaLink, inP: distSY < viaLink }
   })
   const pSet = new Set(pChecks.filter((c) => c.inP).map((c) => c.node))
 
@@ -133,6 +147,11 @@ export function computeRlfa(
       skipped.push({ neighbor: n, link: edge.linkId, reason: 'max-metric' })
       continue
     }
+    // RFC 7490 §5.4: nor one "whose first hop has the overload bit set".
+    if (table.graph.overloaded.has(n)) {
+      skipped.push({ neighbor: n, link: edge.linkId, reason: 'overload' })
+      continue
+    }
     const cur = exitLinks.get(n)
     if (cur === undefined || edge.metric < cur.metric) exitLinks.set(n, edge)
   }
@@ -142,6 +161,7 @@ export function computeRlfa(
       if (pSet.has(node)) continue
       const distNY = dist(table, n, node)
       const distSY = dist(table, s, node)
+      const viaS = viaCost(table, n, s, node)
       extChecks.push({
         neighbor: n,
         node,
@@ -149,7 +169,9 @@ export function computeRlfa(
         distNY,
         distNS,
         distSY,
-        inP: inExtPSpace(distNY, distNS, distSY),
+        viaS,
+        // inExtPSpace() with an overloaded S never transit.
+        inP: distNY < viaS,
       })
     }
   }
@@ -160,7 +182,9 @@ export function computeRlfa(
   const qChecks = others.map((node): QCheck => {
     const distYE = toE.get(node) ?? Infinity
     const distYS = toS.get(node) ?? Infinity
-    return { node, distYE, distYS, inQ: inQSpace(distYE, distYS, cSE) }
+    // inQSpace() with an overloaded S never transit: Y→…→S→E would pass through S.
+    const viaLink = table.graph.overloaded.has(s) ? Infinity : distYS + cSE
+    return { node, distYE, distYS, viaLink, inQ: distYE < viaLink }
   })
   const qSet = new Set(qChecks.filter((c) => c.inQ).map((c) => c.node))
 
@@ -175,7 +199,9 @@ export function computeRlfa(
 
   const pSpace = others.filter((y) => pSet.has(y))
   const extPSpace = others.filter((y) => pSet.has(y) || exits.has(y))
-  const pq = (extended ? extPSpace : pSpace).filter((y) => qSet.has(y))
+  const inBoth = (extended ? extPSpace : pSpace).filter((y) => qSet.has(y))
+  const pq = inBoth.filter((y) => !table.graph.overloaded.has(y))
+  const overloadedPq = inBoth.filter((y) => table.graph.overloaded.has(y))
 
   const exitVia: Record<NodeId, NodeId> = {}
   const costs = pq.map((node): PqCost => {
@@ -202,6 +228,7 @@ export function computeRlfa(
     extChecks,
     qChecks,
     skipped,
+    ...(overloadedPq.length > 0 && { overloadedPq }),
   }
   return best === undefined ? result : { ...result, best }
 }

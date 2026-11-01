@@ -58,6 +58,7 @@ LFA LAB/
 │   │   ├── what-if.ts       coverage before vs after one change, e.g. a new metric (§13 of 02)
 │   │   ├── msd.ts           max SID depth: each router's limit, and "is this stack too deep?" (§14 of 02)
 │   │   ├── lfa-policy.ts    LFA policy: each router's preferences and excluded neighbors (§15 of 02)
+│   │   ├── weak-spots.ts    weakest spots: every link and router failed alone, ranked (§17 of 02)
 │   │   ├── simulate.ts      failure simulation, per source and for every router
 │   │   └── index.ts         computeForSource(), computeCoverage()
 │   ├── io/
@@ -89,7 +90,8 @@ LFA LAB/
 │   │   ├── CompareFailure.tsx  the three repair modes side by side while something is down
 │   │   ├── MiniMap.tsx      small SVG copy of the diagram with one path
 │   │   ├── LinkView.tsx     per-link view: pick a link, its traffic and repairs both ways
-│   │   ├── WhatIf.tsx       what-if diff: try a metric on a link, coverage before → after
+│   │   ├── WhatIf.tsx       what-if diff: try a metric on a link or a router's overload bit, coverage before → after
+│   │   ├── WeakSpots.tsx    weakest spots: links and routers ranked by the traffic their failure leaves unprotected
 │   │   ├── CoverageReport.tsx
 │   │   └── PropertiesPanel.tsx  edit selected node/link
 │   ├── App.tsx  main.tsx
@@ -108,6 +110,7 @@ interface RouterNode {
   sidIndex: number;      // prefix-SID index; label = srgbBase + sidIndex
   msd?: number;          // max SID depth of this router; overrides Topology.msd (D44)
   lfaExclude?: NodeId[]; // neighbors never used as an LFA (RFC 7916 §6.2.4.4, D45)
+  overload?: boolean;    // IS-IS overload bit: never transit, never a backup (D47)
   pos?: { x: number; y: number };  // UI only, ignored by the engine
 }
 
@@ -171,6 +174,7 @@ lfa_policy: { node_protecting: prefer, downstream: require }  # optional, prefer
 nodes:
   - { id: S, sid: 1 }
   - { id: E, sid: 2, msd: 2, lfa_exclude: [C] }               # msd optional, overrides the top one; lfa_exclude optional
+  - { id: A, sid: 4, overload: true }                          # optional overload bit: no transit through A (D47)
   - { id: C, sid: 3, name: "Core-3", pos: { x: 120, y: 40 } }  # name, pos optional
 links:
   - { a: S, b: E, metric: 1 }                 # same metric both ways

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { RepairMode } from '../engine/simulate'
 import type { WhatIf as Diff, WhatIfChange, WhatIfEffect } from '../engine/what-if'
-import { updateLink } from '../state/edit'
+import { updateLink, updateRouter } from '../state/edit'
 import { useStore } from '../state/store'
 import { engine } from './engine'
 import {
@@ -187,23 +187,217 @@ function Changes({ changes }: { changes: WhatIfChange[] }) {
   )
 }
 
+/** The diff itself: shares, the routers and destinations that change. Shared by both tries. */
+function DiffBody({ diff }: { diff: Diff }) {
+  const anyFailed = useStore((s) => s.failedLinks.length > 0 || s.failedNodes.length > 0)
+  return (
+    <>
+      <Shares diff={diff} />
+      {anyFailed && (
+        <p className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs dark:border-amber-700 dark:bg-amber-950">
+          These are the backups planned on the full network, as in the coverage report. The links
+          and routers down now are not taken out.
+        </p>
+      )}
+      <Routers diff={diff} />
+      <Changes changes={diff.changes} />
+    </>
+  )
+}
+
+/** Progress while the worker computes both sides, or its error. */
+function Pending({
+  task,
+}: {
+  task: { error?: string | undefined; progress: { done: number; total: number } | null }
+}) {
+  return task.error ? (
+    <p className="mt-2 text-red-600">The engine failed: {task.error}</p>
+  ) : (
+    <div className="mt-2 flex items-center gap-2">
+      <progress
+        className="w-48"
+        aria-label="What-if progress"
+        max={task.progress?.total ?? 1}
+        value={task.progress?.done ?? 0}
+      />
+      <span className="text-xs text-slate-500">
+        {task.progress ? `${task.progress.done} of ${task.progress.total} routers` : 'Starting…'}
+      </span>
+    </div>
+  )
+}
+
 /**
  * What-if diff (TODO backlog, docs/02-algorithms.md §13): try a new metric on one
- * link and see coverage before and after, every router as the source. Nothing is
- * edited until "Apply", which is one undo step.
+ * link, or flip a router's overload bit (§16), and see coverage before and after,
+ * every router as the source. Nothing is edited until "Apply", which is one undo step.
  */
 export function WhatIf() {
-  const topology = useStore((s) => s.topology)
-  const extended = useStore((s) => s.settings.extended)
   const state = useStore((s) => s.whatIf)
   const selection = useStore((s) => s.selection)
-  const anyFailed = useStore((s) => s.failedLinks.length > 0 || s.failedNodes.length > 0)
+  const openMetric = useStore((s) => s.openWhatIf)
+  const openOverload = useStore((s) => s.openOverloadWhatIf)
+  if (state === null)
+    return (
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className={button}
+          onClick={() => openMetric(selection?.kind === 'link' ? selection.id : null)}
+        >
+          What-if: change a metric
+        </button>
+        <button
+          type="button"
+          className={button}
+          onClick={() => openOverload(selection?.kind === 'node' ? selection.id : null)}
+        >
+          What-if: overload a router
+        </button>
+      </div>
+    )
+  return state.kind === 'metric' ? <MetricTry id={state.link} /> : <OverloadTry id={state.node} />
+}
+
+/** Pick one kind of try or the other; the panel keeps its place on the page. */
+function KindPicker({ kind }: { kind: 'metric' | 'overload' }) {
+  const selection = useStore((s) => s.selection)
+  const openMetric = useStore((s) => s.openWhatIf)
+  const openOverload = useStore((s) => s.openOverloadWhatIf)
+  return (
+    <label className="text-xs">
+      Try
+      <select
+        className={`${control} block`}
+        value={kind}
+        onChange={(e) =>
+          e.target.value === 'metric'
+            ? openMetric(selection?.kind === 'link' ? selection.id : null)
+            : openOverload(selection?.kind === 'node' ? selection.id : null)
+        }
+      >
+        <option value="metric">A new metric on a link</option>
+        <option value="overload">The overload bit on a router</option>
+      </select>
+    </label>
+  )
+}
+
+/**
+ * Flip one router's overload bit (D47): set, no other router sends transit traffic
+ * through it (ISO 10589). Runs as soon as a router is picked: there is nothing to type.
+ */
+function OverloadTry({ id }: { id: string | null }) {
+  const topology = useStore((s) => s.topology)
+  const extended = useStore((s) => s.settings.extended)
+  const open = useStore((s) => s.openOverloadWhatIf)
+  const close = useStore((s) => s.closeWhatIf)
+  const apply = useStore((s) => s.updateRouter)
+  const [appliedAt, setApplied] = useState<{ node: string; text: string } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const node = id === null ? undefined : topology.nodes.find((n) => n.id === id)
+  const on = node?.overload === true
+  const after = useMemo(() => {
+    if (node === undefined) return undefined
+    const r = updateRouter(topology, node.id, { overload: !on })
+    return r.ok ? r.topology : undefined
+  }, [topology, node, on])
+  const task = useEngineTask<Diff>([topology, after, extended], after !== undefined, (onProgress) =>
+    engine().whatIf(topology, after!, { extended }, onProgress),
+  )
+  const applied = appliedAt !== null && appliedAt.node === id ? appliedAt.text : null
+  const options = topology.nodes.map((n) => n.id).sort()
+  const change = node ? `${node.id} overload bit ${on ? 'on → off' : 'off → on'}` : ''
+
+  return (
+    <section aria-label="What-if diff" className="text-sm">
+      <div className="flex flex-wrap items-end gap-3">
+        <h2 className="mr-auto text-base font-semibold">What-if: overload a router</h2>
+        <button type="button" className={button} onClick={close}>
+          Hide
+        </button>
+      </div>
+      <div className="mt-2 flex flex-wrap items-end gap-3">
+        <KindPicker kind="overload" />
+        <label className="text-xs">
+          Router
+          <select
+            className={`${control} block`}
+            value={node ? node.id : ''}
+            onChange={(e) => {
+              open(e.target.value === '' ? null : e.target.value)
+              setError(null)
+            }}
+          >
+            <option value="">Pick a router…</option>
+            {options.map((o) => (
+              <option key={o} value={o}>
+                {o}
+                {topology.nodes.find((n) => n.id === o)?.overload ? ' (overloaded)' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {error && (
+        <p role="alert" className="mt-1 text-red-700 dark:text-red-400">
+          {error}
+        </p>
+      )}
+      {!node ? (
+        <p className="mt-2 text-xs text-slate-500">
+          Pick a router here or click one on the diagram. With the overload bit set, other routers
+          send it traffic for itself only, never through it: it can&apos;t be an LFA, a Remote LFA
+          tunnel end or a hop of a TI-LFA path. See how LFA, Remote LFA and TI-LFA coverage change,
+          every router as the source.
+        </p>
+      ) : applied !== null ? (
+        <p className="mt-2 text-green-700 dark:text-green-400">
+          ✓ Applied: {applied}. Undo with Ctrl+Z.
+        </p>
+      ) : !task.value ? (
+        <Pending task={task} />
+      ) : (
+        <div className="mt-2 space-y-3">
+          <p>
+            <strong>{change}</strong>, every router as the source (
+            {task.value.before.pairs === task.value.after.pairs
+              ? plural(task.value.after.pairs, '(destination, link) pair')
+              : `${task.value.before.pairs} → ${plural(task.value.after.pairs, '(destination, link) pair')}: paths through ${node.id} change`}
+            ).
+          </p>
+          <DiffBody diff={task.value} />
+          <button
+            type="button"
+            className={button}
+            onClick={() => {
+              const err = apply(node.id, { overload: !on })
+              if (err !== null) {
+                setError(err)
+                return
+              }
+              setApplied({ node: node.id, text: change })
+            }}
+          >
+            {on ? `Clear the overload bit on ${node.id}` : `Set the overload bit on ${node.id}`}
+          </button>
+        </div>
+      )}
+    </section>
+  )
+}
+
+/** A new metric on one link (§13). */
+function MetricTry({ id }: { id: string | null }) {
+  const topology = useStore((s) => s.topology)
+  const extended = useStore((s) => s.settings.extended)
   const open = useStore((s) => s.openWhatIf)
   const close = useStore((s) => s.closeWhatIf)
   const apply = useStore((s) => s.updateLink)
   const b = useMemo(() => bundles(topology), [topology])
 
-  const id = state?.link ?? null
   const link = id === null ? undefined : topology.links.find((l) => l.id === id)
   // The boxes start at the link's metrics, and again whenever another link is picked.
   // One box sets both ways, like the metric editor; two only for a link that already
@@ -233,17 +427,6 @@ export function WhatIf() {
     engine().whatIf(topology, after!, { extended }, onProgress),
   )
 
-  if (state === null)
-    return (
-      <button
-        type="button"
-        className={button}
-        onClick={() => open(selection?.kind === 'link' ? selection.id : null)}
-      >
-        What-if: change a metric
-      </button>
-    )
-
   const options = topology.links
     .map((l) => ({ id: l.id, name: linkName(b, l.a, l.b, l.id) }))
     .sort((x, y) => (x.name < y.name ? -1 : x.name > y.name ? 1 : 0))
@@ -271,6 +454,9 @@ export function WhatIf() {
         </button>
       </div>
 
+      <div className="mt-2">
+        <KindPicker kind="metric" />
+      </div>
       <form
         aria-label="Metric to try"
         className="mt-2 flex flex-wrap items-end gap-3"
@@ -373,22 +559,8 @@ export function WhatIf() {
           Now {link.a}→{link.b} {link.metricAB}, {link.b}→{link.a} {link.metricBA}. Nothing changes
           until you press Apply.
         </p>
-      ) : task.error ? (
-        <p className="mt-2 text-red-600">The engine failed: {task.error}</p>
       ) : !task.value ? (
-        <div className="mt-2 flex items-center gap-2">
-          <progress
-            className="w-48"
-            aria-label="What-if progress"
-            max={task.progress?.total ?? 1}
-            value={task.progress?.done ?? 0}
-          />
-          <span className="text-xs text-slate-500">
-            {task.progress
-              ? `${task.progress.done} of ${task.progress.total} routers`
-              : 'Starting…'}
-          </span>
-        </div>
+        <Pending task={task} />
       ) : (
         <div className="mt-2 space-y-3">
           <p>
@@ -396,15 +568,7 @@ export function WhatIf() {
             {plural(task.value.after.pairs, '(destination, link) pair')}).
             {same && ' That is the metric it has now, so nothing changes.'}
           </p>
-          <Shares diff={task.value} />
-          {anyFailed && (
-            <p className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs dark:border-amber-700 dark:bg-amber-950">
-              These are the backups planned on the full network, as in the coverage report. The
-              links and routers down now are not taken out.
-            </p>
-          )}
-          <Routers diff={task.value} />
-          <Changes changes={task.value.changes} />
+          <DiffBody diff={task.value} />
           <div className="flex flex-wrap gap-2">
             <button
               type="button"

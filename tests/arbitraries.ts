@@ -7,11 +7,24 @@ import { uniqueLinkId } from '../src/io/yaml'
  * 4–30 routers, metrics 1–20, no self-loops. A random spanning tree keeps it
  * connected; extra links add cycles and ECMP. With `parallel`, extra links may
  * join routers that are already linked (bundles, D29), with metrics 1–5 so equal
- * links are common.
+ * links are common. With `overload`, about one router in four has the overload bit.
  */
 export function connectedTopology(
-  opts: { symmetric?: boolean; parallel?: boolean } = {},
+  opts: { symmetric?: boolean; parallel?: boolean; overload?: boolean } = {},
 ): fc.Arbitrary<Topology> {
+  const base = connected(opts)
+  if (!opts.overload) return base
+  return base.chain((t) =>
+    fc
+      .array(fc.nat({ max: 3 }), { minLength: t.nodes.length, maxLength: t.nodes.length })
+      .map((ol) => ({
+        ...t,
+        nodes: t.nodes.map((n, i) => (ol[i] === 0 ? { ...n, overload: true } : n)),
+      })),
+  )
+}
+
+function connected(opts: { symmetric?: boolean; parallel?: boolean }): fc.Arbitrary<Topology> {
   return fc.integer({ min: 4, max: 30 }).chain((n) =>
     fc
       .record({

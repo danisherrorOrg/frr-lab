@@ -17,6 +17,8 @@ export interface Graph {
   out: Map<NodeId, Edge[]>
   /** Edges arriving at each router, sorted by `from`, then link id. Used by reverse SPF (§1.2). */
   in: Map<NodeId, Edge[]>
+  /** Routers with the overload bit set: never transit (ISO 10589, RFC 7490 §5.4). */
+  overloaded: ReadonlySet<NodeId>
 }
 
 const byId = (x: NodeId, y: NodeId) => (x < y ? -1 : x > y ? 1 : 0)
@@ -53,7 +55,17 @@ export function buildGraph(topology: Topology): Graph {
   for (const edges of inc.values())
     edges.sort((x, y) => byId(x.from, y.from) || byId(x.linkId, y.linkId))
 
-  return { nodes, out, in: inc }
+  const overloaded = new Set(topology.nodes.filter((n) => n.overload === true).map((n) => n.id))
+  return { nodes, out, in: inc, overloaded }
+}
+
+/**
+ * True when a path x → … → m → … → y would carry transit traffic through m and m
+ * has the overload bit set, so no such path exists (ISO 10589, RFC 7490 §5.4).
+ * The ends of a path are never transit.
+ */
+export function noTransit(graph: Graph, m: NodeId, x: NodeId, y: NodeId): boolean {
+  return m !== x && m !== y && graph.overloaded.has(m)
 }
 
 /**
@@ -125,5 +137,10 @@ export function hopText(
 export function withoutLink(graph: Graph, linkId: string): Graph {
   const drop = (m: Map<NodeId, Edge[]>) =>
     new Map([...m].map(([k, edges]) => [k, edges.filter((e) => e.linkId !== linkId)]))
-  return { nodes: graph.nodes, out: drop(graph.out), in: drop(graph.in) }
+  return {
+    nodes: graph.nodes,
+    out: drop(graph.out),
+    in: drop(graph.in),
+    overloaded: graph.overloaded,
+  }
 }

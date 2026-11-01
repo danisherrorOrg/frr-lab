@@ -15,6 +15,7 @@ import {
 } from '../engine/simulate'
 import { coverageMap, type HeatMap } from '../engine/heat-map'
 import { linkView, type LinkView } from '../engine/link-view'
+import { weakSpots, type WeakSpots } from '../engine/weak-spots'
 import { whatIf, type WhatIf } from '../engine/what-if'
 import type { DestinationResult, NodeId, Topology } from '../engine/types'
 
@@ -69,6 +70,14 @@ export type EngineRequest =
       after: Topology
       options?: { extended?: boolean }
     }
+  /** Weakest spots (TODO backlog, docs/02-algorithms.md §17), with progress. */
+  | {
+      id: number
+      kind: 'weak-spots'
+      topology: Topology
+      mode: RepairMode
+      options?: { extended?: boolean }
+    }
 
 export type EngineResponse =
   | { id: number; kind: 'progress'; done: number; total: number; source: NodeId }
@@ -80,6 +89,7 @@ export type EngineResponse =
   | { id: number; kind: 'link'; view: LinkView }
   | { id: number; kind: 'heat-map'; map: HeatMap }
   | { id: number; kind: 'what-if'; diff: WhatIf }
+  | { id: number; kind: 'weak-spots'; spots: WeakSpots }
   | { id: number; kind: 'error'; message: string }
 
 /**
@@ -138,6 +148,12 @@ export function handleRequest(req: EngineRequest, post: (res: EngineResponse) =>
         id: req.id,
         kind: 'what-if',
         diff: whatIf(req.before, req.after, { ...req.options, onProgress }),
+      })
+    } else if (req.kind === 'weak-spots') {
+      post({
+        id: req.id,
+        kind: 'weak-spots',
+        spots: weakSpots(req.topology, req.mode, { ...req.options, onProgress }),
       })
     } else {
       const report = computeCoverage(req.topology, { ...req.options, onProgress })

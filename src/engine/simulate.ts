@@ -5,8 +5,8 @@ import { cheapestEdge, type Edge } from './graph'
 import { computeForSource } from './index'
 import { prefixLabel } from './labels'
 import { shortestPath } from './paths'
-import { allPairs, type AllPairs } from './spf'
-import type { DestinationResult, NodeId, Segment, Topology } from './types'
+import { allPairs, reachable, type AllPairs } from './spf'
+import type { DestinationResult, NodeId, Protection, Segment, Topology } from './types'
 
 /**
  * Which FRR methods the routers run, as on a real router:
@@ -207,6 +207,42 @@ function withoutLinks(topology: Topology, ids: Set<string>): Topology {
   return t
 }
 
+// Keyed by topology object (D15): every failure of one network shares the routers'
+// backups, which are planned on the full topology (RFC 5286 §1, RFC 9855 §3).
+const backupCache = new WeakMap<Topology, Map<string, DestinationResult[]>>()
+
+/** Router X's results without explain steps (its backups), cached per topology. */
+export function backupsAt(
+  topology: Topology,
+  x: NodeId,
+  extended: boolean | undefined,
+): DestinationResult[] {
+  const byRouter = backupCache.get(topology) ?? new Map<string, DestinationResult[]>()
+  backupCache.set(topology, byRouter)
+  const key = `${extended ?? true}|${x}`
+  let r = byRouter.get(key)
+  if (r === undefined) {
+    r = computeForSource(topology, x, {
+      explain: false,
+      ...(extended !== undefined && { extended }),
+    })
+    byRouter.set(key, r)
+  }
+  return r
+}
+
+/**
+ * Does the router have a backup it can install for this one link in `mode`? The same
+ * tests as the repair the simulation follows: ECMP in every mode, then TI-LFA in
+ * TI-LFA mode (not if too deep, D44), else the LFA, else (LFA + Remote LFA) the PQ node.
+ */
+export function hasBackup(p: Protection, mode: RepairMode): boolean {
+  if (p.ecmpProtected) return true
+  if (mode === 'tilfa') return p.tilfa.path !== undefined && p.tilfa.tooDeep !== true
+  if (p.lfa.best !== undefined) return true
+  return mode === 'rlfa' && p.rlfa.needed && p.rlfa.best !== undefined
+}
+
 const samePath = (x: NodeId[], y: NodeId[]) =>
   x.length === y.length && x.every((n, i) => n === y[i])
 
@@ -280,18 +316,7 @@ export function simulateFailure(
   const normalLink = (x: NodeId, y: NodeId) => cheapestEdge(table.graph, x, y)!
 
   // Each router's results, computed once: every flow repaired there shares them.
-  const atRouter = new Map<NodeId, DestinationResult[]>()
-  const resultsAt = (x: NodeId) => {
-    let r = atRouter.get(x)
-    if (r === undefined) {
-      r = computeForSource(topology, x, {
-        explain: false,
-        ...(options.extended !== undefined && { extended: options.extended }),
-      })
-      atRouter.set(x, r)
-    }
-    return r
-  }
+  const resultsAt = (x: NodeId) => backupsAt(topology, x, options.extended)
 
   const flows: Flow[] = []
   for (const d of table.graph.nodes) {
@@ -473,6 +498,91 @@ export function simulateAllSources(
     onProgress?.(i + 1, sources.length, source)
     return r
   })
+}
+
+/** One flow's normal path, for counting many failures at once (weak spots). */
+export interface NormalFlow {
+  source: NodeId
+  dest: NodeId
+  /** shortestPath(source, dest): the path simulateFailure follows. */
+  path: NodeId[]
+}
+
+/** How the flows that meet one failed router end; the statuses of FailureSummary. */
+export interface RouterFailureCounts {
+  affected: number
+  repaired: number
+  dropped: number
+  looped: number
+  unreachable: number
+  /** Flows to the failed router itself (D27). */
+  destDown: number
+}
+
+/**
+ * Fail router `n` alone and count what happens to the flows in `flows` (normal
+ * paths, from every router), as simulateFailure would for each source. Only the
+ * flows whose path passes `n` are followed, with the same hop-by-hop walk; the
+ * others are not affected. Much faster than simulateAllSources when every router
+ * is failed in turn, since nothing is computed for the flows that don't meet `n`.
+ */
+export function routerFailureCounts(
+  topology: Topology,
+  n: NodeId,
+  mode: RepairMode,
+  flows: readonly NormalFlow[],
+  options: SimulateOptions = {},
+): RouterFailureCounts {
+  const table = allPairs(topology)
+  const downIds = new Set(topology.links.filter((l) => l.a === n || l.b === n).map((l) => l.id))
+  const isUp = (linkId: string) => !downIds.has(linkId)
+  const normalLink = (x: NodeId, y: NodeId) => cheapestEdge(table.graph, x, y)!
+  const resultsAt = (x: NodeId) => backupsAt(topology, x, options.extended)
+  const prefixOf: PrefixOf = (node) => ({
+    kind: 'prefix',
+    node,
+    label: prefixLabel(topology, node),
+  })
+  const reach = new Map<NodeId, Set<NodeId>>()
+  const reachFrom = (root: NodeId) => {
+    let r = reach.get(root)
+    if (r === undefined) reach.set(root, (r = reachable(table.graph, root, (id) => !isUp(id))))
+    return r
+  }
+
+  const c: RouterFailureCounts = {
+    affected: 0,
+    repaired: 0,
+    dropped: 0,
+    looped: 0,
+    unreachable: 0,
+    destDown: 0,
+  }
+  for (const f of flows) {
+    // A failed router sends nothing; the first link of the path that touches it is
+    // the one the PLR finds down.
+    const j = f.path.indexOf(n)
+    if (f.source === n || j < 0) continue
+    if (f.dest === n) {
+      c.destDown += 1
+      continue
+    }
+    c.affected += 1
+    // "No final path" (simulateFailure's `after`). The PLR reached n's link without
+    // touching n, so the source reaches D exactly when the PLR does (links work both
+    // ways), unless the source has the overload bit and the PLR would pass through it.
+    const plr = f.path[j - 1]!
+    const root = f.source !== plr && table.graph.overloaded.has(f.source) ? f.source : plr
+    if (!reachFrom(root).has(f.dest)) {
+      c.unreachable += 1
+      continue
+    }
+    const walk = forward(table, f.source, f.dest, mode, isUp, normalLink, resultsAt, prefixOf)
+    if (walk.delivered) c.repaired += 1
+    else if (walk.drop) c.dropped += 1
+    else c.looped += 1
+  }
+  return c
 }
 
 interface Walk {

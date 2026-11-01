@@ -432,3 +432,23 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Other options considered:** skip the speed tests in CI (loses the guard against a big slowdown); run them in a separate CI step on their own (CI timings would still vary from run to run).
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D47 – Overload bit on a router (2026-11-01)
+- **Why:** TODO backlog "Design checks": a router with the IS-IS overload bit (or costed out for maintenance) is excluded from transit; engineers want to see how coverage changes. Checked against RFC 5286 §3.5 and RFC 7490 §5.4 on 2026-11-01.
+- **Model:** `overload: true` on a router (YAML, properties panel, right-click menu). SPF never passes through it, but it stays a destination and the root of its own SPF. It is never an LFA (RFC 5286 §3.5, no exception for its own address), a Remote LFA tunnel exit or PQ node (RFC 7490 §5.4). TI-LFA follows from the SPF. Only `true` is stored.
+- **Inequalities:** a "path through M" with M overloaded in the middle costs ∞ (`viaCost`, `linkPathCost`), so Inequalities 1 and 3, P-, extended P- and Q-space and the §1.5 "avoids link" test stay correct (`docs/02-algorithms.md` §16). Without overloaded routers every number is the same as before; the check objects gained the right-hand-side totals (`viaS`, `viaLink`, …) for the explain steps.
+- **Coverage change:** the what-if diff (D43) can try flipping one router's overload bit ("What-if: overload a router"); nothing changes until Apply, one undo step.
+- **Max-metric router:** RFC 6987-style "max metric on every link" is not a separate setting: the overload bit is the IS-IS way to stop transit, and a metric of 16,777,215 on a link is already handled (RFC 5286 §3.5). A router with a high metric on all links can be drawn with the metric editor.
+- **Other options considered:** an app setting (not saved with the network); removing the router's links (it would stop being a destination too, which is the router failure view).
+- **No new dependencies.**
+- **Status:** Accepted.
+
+### D48 – Weakest spots: links and routers whose failure leaves the most traffic unprotected (2026-11-01)
+- **Why:** TODO backlog "Design checks": find the single points of weakness before a design goes live.
+- **Measure:** fail each link and each router alone; for every router as the source, count the flows that cross it and how they end in the chosen repair mode (§8). Unprotected = dropped + looping + cut off. Ranked by that, then by traffic affected. Flows to and from a failed router are left out (D27). `docs/02-algorithms.md` §17.
+- **Same numbers as the failure view:** a test checks each count against `simulateAllSources` for that failure. "Fail it" takes down just that link or router in that mode, so the failure panel shows the same flows hop by hop.
+- **Speed:** calling the simulation for every failure took 13 s on 200 routers / 600 links. Links now use the single-failure rule (one repair at most, no loops, §8); routers follow only the flows through them with the same walk, and use a reachability search instead of a full SPF per failure. About 2 s (test limit 4 s); each router's backups are cached per topology (`backupsAt`), which also speeds up the failure view.
+- **UI:** "Weakest spots" panel under the what-if diff: repair mode (starts at the failure view's), show links / routers / both, top 10 with "Show all", a status line naming the weakest, and per row dropped / loops / cut off / repaired, a name that selects it on the diagram, and "Fail it". Runs in the worker with progress.
+- **Other options considered:** reuse the heat map's per-link counts (they count each router's own plan, not the traffic of every router, and say nothing about router failures); pairs of failures (n² failures, and FRR plans for one).
+- **No new dependencies.**
+- **Status:** Accepted.

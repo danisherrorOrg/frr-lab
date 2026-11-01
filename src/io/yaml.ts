@@ -230,7 +230,7 @@ function parseNodes(
       errors.push(`${where}: must be a mapping like { id: S, sid: 1 }, not "${shown(item)}".`)
       return
     }
-    const { id, sid, name, pos, msd, lfa_exclude: exclude } = item
+    const { id, sid, name, pos, msd, overload, lfa_exclude: exclude } = item
     const named = typeof id === 'string' && id !== '' ? `${where} (${id})` : where
     unknownKeys(item, NODE_FIELDS, (key, hint) =>
       errors.push(`${named}: unknown field "${key}". ${hint}`),
@@ -278,6 +278,10 @@ function parseNodes(
       errors.push(`${label}: "msd" ${msdRule}`)
       valid = false
     }
+    if (overload !== undefined && typeof overload !== 'boolean') {
+      errors.push(`${label}: "overload" must be true or false.`)
+      valid = false
+    }
     const isExclude =
       Array.isArray(exclude) && exclude.every((x) => typeof x === 'string' && x !== '')
     if (exclude !== undefined && !isExclude) {
@@ -298,6 +302,7 @@ function parseNodes(
     if (typeof name === 'string') node.name = name
     if (msd !== undefined) node.msd = msd as number
     if (isExclude && exclude.length > 0) node.lfaExclude = [...new Set(exclude as string[])].sort()
+    if (overload === true) node.overload = true
     if (isPos) node.pos = { x: pos.x as number, y: pos.y as number }
     nodes.push(node)
   })
@@ -435,6 +440,7 @@ export function serializeTopology(topology: Topology): string {
       ...(n.name !== undefined && { name: n.name }),
       ...(n.msd !== undefined && { msd: n.msd }),
       ...(n.lfaExclude !== undefined && n.lfaExclude.length > 0 && { lfa_exclude: n.lfaExclude }),
+      ...(n.overload === true && { overload: true }),
       ...(n.pos !== undefined && { pos: { x: n.pos.x, y: n.pos.y } }),
     })),
     links: topology.links.map((l) => ({

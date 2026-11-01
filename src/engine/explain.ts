@@ -8,6 +8,17 @@ import type { ExplainStep, LfaCandidate, NodeId, Segment } from './types'
 const mark = (ok: boolean) => (ok ? '✓' : '✗')
 const num = (x: number) => (Number.isFinite(x) ? String(x) : '∞')
 
+/**
+ * "= 5+6 = 11", or, when the router in the middle has the overload bit and so can't
+ * be transit, "= ∞ (B has the overload bit: no transit through it)" (RFC 7490 §5.4).
+ */
+const sumText = (parts: number[], total: number, middle: NodeId[], graph?: Graph) => {
+  const over = middle.find((m) => graph?.overloaded.has(m))
+  if (!Number.isFinite(total) && over !== undefined && parts.every(Number.isFinite))
+    return `= ∞ (${over} has the overload bit: no transit through it)`
+  return `= ${parts.map(num).join('+')} = ${num(total)}`
+}
+
 /** Where S, D and E sit for one protection, so steps can name them. */
 export interface LfaContext {
   s: NodeId
@@ -35,19 +46,26 @@ export function explainLfa(result: LfaResult, ctx: LfaContext): ExplainStep[] {
   for (const skip of result.skipped) {
     const via = hopText(graph, s, skip.neighbor, skip.link)
     steps.push(
-      skip.reason === 'excluded'
+      skip.reason === 'overload'
         ? {
             rule: 'LFA skipped',
-            text: `Via ${via}: skipped, ${s}'s policy never uses ${skip.neighbor} as an alternate`,
-            ok: false,
-            rfc: 'RFC 7916 §6.2.4.4',
-          }
-        : {
-            rule: 'LFA skipped',
-            text: `Via ${via}: skipped, link ${linkText(graph, s, skip.neighbor, skip.link)} has the maximum metric ${MAX_METRIC}`,
+            text: `Via ${via}: skipped, ${skip.neighbor} has the overload bit set, so it is never an alternate`,
             ok: false,
             rfc: 'RFC 5286 §3.5',
-          },
+          }
+        : skip.reason === 'excluded'
+          ? {
+              rule: 'LFA skipped',
+              text: `Via ${via}: skipped, ${s}'s policy never uses ${skip.neighbor} as an alternate`,
+              ok: false,
+              rfc: 'RFC 7916 §6.2.4.4',
+            }
+          : {
+              rule: 'LFA skipped',
+              text: `Via ${via}: skipped, link ${linkText(graph, s, skip.neighbor, skip.link)} has the maximum metric ${MAX_METRIC}`,
+              ok: false,
+              rfc: 'RFC 5286 §3.5',
+            },
     )
   }
 
@@ -105,7 +123,7 @@ function candidateSteps(
   return [
     {
       rule: 'LFA loop-free (Inequality 1)',
-      text: `Via ${via}: ${nd} < dist(${n},${s})+dist(${s},${d}) = ${num(c.distNS)}+${num(c.distSD)} = ${num(c.distNS + c.distSD)} ${mark(flags.loopFree)}`,
+      text: `Via ${via}: ${nd} < dist(${n},${s})+dist(${s},${d}) ${sumText([c.distNS, c.distSD], c.viaS, [s], graph)} ${mark(flags.loopFree)}`,
       ok: flags.loopFree,
       rfc: 'RFC 5286 §3.1',
     },
@@ -117,7 +135,7 @@ function candidateSteps(
     },
     {
       rule: 'LFA node-protecting (Inequality 3)',
-      text: `Via ${via}: ${nd} < dist(${n},${e})+dist(${e},${d}) = ${num(c.distNE)}+${num(c.distED)} = ${num(c.distNE + c.distED)} ${mark(flags.nodeProtecting)}`,
+      text: `Via ${via}: ${nd} < dist(${n},${e})+dist(${e},${d}) ${sumText([c.distNE, c.distED], c.viaE, [e], graph)} ${mark(flags.nodeProtecting)}`,
       ok: flags.nodeProtecting,
       rfc: 'RFC 5286 §3.2',
     },
@@ -194,9 +212,13 @@ export function explainRlfa(result: RlfaResult, ctx: RlfaContext): ExplainStep[]
   const steps: ExplainStep[] = []
 
   for (const skip of result.skipped) {
+    const why =
+      skip.reason === 'overload'
+        ? `${skip.neighbor} has the overload bit set`
+        : `link ${linkText(graph, s, skip.neighbor, skip.link)} has the maximum metric ${MAX_METRIC}`
     steps.push({
       rule: 'Extended P-space skipped',
-      text: `Via ${hopText(graph, s, skip.neighbor, skip.link)}: not used as a tunnel exit, link ${linkText(graph, s, skip.neighbor, skip.link)} has the maximum metric ${MAX_METRIC}`,
+      text: `Via ${hopText(graph, s, skip.neighbor, skip.link)}: not used as a tunnel exit, ${why}`,
       ok: false,
       rfc: 'RFC 7490 §5.4',
     })
@@ -206,7 +228,7 @@ export function explainRlfa(result: RlfaResult, ctx: RlfaContext): ExplainStep[]
     const y = c.node
     steps.push({
       rule: 'P-space',
-      text: `P-space: ${y}: dist(${s},${y})=${num(c.distSY)} < c(${s},${e})+dist(${e},${y}) = ${cSE}+${num(c.distEY)} = ${num(cSE + c.distEY)} ${mark(c.inP)}`,
+      text: `P-space: ${y}: dist(${s},${y})=${num(c.distSY)} < c(${s},${e})+dist(${e},${y}) ${sumText([cSE, c.distEY], c.viaLink, [e], graph)} ${mark(c.inP)}`,
       ok: c.inP,
       rfc: 'RFC 7490 §5.2.1.1',
     })
@@ -216,7 +238,7 @@ export function explainRlfa(result: RlfaResult, ctx: RlfaContext): ExplainStep[]
     const { neighbor: n, node: y } = c
     steps.push({
       rule: 'Extended P-space',
-      text: `Extended P-space: ${y} via ${n}: dist(${n},${y})=${num(c.distNY)} < dist(${n},${s})+dist(${s},${y}) = ${num(c.distNS)}+${num(c.distSY)} = ${num(c.distNS + c.distSY)} ${mark(c.inP)}`,
+      text: `Extended P-space: ${y} via ${n}: dist(${n},${y})=${num(c.distNY)} < dist(${n},${s})+dist(${s},${y}) ${sumText([c.distNS, c.distSY], c.viaS, [s], graph)} ${mark(c.inP)}`,
       ok: c.inP,
       rfc: 'RFC 7490 §5.2.1.2',
     })
@@ -226,19 +248,30 @@ export function explainRlfa(result: RlfaResult, ctx: RlfaContext): ExplainStep[]
     const y = c.node
     steps.push({
       rule: 'Q-space',
-      text: `Q-space: ${y}: dist(${y},${e})=${num(c.distYE)} < dist(${y},${s})+c(${s},${e}) = ${num(c.distYS)}+${cSE} = ${num(c.distYS + cSE)} ${mark(c.inQ)}`,
+      text: `Q-space: ${y}: dist(${y},${e})=${num(c.distYE)} < dist(${y},${s})+c(${s},${e}) ${sumText([c.distYS, cSE], c.viaLink, [s], graph)} ${mark(c.inQ)}`,
       ok: c.inQ,
       rfc: 'RFC 7490 §5.2.1.3',
     })
   }
 
   const pName = result.extended ? 'extended P' : 'P'
+  if (result.overloadedPq !== undefined) {
+    const many = result.overloadedPq.length > 1
+    steps.push({
+      rule: 'PQ nodes',
+      text: `${result.overloadedPq.join(', ')} ${many ? 'are' : 'is'} in both spaces but ${many ? 'have' : 'has'} the overload bit set, so ${many ? 'they' : 'it'} can't be a tunnel end`,
+      ok: false,
+      rfc: 'RFC 7490 §5.4',
+    })
+  }
   steps.push({
     rule: 'PQ nodes',
     text:
       result.pq.length > 0
         ? `PQ = ${pName} ∩ Q = {${result.pq.join(', ')}}`
-        : `No PQ node: no router is in both ${pName}-space and Q-space ✗`,
+        : result.overloadedPq !== undefined
+          ? `No PQ node: the only routers in both ${pName}-space and Q-space have the overload bit ✗`
+          : `No PQ node: no router is in both ${pName}-space and Q-space ✗`,
     ok: result.pq.length > 0,
     rfc: 'RFC 7490 §5.2.1',
   })
@@ -320,7 +353,7 @@ export function explainTilfa(result: TilfaResult, graph?: Graph, msd?: number): 
     if (w.rejected !== undefined) {
       steps.push({
         rule: 'TI-LFA walk',
-        text: `From ${w.from}, ${w.rejected.node}: ${checkText(w.rejected, result, sE)}`,
+        text: `From ${w.from}, ${w.rejected.node}: ${checkText(w.rejected, result, sE, graph)}`,
         ok: false,
         rfc: 'RFC 9855 §5',
       })
@@ -328,7 +361,7 @@ export function explainTilfa(result: TilfaResult, graph?: Graph, msd?: number): 
     if (w.segment.kind === 'prefix' && w.accepted !== undefined) {
       steps.push({
         rule: 'TI-LFA walk',
-        text: `From ${w.from}, ${w.accepted.node}: ${checkText(w.accepted, result, sE)} → ${name(w.segment)}`,
+        text: `From ${w.from}, ${w.accepted.node}: ${checkText(w.accepted, result, sE, graph)} → ${name(w.segment)}`,
         ok: true,
         rfc: 'RFC 9855 §5',
       })
@@ -384,12 +417,13 @@ export function explainTilfa(result: TilfaResult, graph?: Graph, msd?: number): 
 }
 
 /** "(a) same cost as the repair path; (b) all normal paths avoid S–E" with the numbers. */
-function checkText(c: SegmentCheck, { s, e, cSE }: TilfaResult, sE: string): string {
+function checkText(c: SegmentCheck, { s, e, cSE }: TilfaResult, sE: string, graph?: Graph): string {
   const xy = `dist(${c.from},${c.node})=${num(c.distXY)}`
-  const sum = c.distXS + cSE + c.distEY
+  // S is only transit when the segment starts elsewhere, E only when it ends elsewhere.
+  const middle = [...(c.from !== s ? [s] : []), ...(c.node !== e ? [e] : [])]
   return (
     `${xy} matches path cost ${num(c.pathCost)} ${mark(c.onPath)}; ` +
-    `avoids ${sE}: ${xy} < dist(${c.from},${s})+c(${s},${e})+dist(${e},${c.node}) = ` +
-    `${num(c.distXS)}+${cSE}+${num(c.distEY)} = ${num(sum)} ${mark(c.avoids)}`
+    `avoids ${sE}: ${xy} < dist(${c.from},${s})+c(${s},${e})+dist(${e},${c.node}) ` +
+    `${sumText([c.distXS, cSE, c.distEY], c.viaLink, middle, graph)} ${mark(c.avoids)}`
   )
 }

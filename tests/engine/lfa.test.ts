@@ -86,6 +86,8 @@ describe('computeLfa', () => {
         distSD: 20,
         distNE: 20,
         distED: 10,
+        viaS: 35,
+        viaE: 30,
       },
     ])
   })

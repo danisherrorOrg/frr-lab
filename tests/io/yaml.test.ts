@@ -415,6 +415,32 @@ links:
   })
 })
 
+describe('parseTopology: overload bit', () => {
+  const text = (extra: string) =>
+    `name: t\nnodes:\n  - { id: S, sid: 1${extra} }\n  - { id: E, sid: 2 }\nlinks:\n  - { a: S, b: E, metric: 1 }\n`
+
+  it('reads overload: true, and stores nothing for false', () => {
+    expect(expectOk(parseTopology(text(', overload: true'))).nodes[0]!.overload).toBe(true)
+    const off = expectOk(parseTopology(text(', overload: false'))).nodes[0]!
+    expect('overload' in off).toBe(false)
+  })
+
+  it('flags a value that is not true or false, and suggests the key for a typo', () => {
+    expect(errorsOf(text(', overload: yes please'))).toEqual([
+      'Node #1 (S): "overload" must be true or false.',
+    ])
+    expect(errorsOf(text(', overloaded: true'))[0]).toBe(
+      'Node #1 (S): unknown field "overloaded". Did you mean "overload"?',
+    )
+  })
+
+  it('round-trips through serializeTopology', () => {
+    const topo = expectOk(parseTopology(text(', overload: true')))
+    expect(serializeTopology(topo)).toContain('overload: true')
+    expect(expectOk(parseTopology(serializeTopology(topo)))).toEqual(topo)
+  })
+})
+
 describe('parseTopology: warnings', () => {
   it('warns (but still loads) when the graph is disconnected', () => {
     const result = parseTopology(`

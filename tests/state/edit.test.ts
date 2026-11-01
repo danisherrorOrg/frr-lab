@@ -195,6 +195,17 @@ describe('LFA policy edits (D45)', () => {
   })
 })
 
+describe('updateRouter: overload bit (D47)', () => {
+  it('sets it, keeps it through a rename, and false removes it', () => {
+    const t = ok(updateRouter(square(), 'S', { overload: true }))
+    expect(t.nodes.find((n) => n.id === 'S')!.overload).toBe(true)
+    const renamed = ok(updateRouter(t, 'S', { id: 'S1' }))
+    expect(renamed.nodes.find((n) => n.id === 'S1')!.overload).toBe(true)
+    const off = ok(updateRouter(t, 'S', { overload: false }))
+    expect('overload' in off.nodes.find((n) => n.id === 'S')!).toBe(false)
+  })
+})
+
 describe('withPositions', () => {
   it('places routers without a position on a circle and keeps the others', () => {
     const t: Topology = {

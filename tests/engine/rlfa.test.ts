@@ -93,6 +93,7 @@ describe('computeRlfa', () => {
       node: 'C',
       distSY: 2,
       distEY: 1,
+      viaLink: 2,
       inP: false,
     })
     expect(r.extChecks).toContainEqual({
@@ -102,12 +103,14 @@ describe('computeRlfa', () => {
       distNY: 2,
       distNS: 1,
       distSY: 2,
+      viaS: 3,
       inP: true,
     })
     expect(r.qChecks.find((c) => c.node === 'A')).toEqual({
       node: 'A',
       distYE: 2,
       distYS: 1,
+      viaLink: 2,
       inQ: false,
     })
     expect(r.costs).toEqual([
@@ -135,6 +138,7 @@ describe('computeRlfa', () => {
       node: 'C',
       distYE: 1,
       distYS: 2,
+      viaLink: 3,
       inQ: true,
     })
     expect(r.qSpace).toEqual(['B', 'C'])

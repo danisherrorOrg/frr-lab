@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { computeAllSources, computeCoverage, computeForSource } from '../../src/engine/index'
 import { coverageMap } from '../../src/engine/heat-map'
 import { linkView } from '../../src/engine/link-view'
+import { weakSpots } from '../../src/engine/weak-spots'
 import { whatIf } from '../../src/engine/what-if'
 import { simulateAllSources, simulateFailure } from '../../src/engine/simulate'
 import { createEngineClient, createInlineWorker, type WorkerLike } from '../../src/worker/client'
@@ -87,6 +88,17 @@ describe('what-if requests', () => {
     const diff = await client.whatIf(before, after, { extended: true }, (d) => progress.push(d))
     expect(diff).toEqual(whatIf(before, after, { extended: true }))
     expect(progress).toEqual([1, 2, 3, 4, 5])
+  })
+})
+
+describe('weak-spots requests', () => {
+  it('the client resolves the same ranking as the engine, with progress per link and router', async () => {
+    const client = createEngineClient(fakeWorker())
+    const t = loadFixture('03-ring5-highmetric.yaml')
+    const progress: number[] = []
+    const spots = await client.weakSpots(t, 'lfa', { extended: true }, (d) => progress.push(d))
+    expect(spots).toEqual(weakSpots(t, 'lfa', { extended: true }))
+    expect(progress).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
   })
 })
 

@@ -49,6 +49,7 @@ export function CanvasMenu({
   if (target.kind === 'node') {
     const id = target.id
     const down = failedNodes.includes(id)
+    const overload = topology.nodes.find((n) => n.id === id)?.overload === true
     label = `Router ${id}`
     items = [
       {
@@ -59,6 +60,14 @@ export function CanvasMenu({
       {
         text: down ? `↺ Restore router ${id}` : `✕ Fail router ${id}`,
         act: () => st().toggleFailedNode(id),
+      },
+      {
+        text: overload ? `⬡ Clear overload bit on ${id}` : `⬡ Set overload bit on ${id}`,
+        act: () => st().updateRouter(id, { overload: !overload }),
+      },
+      {
+        text: overload ? '⇄ What if the overload bit is cleared?' : '⇄ What if it is overloaded?',
+        act: () => st().openOverloadWhatIf(id),
       },
       { text: `🗑 Delete router ${id}`, act: () => st().remove(target) },
     ]

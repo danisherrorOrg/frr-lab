@@ -23,6 +23,7 @@ import { ResultsTable } from './ui/ResultsTable'
 import { Sidebar } from './ui/Sidebar'
 import { Toolbar } from './ui/Toolbar'
 import { Tour } from './ui/Tour'
+import { WeakSpots } from './ui/WeakSpots'
 import { WhatIf } from './ui/WhatIf'
 import { YamlGuide } from './ui/YamlGuide'
 import { isFirstVisit, markTourSeen } from './ui/tour-steps'
@@ -417,6 +418,7 @@ export function App() {
             }}
           />
           <WhatIf />
+          <WeakSpots />
           <CoverageReport source={source} />
         </main>
       </div>

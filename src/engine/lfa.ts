@@ -1,6 +1,6 @@
 import type { Edge } from './graph'
 import { DEFAULT_LFA_POLICY, type ResolvedLfaPolicy } from './lfa-policy'
-import { avoidsLink, dist, firstLinks, type AllPairs } from './spf'
+import { avoidsLink, dist, firstLinks, viaCost, type AllPairs } from './spf'
 import type { LfaCandidate, NodeId } from './types'
 
 /** Highest IS-IS wide metric. RFC 5286 §3.5: never use an alternate over such a link. */
@@ -28,6 +28,13 @@ export interface LfaCheck {
   distSD: number
   distNE: number
   distED: number
+  /**
+   * dist(N,S) + dist(S,D) and dist(N,E) + dist(E,D): the right-hand sides of
+   * Inequalities 1 and 3. Infinity when S or E has the overload bit, so N can't pass
+   * through it (RFC 7490 §5.4).
+   */
+  viaS: number
+  viaE: number
 }
 
 export interface LfaResult {
@@ -36,10 +43,10 @@ export interface LfaResult {
   /** Same order as `candidates`. */
   checks: LfaCheck[]
   /**
-   * Links left out before any check, and why: a maximum metric (RFC 5286 §3.5), or
-   * a neighbor S's policy never uses (RFC 7916 §6.2.4.4).
+   * Links left out before any check, and why: a maximum metric or a neighbor with
+   * the overload bit (RFC 5286 §3.5), or a neighbor S's policy never uses (RFC 7916 §6.2.4.4).
    */
-  skipped: { neighbor: NodeId; link: string; reason: 'max-metric' | 'excluded' }[]
+  skipped: { neighbor: NodeId; link: string; reason: 'max-metric' | 'overload' | 'excluded' }[]
   /** The policy the choice used (docs/02-algorithms.md §15). */
   policy: ResolvedLfaPolicy
   best?: NodeId
@@ -99,6 +106,12 @@ export function computeLfa(
       result.skipped.push({ neighbor: n, link: edge.linkId, reason: 'max-metric' })
       continue
     }
+    // RFC 5286 §3.5: "if N_i has the overload bit set, then S MUST NOT consider using
+    // N_i as an alternate", even for N_i's own address.
+    if (table.graph.overloaded.has(n)) {
+      result.skipped.push({ neighbor: n, link: edge.linkId, reason: 'overload' })
+      continue
+    }
     // RFC 7916 §6.2.4.4: the operator can exclude a specific alternate.
     if (policy.exclude.includes(n)) {
       result.skipped.push({ neighbor: n, link: edge.linkId, reason: 'excluded' })
@@ -113,14 +126,17 @@ export function computeLfa(
       distSD,
       distNE: dist(table, n, e),
       distED,
+      viaS: viaCost(table, n, s, d),
+      viaE: viaCost(table, n, e, d),
     }
     result.checks.push(check)
     const cand: LfaCandidate = {
       neighbor: n,
       link: edge.linkId,
-      loopFree: loopFree(check.distND, check.distNS, distSD),
+      // Same as loopFree() and nodeProtecting(), with an overloaded S or E never transit.
+      loopFree: check.distND < check.viaS,
       downstream: downstream(check.distND, distSD),
-      nodeProtecting: nodeProtecting(check.distND, check.distNE, distED),
+      nodeProtecting: check.distND < check.viaE,
       cost: check.cSN + check.distND,
     }
     const rejected = cand.loopFree ? policyRejection(cand, policy, d === e) : undefined

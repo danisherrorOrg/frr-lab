@@ -79,6 +79,23 @@ export function Legend({ heat }: { heat?: HeatState }) {
           ✕ failed router (all its links down)
         </li>
         <li className="flex items-center gap-1">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            aria-hidden="true"
+            className="inline-block"
+          >
+            <polygon
+              points="4,0.5 10,0.5 13.5,4 13.5,10 10,13.5 4,13.5 0.5,10 0.5,4"
+              fill="#e2e8f0"
+              stroke="#b45309"
+              strokeWidth="2"
+            />
+          </svg>
+          OL = overload bit: no transit traffic through it
+        </li>
+        <li className="flex items-center gap-1">
           <svg width="28" height="14" aria-hidden="true" className="inline-block">
             <line
               x1="0"

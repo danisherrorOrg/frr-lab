@@ -3,7 +3,7 @@
 import { edgeOf } from './graph'
 import { computeForSource } from './index'
 import { toRows, type Method, type ResultRow } from './rows'
-import { allPairs, dist } from './spf'
+import { allPairs, dist, linkPathCost } from './spf'
 import type { NodeId, Topology } from './types'
 
 /** One destination the router before the link protects over it. */
@@ -65,10 +65,10 @@ export function linkView(
     // X's traffic to D crosses from→to on some shortest path when
     // dist(X,from) + c + dist(to,D) = dist(X,D) (§1.5 with "=" as "uses it").
     const pairs = rows.map((row): LinkPair => {
-      const toD = dist(table, to, row.dest)
       const sources = nodes.filter((x) => {
         if (x === row.dest) return false
-        const via = dist(table, x, from) + metric + toD
+        // Infinity when `from` or `to` has the overload bit and would be transit.
+        const via = linkPathCost(table, x, from, to, metric, row.dest)
         return Number.isFinite(via) && via === dist(table, x, row.dest)
       })
       return { row, sources }

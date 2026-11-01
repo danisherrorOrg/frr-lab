@@ -1,6 +1,7 @@
 import type { ComputeOptions, CoverageReport, SourceRows } from '../engine/index'
 import type { HeatMap } from '../engine/heat-map'
 import type { LinkView } from '../engine/link-view'
+import type { WeakSpots } from '../engine/weak-spots'
 import type { WhatIf } from '../engine/what-if'
 import type { FailureSimulation, RepairMode, SourceFailure } from '../engine/simulate'
 import type { DestinationResult, NodeId, Topology } from '../engine/types'
@@ -61,6 +62,13 @@ export interface EngineClient {
     options?: { extended?: boolean },
     onProgress?: (done: number, total: number, source: NodeId) => void,
   ): Promise<WhatIf>
+  /** Weakest spots: every link and router failed in turn (docs/02-algorithms.md §17). */
+  weakSpots(
+    topology: Topology,
+    mode: RepairMode,
+    options?: { extended?: boolean },
+    onProgress?: (done: number, total: number, source: NodeId) => void,
+  ): Promise<WeakSpots>
   /** Stops the worker; pending calls reject. */
   terminate(): void
 }
@@ -131,6 +139,7 @@ export function createEngineClient(worker: WorkerLike = createDefaultWorker()): 
     else if (data.kind === 'link') p.resolve(data.view as never)
     else if (data.kind === 'heat-map') p.resolve(data.map as never)
     else if (data.kind === 'what-if') p.resolve(data.diff as never)
+    else if (data.kind === 'weak-spots') p.resolve(data.spots as never)
     else p.resolve(data.report as never)
   })
 
@@ -178,6 +187,8 @@ export function createEngineClient(worker: WorkerLike = createDefaultWorker()): 
       send({ kind: 'heat-map', topology, ...(options && { options }) }, onProgress),
     whatIf: (before, after, options, onProgress) =>
       send({ kind: 'what-if', before, after, ...(options && { options }) }, onProgress),
+    weakSpots: (topology, mode, options, onProgress) =>
+      send({ kind: 'weak-spots', topology, mode, ...(options && { options }) }, onProgress),
     terminate: () => {
       worker.terminate()
       for (const p of pending.values()) p.reject(new Error('The engine worker was stopped.'))

@@ -126,6 +126,12 @@ export const STYLE: cytoscape.StylesheetJson = [
     },
   },
   {
+    // Overload bit (D47): a stop-sign octagon with a thick amber border and "OL" in the
+    // label, so it reads without colour too.
+    selector: 'node.overload',
+    style: { shape: 'octagon', 'border-color': '#b45309', 'border-width': 4 },
+  },
+  {
     // A picked P / Q / PQ set (detail panel): ring its routers, fade the others.
     selector: 'node.spot',
     style: {
@@ -234,9 +240,10 @@ function nodeLabel(
   star: boolean,
   down: boolean,
   heat?: string,
+  overload?: boolean,
 ) {
   const top = down ? `✕ ${id}` : star ? `★ ${id}` : id
-  return [top, name, heat].filter((x) => x).join('\n')
+  return [top, name, overload ? 'OL' : undefined, heat].filter((x) => x).join('\n')
 }
 
 /** Metric labels: one in the middle, or one near each end when they differ (cost leaving that end). */
@@ -280,7 +287,7 @@ export function sync(cy: cytoscape.Core, t: Topology) {
 
 const HEAT_CLASSES = 'heat-full heat-most heat-part heat-low heat-idle'
 
-const CLASSES = `${HEAT_CLASSES} p-space q-space pq spot faded down source dest sel link-start primary backup final primary-fwd primary-rev backup-fwd backup-rev final-fwd final-rev flowing failed packet-at packet-hop walk-stack walk-current`
+const CLASSES = `${HEAT_CLASSES} overload p-space q-space pq spot faded down source dest sel link-start primary backup final primary-fwd primary-rev backup-fwd backup-rev final-fwd final-rev flowing failed packet-at packet-hop walk-stack walk-current`
 
 export function decorate(
   cy: cytoscape.Core,
@@ -300,14 +307,17 @@ export function decorate(
     cy.elements().removeClass(CLASSES)
     const failed = new Set(extra.failed)
     const downNodes = new Set(extra.failedNodes ?? [])
+    const overloaded = new Set(t.nodes.filter((n) => n.overload === true).map((n) => n.id))
     cy.nodes().forEach((n) => {
       const down = downNodes.has(n.id())
       const heat = extra.heat?.nodes[n.id()]
+      const ol = overloaded.has(n.id())
       n.data(
         'display',
-        nodeLabel(n.id(), n.data('name') || undefined, n.id() === h.pq, down, heat?.text),
+        nodeLabel(n.id(), n.data('name') || undefined, n.id() === h.pq, down, heat?.text, ol),
       )
       if (down) n.addClass('down')
+      if (ol) n.addClass('overload')
       if (heat) n.addClass(`heat-${heat.level}`)
     })
     cy.edges().forEach((e) => {

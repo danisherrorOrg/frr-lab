@@ -129,5 +129,6 @@ function withoutEdge(graph: Graph, s: string, e: string): Graph {
     nodes: graph.nodes,
     out: new Map([...graph.out].map(([k, v]) => [k, v.filter(keep)])),
     in: new Map([...graph.in].map(([k, v]) => [k, v.filter(keep)])),
+    overloaded: graph.overloaded,
   }
 }
