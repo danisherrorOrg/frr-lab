@@ -6,7 +6,9 @@ import type { NodeId } from '../engine/types'
 import { useStore } from '../state/store'
 import { decorate, stepFlow, STYLE, sync, type Highlight } from './canvas'
 import { CanvasMenu, type Target } from './CanvasMenu'
-import { heatLines, heatMarks, tooltipLines } from './format'
+import { downloadBlob, downloadText } from './download'
+import { diagramPng, diagramSvg } from './export-image'
+import { fileName, heatLines, heatMarks, tooltipLines } from './format'
 import { MetricEditor } from './MetricEditor'
 
 /** Something placed at a spot inside the canvas box. */
@@ -217,6 +219,15 @@ export function GraphCanvas({
     })
   }
 
+  /** Save the whole diagram as it looks now (paths, failures, heat map) for slides (D49). */
+  const saveImage = (kind: 'png' | 'svg') => {
+    const cy = cyRef.current
+    if (!cy) return
+    const name = fileName(topology.name, kind)
+    if (kind === 'png') downloadBlob(name, diagramPng(cy))
+    else downloadText(name, diagramSvg(cy, topology.name), 'image/svg+xml')
+  }
+
   const cursor = tool === 'select' ? 'cursor-default' : 'cursor-crosshair'
   return (
     <div
@@ -268,6 +279,24 @@ export function GraphCanvas({
           onClick={() => useStore.getState().autoLayout()}
         >
           Auto layout
+        </button>
+        <button
+          type="button"
+          className={control}
+          aria-label="Save the diagram as PNG"
+          title="Save the whole diagram as a PNG picture, as it looks now (white background)"
+          onClick={() => saveImage('png')}
+        >
+          ⤓ PNG
+        </button>
+        <button
+          type="button"
+          className={control}
+          aria-label="Save the diagram as SVG"
+          title="Save the whole diagram as an SVG drawing that stays sharp at any size"
+          onClick={() => saveImage('svg')}
+        >
+          ⤓ SVG
         </button>
       </div>
       {tip && (

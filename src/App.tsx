@@ -26,6 +26,7 @@ import { Tour } from './ui/Tour'
 import { WeakSpots } from './ui/WeakSpots'
 import { WhatIf } from './ui/WhatIf'
 import { YamlGuide } from './ui/YamlGuide'
+import { GenerateDialog } from './ui/GenerateDialog'
 import { isFirstVisit, markTourSeen } from './ui/tour-steps'
 import { useHeatMap } from './ui/useHeatMap'
 import { useResults } from './ui/useResults'
@@ -424,6 +425,7 @@ export function App() {
       </div>
       <Tour />
       <YamlGuide />
+      <GenerateDialog />
     </div>
   )
 }

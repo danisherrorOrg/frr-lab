@@ -73,10 +73,12 @@ LFA LAB/
 │   │   ├── store.ts         topology, selection, failed links, undo/redo history
 │   │   ├── edit.ts          pure topology edits (add/move/delete/update + checks)
 │   │   ├── examples.ts      built-in examples, bundled from examples/*.yaml
-│   │   └── layout.ts        "Auto layout": deterministic force layout (D30)
+│   │   ├── layout.ts        "Auto layout": deterministic force layout (D30)
+│   │   └── generate.ts      Random topology generator: ring, grid, leaf-spine, mesh (seeded, D50)
 │   ├── ui/
 │   │   ├── GraphCanvas.tsx  Cytoscape wrapper (clicks → store actions)
 │   │   ├── canvas.ts        Cytoscape styles, sync and highlight (tested headless)
+│   │   ├── export-image.ts  Diagram as PNG (Cytoscape) or SVG (written from computed styles)
 │   │   ├── Sidebar.tsx      tools, source picker, settings
 │   │   ├── Toolbar.tsx      add node/link, fail mode, examples, import/export
 │   │   ├── CanvasMenu.tsx   right-click menu on a router or link (D30)

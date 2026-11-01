@@ -88,6 +88,8 @@ export interface AppState {
   tour: number | null
   /** The "YAML format" guide is open. */
   yamlGuide: boolean
+  /** The random topology generator dialog is open (D50). */
+  generator: boolean
   /** The per-link view (TODO backlog): null = closed, else the link picked (null = none yet). */
   linkView: { link: string | null } | null
   /**
@@ -146,6 +148,7 @@ export interface AppState {
   setNotice: (n: Notice | null) => void
   setTour: (step: number | null) => void
   setYamlGuide: (open: boolean) => void
+  setGenerator: (open: boolean) => void
   /** Open the per-link view on this link (null = open with none picked) and select it. */
   openLinkView: (link: string | null) => void
   closeLinkView: () => void
@@ -250,6 +253,7 @@ export const useStore = create<AppState>()((set, get) => {
     notice: null,
     tour: null,
     yamlGuide: false,
+    generator: false,
     linkView: null,
     heatMap: null,
     whatIf: null,
@@ -456,6 +460,7 @@ export const useStore = create<AppState>()((set, get) => {
     setNotice: (notice) => set({ notice }),
     setTour: (tour) => set({ tour }),
     setYamlGuide: (yamlGuide) => set({ yamlGuide }),
+    setGenerator: (generator) => set({ generator }),
     openLinkView: (link) =>
       set({ linkView: { link }, ...(link !== null && { selection: { kind: 'link', id: link } }) }),
     closeLinkView: () => set({ linkView: null }),

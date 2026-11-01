@@ -173,13 +173,13 @@ export function pickBackup(
 export const toNumber = (text: string) => (text.trim() === '' ? NaN : Number(text.trim()))
 
 /** File name from the topology name: "Small ISP core" → "small-isp-core.yaml". */
-export const fileName = (name: string) =>
+export const fileName = (name: string, ext = 'yaml') =>
   `${
     name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '') || 'topology'
-  }.yaml`
+  }.${ext}`
 
 /**
  * The flow drawn on the canvas: the chosen one, else the first affected one. A failed

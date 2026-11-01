@@ -47,6 +47,7 @@ export function Toolbar() {
   const redo = useStore((s) => s.redo)
   const setTour = useStore((s) => s.setTour)
   const setYamlGuide = useStore((s) => s.setYamlGuide)
+  const setGenerator = useStore((s) => s.setGenerator)
 
   const importFile = async (file: File) => {
     const { loadTopology, setNotice } = useStore.getState()
@@ -84,6 +85,14 @@ export function Toolbar() {
           </option>
         ))}
       </select>
+      <button
+        type="button"
+        className={button}
+        onClick={() => setGenerator(true)}
+        title="Make a ring, grid, leaf-spine or random mesh of any size"
+      >
+        Generate…
+      </button>
       <button type="button" className={button} onClick={() => fileInput.current?.click()}>
         Import YAML
       </button>

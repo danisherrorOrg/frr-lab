@@ -452,3 +452,23 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Other options considered:** reuse the heat map's per-link counts (they count each router's own plan, not the traffic of every router, and say nothing about router failures); pairs of failures (n² failures, and FRR plans for one).
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D49 – Export the diagram as PNG or SVG (2026-11-01)
+- **Why:** TODO backlog "Data in / out": people want the picture for slides and docs, with the paths and failures they are looking at.
+- **What is exported:** the whole network (not only the part in view), as it looks now: highlighted paths, failed links and routers, P/Q sets, heat map, packet-walk labels. White background in both themes, since slides and docs are usually light. File named after the topology (`small-isp-core.png`).
+- **PNG:** Cytoscape's own `cy.png()` at 2× scale, so it stays sharp on a projector.
+- **SVG:** written by `diagramSvg()` in `src/ui/export-image.ts` from each element's computed Cytoscape style (colours, widths, dashes, halos, arrows, octagons for overload, gradient for P+Q, double border for the destination, label boxes). Parallel links are drawn as curves on both sides. Each router and link has a `<title>` with its id. Tested headless (`tests/ui/export-image.test.ts`), including that the file is valid XML.
+- **Other options considered:** the `cytoscape-svg` extension (a new dependency for one button; it also renders from the canvas renderer, which jsdom can't test); PNG only (blurry when scaled in a document).
+- **No new dependencies.**
+- **Status:** Accepted.
+
+### D50 – Random topology generator (2026-11-01)
+- **Why:** TODO backlog "Data in / out": try LFA / RLFA / TI-LFA on networks bigger than the examples without drawing them by hand.
+- **Shapes:** ring (each router to the next), grid (as square as possible, links right and down), leaf-spine (2 spines up to 8 routers, then 4; every leaf to every spine) and random mesh (a random tree so it is always connected, then random extra links up to about 3 per router; no parallel links). Size slider: 3 to 100 routers (grid and leaf-spine from 4). 100 keeps the biggest (leaf-spine, 384 links) inside the 200-router / 600-link speed target.
+- **Seeded, not random:** `generateTopology()` in `src/state/generate.ts` is pure; a seed drives a Park–Miller generator (as in the auto layout), so the same settings always give the same network and tests can pin it. The dialog shows the seed for a mesh or varied metrics, with "Another one" (seed + 1).
+- **Metrics:** 10 everywhere, or "Varied metrics" 5 to 50 in steps of 5 (same both ways), so not every path is an ECMP tie.
+- **Positions:** ring, grid and leaf-spine are placed by shape; a mesh uses the auto layout (D30).
+- **UI:** "Generate…" in the top bar opens a dialog (shape, size slider, varied metrics, seed, a one-line preview: "Grid 3×4: 12 routers, 17 links"). Generate replaces the network on screen as one undo step; R1 (or L1) becomes the source. It is then an ordinary topology: edit, export YAML, share.
+- **Other options considered:** `Math.random` in the UI (can't reproduce a network someone reports); more shapes such as full mesh or hub-and-spoke (easy to add later).
+- **No new dependencies.**
+- **Status:** Accepted.
