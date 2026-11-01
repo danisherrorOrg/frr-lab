@@ -42,8 +42,14 @@ function bigTopology(n = 200, linkCount = 600): Topology {
  */
 const budget = (ms: number) => (process.env.CI ? ms * 3 : ms)
 
+/**
+ * Vitest stops a test after 5 s by default, which is less than some CI budgets above.
+ * A longer timeout lets the time check run and report the real number instead.
+ */
+const timeout = budget(10_000)
+
 // TODO.md Phase 5: all-sources coverage on 200 routers / 600 links in under 2 s.
-describe('coverage speed', () => {
+describe('coverage speed', { timeout }, () => {
   it('200 routers, 600 links, all sources: under 2 s', () => {
     const topo = bigTopology()
     expect(topo.links).toHaveLength(600)
@@ -81,7 +87,7 @@ describe('coverage speed', () => {
 })
 
 // Phase 9.6: the "All routers" view stays under 2 s on the same topology.
-describe('all routers as the DUT: speed', () => {
+describe('all routers as the DUT: speed', { timeout }, () => {
   const topo = bigTopology()
 
   it('results rows for every router: under 2 s', () => {
@@ -106,20 +112,16 @@ describe('all routers as the DUT: speed', () => {
 // TODO backlog: weakest spots fail all 600 links and 200 routers in turn, every router as
 // the source. The backups are planned once (the coverage run, 2 s), then each failure is
 // counted from them.
-describe('weakest spots: speed', () => {
+describe('weakest spots: speed', { timeout }, () => {
   for (const mode of ['lfa', 'rlfa', 'tilfa'] as const) {
-    it(
-      `200 routers, 600 links, every failure, ${mode}: under 4 s`,
-      () => {
-        const topo = bigTopology()
-        const start = performance.now()
-        const w = weakSpots(topo, mode)
-        const ms = performance.now() - start
-        expect(w.spots).toHaveLength(800)
-        expect(w.flows).toBe(200 * 199)
-        expect(ms).toBeLessThan(budget(4000))
-      },
-      budget(10_000),
-    )
+    it(`200 routers, 600 links, every failure, ${mode}: under 4 s`, () => {
+      const topo = bigTopology()
+      const start = performance.now()
+      const w = weakSpots(topo, mode)
+      const ms = performance.now() - start
+      expect(w.spots).toHaveLength(800)
+      expect(w.flows).toBe(200 * 199)
+      expect(ms).toBeLessThan(budget(4000))
+    })
   }
 })

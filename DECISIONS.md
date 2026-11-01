@@ -429,6 +429,7 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 ### D46 – Speed tests get 3× the time in CI (2026-11-01)
 - **Why:** the first GitHub Actions run failed two speed tests: all-sources coverage took 2.35 s and the every-router failure summary 2.39 s, against a 2 s limit. The same tests take 0.87 s and 1.50 s on a laptop. Shared CI runners are about 2.7× slower, and all test files run there in parallel on a few CPUs.
 - **Change:** `tests/engine/coverage.speed.test.ts` multiplies each limit by 3 when the `CI` environment variable is set (GitHub Actions sets it). Locally the limits are unchanged, so the requirement (< 2 s in a laptop browser, `docs/01-requirements.md`) is still measured on a laptop.
+- **Follow-up (2026-11-01):** the what-if test (12 s CI budget) then failed on vitest's default 5 s test timeout at 5.35 s. Every speed test now gets a `budget(10 s)` timeout, so the time check runs and reports the real number.
 - **Other options considered:** skip the speed tests in CI (loses the guard against a big slowdown); run them in a separate CI step on their own (CI timings would still vary from run to run).
 - **No new dependencies.**
 - **Status:** Accepted.
