@@ -171,20 +171,6 @@ clear "done when".
 
 ---
 
-## Phase 8 – Launch (1–2 days)
-
-> **Do this last:** launch only after Phase 9 and the other planned work are done.
-
-- [ ] Pick Vercel or GitHub Pages; log it in `DECISIONS.md`
-- [ ] Deploy the static build
-- [ ] Record a demo GIF; take screenshots
-- [ ] Update the README: status, live link, GIF, how to run locally
-- [ ] Tag release `v0.1.0`
-- [ ] Blog / LinkedIn post: "TI-LFA explained with pictures" (use Examples 2 and 3)
-- [ ] Add `projects/lfa-lab.md` + an `INDEX.md` row in the profile folder; update the resume bullet
-
----
-
 ## Phase 9 – User feedback, v0.2 (from hands-on testing, 2026-10-31)
 
 Feedback from a user who knows LFA / RLFA / TI-LFA. Do these first: they fix friction in
@@ -322,3 +308,17 @@ Things that fit the "learn and check FRR" goal and stay offline / no backend.
 4. [x] Quiz mode for students *(D54, `02-algorithms.md` §19)*
 5. [x] LAN links / pseudonodes, multi-level IS-IS *(D55, D56, `02-algorithms.md` §20–21; Example 10; FRR import reads LANs and both levels)*
 6. [x] Microloop view, Flex-Algo, SRv6 *(D57, D58, D59, `02-algorithms.md` §22–24; Example 11)*
+
+---
+
+## Phase 10 – Launch (1–2 days)
+
+> **Do this last:** launch only after Phase 9 and the other planned work are done.
+
+- [ ] Pick Vercel or GitHub Pages; log it in `DECISIONS.md`
+- [ ] Deploy the static build
+- [ ] Record a demo GIF; take screenshots
+- [ ] Update the README: status, live link, GIF, how to run locally
+- [ ] Tag release `v0.1.0`
+- [ ] Blog / LinkedIn post: "TI-LFA explained with pictures" (use Examples 2 and 3)
+- [ ] Add `projects/lfa-lab.md` + an `INDEX.md` row in the profile folder; update the resume bullet
