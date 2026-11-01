@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "learn:diagrams": "UPDATE_LEARN_DIAGRAMS=1 vitest run tests/learn/diagrams.test.ts",
     "lint": "eslint . && prettier --check .",
     "typecheck": "tsc -b",
     "format": "prettier --write ."

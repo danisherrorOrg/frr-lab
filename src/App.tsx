@@ -27,6 +27,7 @@ import { Tour } from './ui/Tour'
 import { WeakSpots } from './ui/WeakSpots'
 import { WhatIf } from './ui/WhatIf'
 import { YamlGuide } from './ui/YamlGuide'
+import { LearnGuide } from './ui/LearnGuide'
 import { FrrImportDialog } from './ui/FrrImportDialog'
 import { GenerateDialog } from './ui/GenerateDialog'
 import { isFirstVisit, markTourSeen } from './ui/tour-steps'
@@ -428,6 +429,7 @@ export function App() {
       </div>
       <Tour />
       <YamlGuide />
+      <LearnGuide />
       <GenerateDialog />
       <FrrImportDialog />
     </div>

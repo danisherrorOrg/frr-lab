@@ -77,6 +77,10 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 5. [x] LAN links / pseudonodes, multi-level IS-IS *(D55, D56)*
 6. [x] Microloop view, Flex-Algo, SRv6 *(D57–D59)*
 
+## Learn guide (D60)
+- [x] Protocol guide in `docs/learn/` (14 chapters, 4 appendices) with diagrams drawn by the engine
+- [x] **📖 Learn** panel in the app with "Try it" links that load each example
+
 ## Phase 10 – Launch (1–2 days)
 
 > **Do this last:** launch only after Phase 9 and the other planned work are done.
