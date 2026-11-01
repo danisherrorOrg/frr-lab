@@ -1,6 +1,6 @@
 // Topology edits for the canvas and properties panel (F1). Every function returns
 // a NEW topology and never changes its input: the engine caches by object (D15).
-import type { Link, NodeId, RouterNode, Topology } from '../engine/types'
+import type { LfaPolicy, Link, NodeId, RouterNode, Topology } from '../engine/types'
 import { ID_PATTERN, MAX_LABEL, MAX_METRIC, MAX_MSD, MIN_MSD, uniqueLinkId } from '../io/yaml'
 // BMI-MSD is one octet (RFC 8491 §2); below 2 not even a Remote LFA tunnel fits.
 const msdError = `Max SID depth must be a whole number from ${MIN_MSD} to ${MAX_MSD}, or empty for no limit.`
@@ -55,13 +55,29 @@ export function moveRouter(t: Topology, id: NodeId, pos: Pos): Topology {
   return { ...t, nodes: t.nodes.map((n) => (n.id === id ? { ...n, pos: roundPos(pos) } : n)) }
 }
 
-/** Removes the router and every link that touches it. */
+/** Removes the router and every link that touches it, and takes it off LFA exclude lists. */
 export function deleteRouter(t: Topology, id: NodeId): Topology {
   return {
     ...t,
-    nodes: t.nodes.filter((n) => n.id !== id),
+    nodes: t.nodes
+      .filter((n) => n.id !== id)
+      .map((n) =>
+        withExclude(
+          n,
+          n.lfaExclude?.filter((x) => x !== id),
+        ),
+      ),
     links: t.links.filter((l) => l.a !== id && l.b !== id),
   }
+}
+
+/** The router with this exclude list; an empty list removes the field. */
+function withExclude(n: RouterNode, list: NodeId[] | undefined): RouterNode {
+  if (list === n.lfaExclude) return n
+  const next = { ...n }
+  if (list === undefined || list.length === 0) delete next.lfaExclude
+  else next.lfaExclude = list
+  return next
 }
 
 export function deleteLink(t: Topology, id: string): Topology {
@@ -87,9 +103,11 @@ export interface RouterPatch {
   sidIndex?: number
   /** Max SID depth; null removes it (the router then uses the network's, D44). */
   msd?: number | null
+  /** Neighbors never used as an LFA (RFC 7916 §6.2.4.4, D45); [] removes the list. */
+  lfaExclude?: NodeId[]
 }
 
-/** Change a router. Renaming also updates its links (ends and ids). */
+/** Change a router. Renaming also updates its links (ends and ids) and other routers' exclude lists. */
 export function updateRouter(t: Topology, id: NodeId, patch: RouterPatch): EditResult {
   const node = t.nodes.find((n) => n.id === id)
   if (!node) return { ok: false, error: `Router "${id}" does not exist.` }
@@ -120,6 +138,14 @@ export function updateRouter(t: Topology, id: NodeId, patch: RouterPatch): EditR
     if (!isWhole(patch.msd, MIN_MSD, MAX_MSD)) return { ok: false, error: msdError }
     next.msd = patch.msd
   }
+  if (patch.lfaExclude !== undefined) {
+    const list = [...new Set(patch.lfaExclude.map((x) => x.trim()).filter((x) => x !== ''))]
+    const unknown = list.filter((x) => !t.nodes.some((n) => n.id === x))
+    if (unknown.length > 0) return { ok: false, error: `No router called ${unknown.join(', ')}.` }
+    if (list.includes(id)) return { ok: false, error: "A router can't exclude itself." }
+    if (list.length === 0) delete next.lfaExclude
+    else next.lfaExclude = list.sort()
+  }
 
   const rename = (x: NodeId) => (x === id ? next.id : x)
   // Renamed links get new ids; parallel ones are numbered again in file order (D29).
@@ -135,10 +161,12 @@ export function updateRouter(t: Topology, id: NodeId, patch: RouterPatch): EditR
           taken.add(newId)
           return { ...l, a, b, id: newId }
         })
-  return {
-    ok: true,
-    topology: { ...t, nodes: t.nodes.map((n) => (n.id === id ? next : n)), links },
-  }
+  const nodes = t.nodes.map((n) => {
+    const me = n.id === id ? next : n
+    if (next.id === id || me.lfaExclude === undefined) return me
+    return withExclude(me, me.lfaExclude.map(rename).sort())
+  })
+  return { ok: true, topology: { ...t, nodes, links } }
 }
 
 export interface LinkPatch {
@@ -182,6 +210,8 @@ export interface TopologyPatch {
   srgbBase?: number
   /** Max SID depth of every router; null = no limit (D44). */
   msd?: number | null
+  /** Merged into the LFA policy; `prefer` is the default, so it is not stored (D45). */
+  lfaPolicy?: LfaPolicy
 }
 
 export function updateTopology(t: Topology, patch: TopologyPatch): EditResult {
@@ -196,6 +226,16 @@ export function updateTopology(t: Topology, patch: TopologyPatch): EditResult {
   else if (patch.msd !== undefined) {
     if (!isWhole(patch.msd, MIN_MSD, MAX_MSD)) return { ok: false, error: msdError }
     next.msd = patch.msd
+  }
+  if (patch.lfaPolicy !== undefined) {
+    const merged: LfaPolicy = { ...t.lfaPolicy, ...patch.lfaPolicy }
+    const policy: LfaPolicy = {}
+    if (merged.nodeProtecting !== undefined && merged.nodeProtecting !== 'prefer')
+      policy.nodeProtecting = merged.nodeProtecting
+    if (merged.downstream !== undefined && merged.downstream !== 'prefer')
+      policy.downstream = merged.downstream
+    if (Object.keys(policy).length === 0) delete next.lfaPolicy
+    else next.lfaPolicy = policy
   }
   return { ok: true, topology: next }
 }

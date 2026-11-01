@@ -15,6 +15,11 @@ export interface RouterNode {
    * (RFC 8491 §5). Overrides the network's `msd`; left out = the network's value.
    */
   msd?: number
+  /**
+   * Neighbors this router never uses as an LFA (RFC 7916 §6.2.4.4: exclude a specific
+   * alternate). Every link to them is skipped. Ids of routers, sorted, no duplicates.
+   */
+  lfaExclude?: NodeId[]
   /** UI only; the engine ignores it. */
   pos?: { x: number; y: number }
 }
@@ -39,9 +44,27 @@ export interface Topology {
   srgbBase: number
   /** Max SID depth of every router without its own `msd` (RFC 8491 §5). Left out = no limit. */
   msd?: number
+  /** How every router picks its LFA (RFC 7916 §6.2). Left out = the D7 order. */
+  lfaPolicy?: LfaPolicy
   nodes: RouterNode[]
   /** Point-to-point. Two routers may have several links (parallel links, D29); each has its own id. */
   links: Link[]
+}
+
+/**
+ * How one LFA criterion is used (RFC 7916 §6.2: "each criterion having a level of preference"):
+ * - `prefer`: ranks candidates that pass it first (the default, D7)
+ * - `require`: candidates that fail it are not used at all
+ * - `ignore`: it plays no part in the choice
+ */
+export type LfaPreference = 'prefer' | 'require' | 'ignore'
+
+/** LFA selection policy (RFC 7916 §6.2). Left-out fields are `prefer`. */
+export interface LfaPolicy {
+  /** Inequality 3 (RFC 5286 §3.2; RFC 7916 §6.2.2). */
+  nodeProtecting?: LfaPreference
+  /** Inequality 2 (RFC 5286 §1; RFC 7916 §6.2.3). */
+  downstream?: LfaPreference
 }
 
 export type Segment =
@@ -59,6 +82,8 @@ export interface LfaCandidate {
   nodeProtecting: boolean
   /** c(S,N) + dist(N,D) */
   cost: number
+  /** Loop-free, but a `require` in S's LFA policy rules it out (RFC 7916 §6.2). */
+  policyRejected?: 'not-node-protecting' | 'not-downstream'
 }
 
 export interface ExplainStep {
@@ -75,7 +100,13 @@ export interface Protection {
   protectedLink: { from: NodeId; to: NodeId; id: string }
   ecmpProtected: boolean
   /** `best` is the chosen neighbor, `bestLink` the link S uses to reach it. */
-  lfa: { candidates: LfaCandidate[]; best?: NodeId; bestLink?: string }
+  lfa: {
+    candidates: LfaCandidate[]
+    best?: NodeId
+    bestLink?: string
+    /** Neighbors S's LFA policy never uses (RFC 7916 §6.2.4.4); left out when none. */
+    excluded?: NodeId[]
+  }
   /** RFC 7490 link protection. S and E never appear in any space (D17). */
   rlfa: {
     pSpace: NodeId[]

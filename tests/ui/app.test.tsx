@@ -116,6 +116,63 @@ describe('App smoke test', () => {
     await vi.waitFor(async () => expect((await rowFor('E')).textContent).toContain('✓ TI-LFA'))
   })
 
+  it('Example 1 LFA policy: excluding N or requiring a downstream LFA changes the backup (D45)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'square')
+    expect((await rowFor('D')).textContent).toContain('✓ LFA')
+
+    // S never uses N: no LFA left for S→D, Remote LFA takes over.
+    act(() => useStore.getState().select({ kind: 'node', id: 'S' }))
+    await user.type(screen.getByLabelText('Never use as LFA'), 'N{Enter}')
+    expect(useStore.getState().topology.nodes.find((n) => n.id === 'S')!.lfaExclude).toEqual(['N'])
+    await vi.waitFor(async () => expect((await rowFor('D')).textContent).toContain('✓ Remote LFA'))
+    await user.click(await rowFor('D'))
+    const details = screen.getByRole('region', { name: 'Details' })
+    expect(details.textContent).toContain("Not used, by S's LFA policy: N.")
+    expect(details.textContent).toContain("skipped, S's policy never uses N as an alternate")
+
+    // Clear it, then require node protection: N passes, so LFA is back.
+    act(() => useStore.getState().select({ kind: 'node', id: 'S' }))
+    await user.clear(screen.getByLabelText('Never use as LFA'))
+    await user.tab()
+    expect(useStore.getState().topology.nodes.find((n) => n.id === 'S')).not.toHaveProperty(
+      'lfaExclude',
+    )
+    act(() => useStore.getState().select(null))
+    await user.selectOptions(screen.getByLabelText('Node-protecting LFAs'), 'require')
+    expect(useStore.getState().topology.lfaPolicy).toEqual({ nodeProtecting: 'require' })
+    await vi.waitFor(async () => expect((await rowFor('D')).textContent).toContain('✓ LFA'))
+    await user.selectOptions(screen.getByLabelText('Node-protecting LFAs'), 'prefer')
+    expect(useStore.getState().topology).not.toHaveProperty('lfaPolicy')
+  })
+
+  it('LFA policy effect line: says when nothing changes, and lists what does (D45)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'ring5')
+    await rowFor('E')
+    expect(screen.queryByRole('status', { name: 'LFA policy effect' })).toBeNull()
+
+    // Ring: both LFAs are node-protecting already, so "require" changes nothing for S.
+    await user.selectOptions(screen.getByLabelText('Node-protecting LFAs'), 'require')
+    await vi.waitFor(() =>
+      expect(screen.getByRole('status', { name: 'LFA policy effect' }).textContent).toBe(
+        'No effect for S: it picks the same LFAs as with the default policy.',
+      ),
+    )
+
+    // Example 6: S's LFAs for D and M are only link-protecting.
+    await user.selectOptions(screen.getByLabelText('Load an example'), 'link-protecting')
+    await rowFor('D')
+    await user.selectOptions(screen.getByLabelText('Node-protecting LFAs'), 'require')
+    await vi.waitFor(() =>
+      expect(screen.getByRole('status', { name: 'LFA policy effect' }).textContent).toBe(
+        "Changes S's LFA for 2 destinations: D (N → none), M (E → none).",
+      ),
+    )
+  })
+
   it('Example 3 packet walk: steps router by router with the label stack, PHP on and off', async () => {
     const user = userEvent.setup()
     render(<App />)

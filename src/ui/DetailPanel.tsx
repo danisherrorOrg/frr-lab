@@ -153,6 +153,11 @@ export function DetailPanel({
           ECMP-protected: another primary next hop avoids link {sE}.
         </p>
       )}
+      {p.lfa.excluded && (
+        <p className="text-slate-500">
+          Not used, by {source}&apos;s LFA policy: {p.lfa.excluded.join(', ')}.
+        </p>
+      )}
       {p.lfa.candidates.length === 0 ? (
         <p className="text-slate-500">No other neighbors to try.</p>
       ) : (
@@ -173,7 +178,7 @@ export function DetailPanel({
                 </td>
                 <td className="pr-3">{c.cost}</td>
                 <td className="pr-3">
-                  {c.loopFree ? '✓' : '✗'} {lfaTags(c)}
+                  {c.loopFree && c.policyRejected === undefined ? '✓' : '✗'} {lfaTags(c)}
                 </td>
               </tr>
             ))}

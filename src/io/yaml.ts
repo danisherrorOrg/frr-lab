@@ -1,9 +1,11 @@
 import { CORE_SCHEMA, dump, load } from 'js-yaml'
-import type { Link, NodeId, RouterNode, Topology } from '../engine/types'
+import type { LfaPolicy, LfaPreference, Link, NodeId, RouterNode, Topology } from '../engine/types'
 import {
   DEFAULT_SRGB_BASE,
   ID_PATTERN,
   KEY_ALIASES,
+  LFA_POLICY_FIELDS,
+  LFA_PREFERENCES,
   LINK_FIELDS,
   MAX_LABEL,
   MAX_METRIC,
@@ -76,15 +78,69 @@ export function parseTopology(text: string): ParseResult {
     else errors.push(`"msd" ${msdRule}`)
   }
 
+  const lfaPolicy = parseLfaPolicy(doc.lfa_policy, errors)
   const { nodes, declared } = parseNodes(doc.nodes, errors)
   const links = parseLinks(doc.links, declared, errors)
 
   if (errors.length > 0) return { ok: false, errors }
   return {
     ok: true,
-    topology: { name, srgbBase, ...(msd !== undefined && { msd }), nodes, links },
-    warnings: connectivityWarnings(nodes, links),
+    topology: {
+      name,
+      srgbBase,
+      ...(msd !== undefined && { msd }),
+      ...(lfaPolicy !== undefined && { lfaPolicy }),
+      nodes,
+      links,
+    },
+    warnings: [...connectivityWarnings(nodes, links), ...excludeWarnings(nodes, links)],
   }
+}
+
+const isPreference = (v: unknown): v is LfaPreference =>
+  (LFA_PREFERENCES as readonly unknown[]).includes(v)
+
+/** `lfa_policy: { node_protecting: require, downstream: ignore }` (RFC 7916 §6.2, D45). */
+function parseLfaPolicy(raw: unknown, errors: string[]): LfaPolicy | undefined {
+  if (raw === undefined || raw === null) return undefined
+  if (!isMap(raw)) {
+    errors.push(
+      '"lfa_policy" must be a mapping like { node_protecting: prefer, downstream: prefer }.',
+    )
+    return undefined
+  }
+  unknownKeys(raw, LFA_POLICY_FIELDS, (key, hint) =>
+    errors.push(`lfa_policy: unknown field "${key}". ${hint}`),
+  )
+  const policy: LfaPolicy = {}
+  for (const [key, field] of [
+    ['node_protecting', 'nodeProtecting'],
+    ['downstream', 'downstream'],
+  ] as const) {
+    const v = raw[key]
+    if (v === undefined) continue
+    if (isPreference(v)) policy[field] = v
+    else
+      errors.push(
+        `lfa_policy: "${key}" must be one of ${LFA_PREFERENCES.join(', ')}, not "${shown(v)}".`,
+      )
+  }
+  return policy
+}
+
+/** An excluded router that isn't a neighbor does nothing: say so, it is likely a mistake. */
+function excludeWarnings(nodes: RouterNode[], links: Link[]): string[] {
+  return nodes.flatMap((n) => {
+    const neighbors = new Set(
+      links.flatMap((l) => (l.a === n.id ? [l.b] : l.b === n.id ? [l.a] : [])),
+    )
+    const stray = (n.lfaExclude ?? []).filter((x) => !neighbors.has(x))
+    return stray.length === 0
+      ? []
+      : [
+          `${n.id}'s lfa_exclude lists ${stray.join(', ')}, not a neighbor of ${n.id}: it has no effect.`,
+        ]
+  })
 }
 
 const msdRule = `(max SID depth) must be a whole number from ${MIN_MSD} to ${MAX_MSD}.`
@@ -174,7 +230,7 @@ function parseNodes(
       errors.push(`${where}: must be a mapping like { id: S, sid: 1 }, not "${shown(item)}".`)
       return
     }
-    const { id, sid, name, pos, msd } = item
+    const { id, sid, name, pos, msd, lfa_exclude: exclude } = item
     const named = typeof id === 'string' && id !== '' ? `${where} (${id})` : where
     unknownKeys(item, NODE_FIELDS, (key, hint) =>
       errors.push(`${named}: unknown field "${key}". ${hint}`),
@@ -222,6 +278,15 @@ function parseNodes(
       errors.push(`${label}: "msd" ${msdRule}`)
       valid = false
     }
+    const isExclude =
+      Array.isArray(exclude) && exclude.every((x) => typeof x === 'string' && x !== '')
+    if (exclude !== undefined && !isExclude) {
+      errors.push(`${label}: "lfa_exclude" must be a list of router ids, like [B, C].`)
+      valid = false
+    } else if (isExclude && exclude.includes(id)) {
+      errors.push(`${label}: "lfa_exclude" can't list the router itself.`)
+      valid = false
+    }
     const isPos = isMap(pos) && Number.isFinite(pos.x) && Number.isFinite(pos.y)
     if (pos !== undefined && !isPos) {
       errors.push(`${label}: "pos" must look like { x: 10, y: 20 }.`)
@@ -232,9 +297,15 @@ function parseNodes(
     const node: RouterNode = { id, sidIndex: sid }
     if (typeof name === 'string') node.name = name
     if (msd !== undefined) node.msd = msd as number
+    if (isExclude && exclude.length > 0) node.lfaExclude = [...new Set(exclude as string[])].sort()
     if (isPos) node.pos = { x: pos.x as number, y: pos.y as number }
     nodes.push(node)
   })
+  for (const n of nodes) {
+    const unknown = (n.lfaExclude ?? []).filter((x) => !declared.has(x))
+    if (unknown.length > 0)
+      errors.push(`Node ${n.id}: "lfa_exclude" names ${unknown.join(', ')}, not a router in nodes.`)
+  }
   return { nodes, declared }
 }
 
@@ -347,11 +418,23 @@ export function serializeTopology(topology: Topology): string {
     name: topology.name,
     srgb_base: topology.srgbBase,
     ...(topology.msd !== undefined && { msd: topology.msd }),
+    ...(topology.lfaPolicy !== undefined &&
+      Object.keys(topology.lfaPolicy).length > 0 && {
+        lfa_policy: {
+          ...(topology.lfaPolicy.nodeProtecting !== undefined && {
+            node_protecting: topology.lfaPolicy.nodeProtecting,
+          }),
+          ...(topology.lfaPolicy.downstream !== undefined && {
+            downstream: topology.lfaPolicy.downstream,
+          }),
+        },
+      }),
     nodes: topology.nodes.map((n) => ({
       id: n.id,
       sid: n.sidIndex,
       ...(n.name !== undefined && { name: n.name }),
       ...(n.msd !== undefined && { msd: n.msd }),
+      ...(n.lfaExclude !== undefined && n.lfaExclude.length > 0 && { lfa_exclude: n.lfaExclude }),
       ...(n.pos !== undefined && { pos: { x: n.pos.x, y: n.pos.y } }),
     })),
     links: topology.links.map((l) => ({

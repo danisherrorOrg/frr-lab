@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { explainLfa } from '../../src/engine/explain'
 import { computeLfa, ecmpProtectors } from '../../src/engine/lfa'
+import { DEFAULT_LFA_POLICY } from '../../src/engine/lfa-policy'
 import { allPairs } from '../../src/engine/spf'
 import { loadFixture } from '../helpers'
 
@@ -69,6 +70,7 @@ describe('explainLfa', () => {
         candidates: [],
         checks: [],
         skipped: [{ neighbor: 'X', link: 'S-X', reason: 'max-metric' }],
+        policy: DEFAULT_LFA_POLICY,
       },
       { s: 'S', d: 'D', e: 'E', ecmpProtectors: [] },
     )
@@ -82,7 +84,7 @@ describe('explainLfa', () => {
 
   it('ECMP step lists the protecting next hops', () => {
     const steps = explainLfa(
-      { candidates: [], checks: [], skipped: [] },
+      { candidates: [], checks: [], skipped: [], policy: DEFAULT_LFA_POLICY },
       { s: 'S', d: 'D', e: 'E', ecmpProtectors: ['A', 'C'] },
     )
     expect(steps[0]?.text).toBe(

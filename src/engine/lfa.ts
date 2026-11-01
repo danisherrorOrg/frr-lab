@@ -1,4 +1,5 @@
 import type { Edge } from './graph'
+import { DEFAULT_LFA_POLICY, type ResolvedLfaPolicy } from './lfa-policy'
 import { avoidsLink, dist, firstLinks, type AllPairs } from './spf'
 import type { LfaCandidate, NodeId } from './types'
 
@@ -34,8 +35,13 @@ export interface LfaResult {
   candidates: LfaCandidate[]
   /** Same order as `candidates`. */
   checks: LfaCheck[]
-  /** Links left out before any check, and why. */
-  skipped: { neighbor: NodeId; link: string; reason: 'max-metric' }[]
+  /**
+   * Links left out before any check, and why: a maximum metric (RFC 5286 §3.5), or
+   * a neighbor S's policy never uses (RFC 7916 §6.2.4.4).
+   */
+  skipped: { neighbor: NodeId; link: string; reason: 'max-metric' | 'excluded' }[]
+  /** The policy the choice used (docs/02-algorithms.md §15). */
+  policy: ResolvedLfaPolicy
   best?: NodeId
   /** The link S uses to reach `best`. */
   bestLink?: string
@@ -67,6 +73,7 @@ export function primaryLink(
  * A candidate is an (outgoing link, neighbor) pair (RFC 5286 §3.6): every other link
  * out of S, other ECMP next hops included (§3.4). Another link to E itself passes
  * Inequality 1 and protects the link but never the node (§3.6 steps 7–8, D29).
+ * `policy` is S's LFA policy (RFC 7916 §6.2, §15 of 02); left out = the D7 order.
  */
 export function computeLfa(
   table: AllPairs,
@@ -74,6 +81,7 @@ export function computeLfa(
   d: NodeId,
   e: NodeId,
   linkId?: string,
+  policy: ResolvedLfaPolicy = DEFAULT_LFA_POLICY,
 ): LfaResult {
   if (s === d) throw new Error(`Source ${s} can't be its own destination.`)
   if (!table.from.has(s)) throw new Error(`Unknown source router "${s}".`)
@@ -81,7 +89,7 @@ export function computeLfa(
 
   const distSD = dist(table, s, d)
   const distED = dist(table, e, d)
-  const result: LfaResult = { candidates: [], checks: [], skipped: [] }
+  const result: LfaResult = { candidates: [], checks: [], skipped: [], policy }
 
   for (const edge of table.graph.out.get(s) ?? []) {
     const n = edge.to
@@ -89,6 +97,11 @@ export function computeLfa(
     // RFC 5286 §3.5: MUST NOT use a link whose cost or reverse cost is the maximum.
     if (edge.metric === MAX_METRIC || edge.back === MAX_METRIC) {
       result.skipped.push({ neighbor: n, link: edge.linkId, reason: 'max-metric' })
+      continue
+    }
+    // RFC 7916 §6.2.4.4: the operator can exclude a specific alternate.
+    if (policy.exclude.includes(n)) {
+      result.skipped.push({ neighbor: n, link: edge.linkId, reason: 'excluded' })
       continue
     }
     const check: LfaCheck = {
@@ -102,40 +115,66 @@ export function computeLfa(
       distED,
     }
     result.checks.push(check)
-    result.candidates.push({
+    const cand: LfaCandidate = {
       neighbor: n,
       link: edge.linkId,
       loopFree: loopFree(check.distND, check.distNS, distSD),
       downstream: downstream(check.distND, distSD),
       nodeProtecting: nodeProtecting(check.distND, check.distNE, distED),
       cost: check.cSN + check.distND,
-    })
+    }
+    const rejected = cand.loopFree ? policyRejection(cand, policy, d === e) : undefined
+    result.candidates.push(rejected === undefined ? cand : { ...cand, policyRejected: rejected })
   }
 
-  const best = bestLfaCandidate(result.candidates)
+  const best = bestLfaCandidate(result.candidates, policy)
   return best === undefined ? result : { ...result, best: best.neighbor, bestLink: best.link }
 }
 
 /**
- * Best LFA among the loop-free candidates (D7, RFC 5286 §1 and §3.6):
- * node-protecting → downstream → lowest c(S,N) + dist(N,D) → lowest router ID
- * → lowest link id (D29).
+ * Why a `require` in the policy rules out a loop-free candidate, if it does.
+ * Node protection can't apply when D is E itself (§4.4 of 02), so then it is not
+ * required: RFC 7916 §6.2.2 falls back to link protection.
  */
-export function chooseBestLfa(candidates: LfaCandidate[]): NodeId | undefined {
-  return bestLfaCandidate(candidates)?.neighbor
+function policyRejection(
+  c: LfaCandidate,
+  policy: ResolvedLfaPolicy,
+  destIsE: boolean,
+): LfaCandidate['policyRejected'] {
+  if (policy.nodeProtecting === 'require' && !destIsE && !c.nodeProtecting)
+    return 'not-node-protecting'
+  if (policy.downstream === 'require' && !c.downstream) return 'not-downstream'
+  return undefined
 }
 
-function bestLfaCandidate(candidates: LfaCandidate[]): LfaCandidate | undefined {
+/**
+ * Best LFA among the loop-free candidates no policy rule rules out (D7, RFC 5286 §1
+ * and §3.6): node-protecting → downstream → lowest c(S,N) + dist(N,D) → lowest
+ * router ID → lowest link id (D29). An `ignore` in the policy skips that step.
+ */
+export function chooseBestLfa(
+  candidates: LfaCandidate[],
+  policy: ResolvedLfaPolicy = DEFAULT_LFA_POLICY,
+): NodeId | undefined {
+  return bestLfaCandidate(candidates, policy)?.neighbor
+}
+
+function bestLfaCandidate(
+  candidates: LfaCandidate[],
+  policy: ResolvedLfaPolicy,
+): LfaCandidate | undefined {
   let best: LfaCandidate | undefined
   for (const c of candidates) {
-    if (c.loopFree && (best === undefined || betterLfa(c, best))) best = c
+    if (!c.loopFree || c.policyRejected !== undefined) continue
+    if (best === undefined || betterLfa(c, best, policy)) best = c
   }
   return best
 }
 
-function betterLfa(a: LfaCandidate, b: LfaCandidate): boolean {
-  if (a.nodeProtecting !== b.nodeProtecting) return a.nodeProtecting
-  if (a.downstream !== b.downstream) return a.downstream
+function betterLfa(a: LfaCandidate, b: LfaCandidate, policy: ResolvedLfaPolicy): boolean {
+  if (policy.nodeProtecting !== 'ignore' && a.nodeProtecting !== b.nodeProtecting)
+    return a.nodeProtecting
+  if (policy.downstream !== 'ignore' && a.downstream !== b.downstream) return a.downstream
   if (a.cost !== b.cost) return a.cost < b.cost
   if (a.neighbor !== b.neighbor) return a.neighbor < b.neighbor
   return a.link < b.link

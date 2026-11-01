@@ -159,6 +159,42 @@ describe('updateRouter: max SID depth', () => {
   })
 })
 
+describe('LFA policy edits (D45)', () => {
+  it('stores only what differs from "prefer"', () => {
+    const t = ok(updateTopology(square(), { lfaPolicy: { nodeProtecting: 'require' } }))
+    expect(t.lfaPolicy).toEqual({ nodeProtecting: 'require' })
+    const both = ok(updateTopology(t, { lfaPolicy: { downstream: 'ignore' } }))
+    expect(both.lfaPolicy).toEqual({ nodeProtecting: 'require', downstream: 'ignore' })
+    const back = ok(
+      updateTopology(both, { lfaPolicy: { nodeProtecting: 'prefer', downstream: 'prefer' } }),
+    )
+    expect(back).not.toHaveProperty('lfaPolicy')
+  })
+
+  it("sets a router's exclude list: sorted, no duplicates, empty clears it", () => {
+    const t = ok(updateRouter(square(), 'S', { lfaExclude: ['N', ' E ', 'N', ''] }))
+    expect(t.nodes.find((n) => n.id === 'S')!.lfaExclude).toEqual(['E', 'N'])
+    const cleared = ok(updateRouter(t, 'S', { lfaExclude: [''] }))
+    expect(cleared.nodes.find((n) => n.id === 'S')).not.toHaveProperty('lfaExclude')
+  })
+
+  it('rejects unknown routers and the router itself', () => {
+    expect(updateRouter(square(), 'S', { lfaExclude: ['X'] })).toEqual({
+      ok: false,
+      error: 'No router called X.',
+    })
+    expect(updateRouter(square(), 'S', { lfaExclude: ['S'] })).toMatchObject({ ok: false })
+  })
+
+  it("renaming or deleting a router updates the other routers' lists", () => {
+    const t = ok(updateRouter(square(), 'S', { lfaExclude: ['N', 'E'] }))
+    const renamed = ok(updateRouter(t, 'N', { id: 'Z' }))
+    expect(renamed.nodes.find((n) => n.id === 'S')!.lfaExclude).toEqual(['E', 'Z'])
+    const gone = deleteRouter(deleteRouter(renamed, 'Z'), 'E')
+    expect(gone.nodes.find((n) => n.id === 'S')).not.toHaveProperty('lfaExclude')
+  })
+})
+
 describe('withPositions', () => {
   it('places routers without a position on a circle and keeps the others', () => {
     const t: Topology = {

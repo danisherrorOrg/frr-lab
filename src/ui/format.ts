@@ -143,10 +143,16 @@ export function lfaTags(c: {
   loopFree: boolean
   downstream: boolean
   nodeProtecting: boolean
+  policyRejected?: 'not-node-protecting' | 'not-downstream'
 }): string {
   if (!c.loopFree) return 'not loop-free'
   const tags = [c.nodeProtecting ? 'node-protecting' : 'link-protecting']
   if (c.downstream) tags.push('downstream')
+  // RFC 7916 §6.2: a "require" in the LFA policy rules it out.
+  if (c.policyRejected !== undefined)
+    tags.push(
+      `ruled out by policy (${c.policyRejected === 'not-node-protecting' ? 'node protection' : 'downstream'} required)`,
+    )
   return tags.join(', ')
 }
 

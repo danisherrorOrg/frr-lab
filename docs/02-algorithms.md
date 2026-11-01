@@ -55,6 +55,8 @@ For S, destination D, primary next hop E, and every other neighbor N of S (other
 4. then lowest router ID
 5. then lowest link id (only matters for parallel links, §9)
 
+The LFA policy (§15, RFC 7916) can turn steps 1 and 2 into hard rules or switch them off, and can exclude neighbors.
+
 ---
 
 ## 3. Remote LFA (RFC 7490): link protection
@@ -517,3 +519,59 @@ Worked checks (Example 3, `msd: 2`):
 | Simulation, S–E down, TI-LFA mode | | traffic to C and E dropped at S, reason `too-deep` |
 
 A property test (random networks, MSD 2 to 4) checks that `tilfa + tooDeep` equals the TI-LFA count with no limit, that the other counts don't change, and that a repair is `tooDeep` exactly when its stack is longer than the MSD.
+
+---
+
+## 15. LFA policy (TODO backlog, D45)
+RFC 7916 §6.2 asks for "policy-based alternate selection": the operator decides which criteria count and how much. LFA Lab models the three knobs most often used:
+
+| Knob | Where | Values | RFC 7916 |
+|---|---|---|---|
+| Node-protecting (Inequality 3) | `lfa_policy.node_protecting`, whole network | `prefer` (default), `require`, `ignore` | §6.2.2: node protection preferred, fall back to link protection |
+| Downstream (Inequality 2) | `lfa_policy.downstream`, whole network | `prefer` (default), `require`, `ignore` | §6.2.3: preference for downstream "SHOULD be configurable" |
+| Exclude a neighbor | `lfa_exclude: [B]` on router S | router ids | §6.2.4.4: "exclude a specific alternate" |
+
+**How they change §2:**
+- **Exclude:** every link from S to an excluded neighbor is skipped before any check, like a max-metric link (reason `excluded`). It is listed apart, not as a candidate.
+- **`require`:** a loop-free candidate that fails the inequality is kept and shown with its numbers but marked `policyRejected` (`not-node-protecting` or `not-downstream`) and never chosen. If no candidate is left, there is no LFA, so Remote LFA is used (§3) as for any destination without an LFA.
+- **`ignore`:** that step of the best-LFA order is skipped. The others keep their order: node-protecting → downstream → lowest cost → router ID → link id.
+- **`prefer`:** the default order of §2. With both knobs on `prefer` and nothing excluded, every result is the same as before.
+- **D = E:** node protection can't apply when the destination is the next-hop router itself (§4.4), so `require` doesn't rule anything out for it: RFC 7916 §6.2.2 falls back to link protection.
+
+**What it doesn't change:**
+- ECMP protection (§1.4): another primary next hop is normal forwarding, not an alternate, so an excluded neighbor still counts as an ECMP protector.
+- Remote LFA and TI-LFA: RFC 7916 is about picking among LFAs. The RLFA tunnel exit and the TI-LFA post-convergence path ignore the policy. RLFA is only *used more often* when the policy leaves no LFA.
+- The preference knobs are per network; only the exclude list is per router. RFC 7916 also lists SRLG, link colour and bandwidth criteria; they are not modelled.
+
+**Explain steps:** a non-default policy adds a first step `S's LFA policy: node-protecting preferred, downstream required, never use A` (RFC 7916 §6.2); an excluded neighbor gives `Via A: skipped, S's policy never uses A as an alternate`; a ruled-out candidate gives `Via B: loop-free, but not downstream, and the policy requires downstream ✗` after its three inequality steps; with nothing left, `No LFA: the loop-free neighbors of S for D are ruled out by the LFA policy`.
+
+**Effect line:** most networks give few choices, so a knob often changes nothing for a router. `lfaPolicyEffect()` compares one source's results without the policy (`withoutLfaPolicy()`) and with it, and lists each (D, protected link) whose chosen LFA changes. The properties panel shows it under the knobs for the source router, and under a router's exclude list for that router: `No effect for S: it picks the same LFAs as with the default policy.` or `Changes S's LFA for 2 destinations: D (N → none), M (E → none).` (Example 6, `node_protecting: require`).
+
+### Worked example
+```
+A ─1─ E ─1─ D
+ \    |     |
+ 10   10    11
+   \  |     |
+     S ──2── B
+```
+Links: S–E 10, E–D 1, S–A 10, A–E 1, S–B 2, B–D 11. S → D: `dist(S,D) = 11` via E (via A 12, via B 13).
+
+| N | dist(N,D) | Loop-free | Downstream `< 11` | Node-protecting | Cost |
+|---|---|---|---|---|---|
+| A | 2 (A-E-D) | `2 < 10+11` ✓ | ✓ | `2 < dist(A,E)+dist(E,D) = 1+1` ✗ | 12 |
+| B | 11 (B-D) | `11 < 2+11` ✓ | ✗ | `11 < 12+1` ✓ | 13 |
+
+| Policy | Best LFA |
+|---|---|
+| default | **B** (node-protecting first) |
+| `node_protecting: ignore` | **A** (downstream next) |
+| both `ignore` | **A** (lowest cost 12) |
+| `downstream: require` | **A** (B ruled out: not downstream) |
+| `node_protecting: require` | **B** (A ruled out) |
+| both `require` | none → Remote LFA |
+| S `lfa_exclude: [B]` | **A** (B skipped) |
+| S `lfa_exclude: [A, B]` | none → Remote LFA |
+| `node_protecting: require`, S → E (D = E) | **A**: node protection doesn't apply to E itself |
+
+Property tests (random networks and policies) check that the chosen LFA is always loop-free, passes every `require` and is never excluded; that `prefer` / `ignore` never change the LFA count and `require` only lowers it; and that the TI-LFA count never changes.

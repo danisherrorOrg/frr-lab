@@ -1,8 +1,9 @@
 import { hopText, isBundle, linkText, type Graph } from './graph'
 import { MAX_METRIC, type LfaCheck, type LfaResult } from './lfa'
+import { isDefaultLfaPolicy, type ResolvedLfaPolicy } from './lfa-policy'
 import type { RlfaResult } from './rlfa'
 import type { SegmentCheck, TilfaResult } from './tilfa'
-import type { ExplainStep, NodeId, Segment } from './types'
+import type { ExplainStep, LfaCandidate, NodeId, Segment } from './types'
 
 const mark = (ok: boolean) => (ok ? '✓' : '✗')
 const num = (x: number) => (Number.isFinite(x) ? String(x) : '∞')
@@ -29,25 +30,68 @@ export interface LfaContext {
 export function explainLfa(result: LfaResult, ctx: LfaContext): ExplainStep[] {
   const { s, d, e, graph } = ctx
   const steps: ExplainStep[] = []
+  if (!isDefaultLfaPolicy(result.policy)) steps.push(policyStep(s, result.policy))
 
   for (const skip of result.skipped) {
-    steps.push({
-      rule: 'LFA skipped',
-      text: `Via ${hopText(graph, s, skip.neighbor, skip.link)}: skipped, link ${linkText(graph, s, skip.neighbor, skip.link)} has the maximum metric ${MAX_METRIC}`,
-      ok: false,
-      rfc: 'RFC 5286 §3.5',
-    })
+    const via = hopText(graph, s, skip.neighbor, skip.link)
+    steps.push(
+      skip.reason === 'excluded'
+        ? {
+            rule: 'LFA skipped',
+            text: `Via ${via}: skipped, ${s}'s policy never uses ${skip.neighbor} as an alternate`,
+            ok: false,
+            rfc: 'RFC 7916 §6.2.4.4',
+          }
+        : {
+            rule: 'LFA skipped',
+            text: `Via ${via}: skipped, link ${linkText(graph, s, skip.neighbor, skip.link)} has the maximum metric ${MAX_METRIC}`,
+            ok: false,
+            rfc: 'RFC 5286 §3.5',
+          },
+    )
   }
 
   result.checks.forEach((c, i) => {
     const cand = result.candidates[i]
     if (cand === undefined) return
     steps.push(...candidateSteps(c, { s, d, e, graph }, cand))
+    if (cand.policyRejected !== undefined) steps.push(rejectedStep(cand, via(graph, s, cand)))
   })
 
   steps.push(ecmpStep(ctx))
   steps.push(bestStep(result, ctx))
   return steps
+}
+
+const via = (graph: Graph | undefined, s: NodeId, c: LfaCandidate) =>
+  hopText(graph, s, c.neighbor, c.link)
+
+const PREF_TEXT = { prefer: 'preferred', require: 'required', ignore: 'ignored' } as const
+
+/** "S's LFA policy: node-protecting required, downstream preferred, never use B". */
+function policyStep(s: NodeId, p: ResolvedLfaPolicy): ExplainStep {
+  const parts = [
+    `node-protecting ${PREF_TEXT[p.nodeProtecting]}`,
+    `downstream ${PREF_TEXT[p.downstream]}`,
+    ...(p.exclude.length > 0 ? [`never use ${p.exclude.join(', ')}`] : []),
+  ]
+  return {
+    rule: 'LFA policy',
+    text: `${s}'s LFA policy: ${parts.join(', ')}`,
+    ok: true,
+    rfc: 'RFC 7916 §6.2',
+  }
+}
+
+function rejectedStep(c: LfaCandidate, viaText: string): ExplainStep {
+  const node = c.policyRejected === 'not-node-protecting'
+  const what = node ? 'node-protecting' : 'downstream'
+  return {
+    rule: 'LFA policy',
+    text: `Via ${viaText}: loop-free, but not ${what}, and the policy requires ${node ? 'node protection' : 'downstream'} ✗`,
+    ok: false,
+    rfc: node ? 'RFC 7916 §6.2.2' : 'RFC 7916 §6.2.3',
+  }
 }
 
 function candidateSteps(
@@ -104,6 +148,13 @@ function bestStep(result: LfaResult, { s, d, graph }: LfaContext): ExplainStep {
   const best = result.candidates[i]
   const check = result.checks[i]
   if (best === undefined || check === undefined) {
+    if (result.candidates.some((c) => c.loopFree && c.policyRejected !== undefined))
+      return {
+        rule: 'Best LFA',
+        text: `No LFA: the loop-free neighbors of ${s} for ${d} are ruled out by the LFA policy`,
+        ok: false,
+        rfc: 'RFC 7916 §6.2',
+      }
     return {
       rule: 'Best LFA',
       text: `No LFA: no neighbor of ${s} passes Inequality 1 for ${d}`,

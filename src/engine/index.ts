@@ -8,6 +8,7 @@ import {
 } from './coverage'
 import { explainLfa, explainRlfa, explainTilfa } from './explain'
 import { computeLfa, ecmpProtectorLinks } from './lfa'
+import { lfaPolicyOf } from './lfa-policy'
 import { msdOf } from './msd'
 import { computeRlfa, rlfaForProtection, type RlfaResult } from './rlfa'
 import { toRows, type SourceRows } from './rows'
@@ -38,6 +39,8 @@ export function computeForSource(
   const withExplain = options.explain ?? true
   // The PLR's own limit: S is the router that imposes the repair (RFC 8491 §5, D44).
   const msd = msdOf(topology, source)
+  // S's own LFA policy (RFC 7916 §6.2, D45).
+  const policy = lfaPolicyOf(topology, source)
 
   // RLFA depends only on the protected link, not on D (RFC 7490 §5.2.1.3): once per link.
   const rlfaByLink = new Map<string, RlfaResult>()
@@ -60,7 +63,10 @@ export function computeForSource(
     const protections = firstLinks(table, source, d).map((edge): Protection => {
       const e = edge.to
       const link = edge.linkId
-      const lfa = computeLfa(table, source, d, e, link)
+      const lfa = computeLfa(table, source, d, e, link, policy)
+      const excluded = [
+        ...new Set(lfa.skipped.filter((x) => x.reason === 'excluded').map((x) => x.neighbor)),
+      ]
       const ecmp = ecmpProtectorLinks(table, source, d, e, link)
       const rlfa = rlfaFor(e, link)
       const tilfa = computeTilfa(topology, source, d, e, link)
@@ -83,10 +89,11 @@ export function computeForSource(
       return {
         protectedLink: { from: source, to: e, id: link },
         ecmpProtected: ecmp.length > 0,
-        lfa:
-          lfa.best === undefined
-            ? { candidates: lfa.candidates }
-            : { candidates: lfa.candidates, best: lfa.best, bestLink: lfa.bestLink! },
+        lfa: {
+          candidates: lfa.candidates,
+          ...(lfa.best !== undefined && { best: lfa.best, bestLink: lfa.bestLink! }),
+          ...(excluded.length > 0 && { excluded }),
+        },
         rlfa: rlfaForProtection(rlfa, lfa.best),
         tilfa: tilfaForProtection(tilfa, msd),
         explain,
@@ -156,6 +163,17 @@ export type {
 } from './coverage'
 export { percent } from './coverage'
 export { isTooDeep, msdOf } from './msd'
+export {
+  DEFAULT_LFA_POLICY,
+  hasLfaPolicy,
+  isDefaultLfaPolicy,
+  lfaPolicyEffect,
+  lfaPolicyOf,
+  withoutLfaPolicy,
+  type LfaPolicyChange,
+  type LfaPolicyEffect,
+  type ResolvedLfaPolicy,
+} from './lfa-policy'
 export { protectedBy, toRows, type Method, type ResultRow, type SourceRows } from './rows'
 export {
   hopLinks,

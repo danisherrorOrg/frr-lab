@@ -5,6 +5,7 @@ import { edgeOf } from './graph'
 import { prefixLabel } from './labels'
 import { computeLfa, ecmpProtectorLinks, primaryLink } from './lfa'
 import { hopLinks, lfaPath, rlfaPath } from './paths'
+import { lfaPolicyOf } from './lfa-policy'
 import { isTooDeep, msdOf } from './msd'
 import { computeRlfa } from './rlfa'
 import type { Method } from './rows'
@@ -143,7 +144,7 @@ export function compareBackups(
         }
 
   // LFA (RFC 5286): S just sends to N, so the packet keeps D's own label.
-  const lfa = computeLfa(table, s, d, e, link)
+  const lfa = computeLfa(table, s, d, e, link, lfaPolicyOf(topology, s))
   const lfaCand = lfa.candidates.find((c) => c.link === lfa.bestLink)
   const lfaRoute =
     lfa.best === undefined ? undefined : route(lfaPath(table, s, lfa.best, d)!, lfa.bestLink)

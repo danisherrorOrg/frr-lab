@@ -259,7 +259,7 @@ describe('parseTopology: errors that help fix the file', () => {
   it('lists the allowed keys when there is no close match', () => {
     const errors = errorsOf('name: t\nnodes: []\ncolour: red\n')
     expect(errors).toContainEqual(
-      'Unknown key "colour". Allowed keys: name, srgb_base, msd, nodes, links.',
+      'Unknown key "colour". Allowed keys: name, srgb_base, msd, lfa_policy, nodes, links.',
     )
   })
 
@@ -347,6 +347,71 @@ links:
     expect(errorsOf('name: t\nnodes:\n  - { id: S, sid: 1, msd: 300 }\n')).toContainEqual(
       'Node #1 (S): "msd" (max SID depth) must be a whole number from 2 to 255.',
     )
+  })
+})
+
+describe('parseTopology: LFA policy (D45)', () => {
+  const net = (extra: string, s = '') => `name: t
+${extra}
+nodes:
+  - { id: S, sid: 1${s} }
+  - { id: E, sid: 2 }
+  - { id: N, sid: 3 }
+links:
+  - { a: S, b: E, metric: 1 }
+  - { a: S, b: N, metric: 1 }
+`
+
+  it("reads lfa_policy and a router's lfa_exclude (sorted, no duplicates)", () => {
+    const topo = expectOk(
+      parseTopology(
+        net(
+          'lfa_policy: { node_protecting: require, downstream: ignore }',
+          ', lfa_exclude: [N, E, N]',
+        ),
+      ),
+    )
+    expect(topo.lfaPolicy).toEqual({ nodeProtecting: 'require', downstream: 'ignore' })
+    expect(topo.nodes[0]!.lfaExclude).toEqual(['E', 'N'])
+    expect(topo.nodes[1]).not.toHaveProperty('lfaExclude')
+  })
+
+  it('flags bad values, unknown fields, unknown routers and the router itself', () => {
+    expect(errorsOf(net('lfa_policy: { downstream: always }'))).toContainEqual(
+      'lfa_policy: "downstream" must be one of prefer, require, ignore, not "always".',
+    )
+    expect(errorsOf(net('lfa_policy: { node_protection: require }'))).toContainEqual(
+      'lfa_policy: unknown field "node_protection". Did you mean "node_protecting"?',
+    )
+    expect(errorsOf(net('lfa_policy: require'))).toContainEqual(
+      '"lfa_policy" must be a mapping like { node_protecting: prefer, downstream: prefer }.',
+    )
+    expect(errorsOf(net('', ', lfa_exclude: [X]'))).toContainEqual(
+      'Node S: "lfa_exclude" names X, not a router in nodes.',
+    )
+    expect(errorsOf(net('', ', lfa_exclude: [S]'))).toContainEqual(
+      'Node #1 (S): "lfa_exclude" can\'t list the router itself.',
+    )
+    expect(errorsOf(net('', ', lfa_exclude: N'))).toContainEqual(
+      'Node #1 (S): "lfa_exclude" must be a list of router ids, like [B, C].',
+    )
+  })
+
+  it('warns when an excluded router is not a neighbor', () => {
+    const r = parseTopology(
+      net('').replace('{ id: N, sid: 3 }', '{ id: N, sid: 3, lfa_exclude: [E] }'),
+    )
+    expect(r.ok && r.warnings).toContainEqual(
+      "N's lfa_exclude lists E, not a neighbor of N: it has no effect.",
+    )
+  })
+
+  it('round-trips through serializeTopology', () => {
+    const topo = expectOk(
+      parseTopology(net('lfa_policy: { downstream: require }', ', lfa_exclude: [N]')),
+    )
+    expect(expectOk(parseTopology(serializeTopology(topo)))).toEqual(topo)
+    expect(serializeTopology(topo)).toContain('lfa_exclude:')
   })
 })
 

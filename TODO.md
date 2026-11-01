@@ -302,7 +302,7 @@ Things that fit the "learn and check FRR" goal and stay offline / no backend.
 - [x] Coverage heat-map on the canvas: colour links / routers by how well they are protected *(D42, `02-algorithms.md` §12)*
 - [x] What-if diff: change a metric and see coverage before vs after ("LFA 60% → 80%") *(D43, `02-algorithms.md` §13)*
 - [x] Max SID depth (MSD) setting: flag TI-LFA repairs whose label stack is too deep for the hardware *(D44, `02-algorithms.md` §14)*
-- [ ] LFA policy knobs (RFC 7916): prefer node-protecting, prefer downstream, exclude a neighbor
+- [x] LFA policy knobs (RFC 7916): prefer node-protecting, prefer downstream, exclude a neighbor *(D45, `02-algorithms.md` §15)*
 - [ ] Overload bit / max-metric router: excluded from transit, see how coverage changes
 - [ ] Find the weakest spots: links or routers whose failure leaves the most destinations unprotected
 

@@ -10,6 +10,8 @@ export const MAX_LABEL = 1_048_575
 // BMI-MSD is one octet (RFC 8491 §2). Below 2, even a Remote LFA tunnel (PQ + D) can't be pushed.
 export const MIN_MSD = 2
 export const MAX_MSD = 255
+// RFC 7916 §6.2: each LFA criterion has a level of preference (D45).
+export const LFA_PREFERENCES = ['prefer', 'require', 'ignore'] as const
 /** Router ids: letters, digits, "_" and "." ("-" joins the two ends in link ids, D14). */
 export const ID_PATTERN = /^[A-Za-z0-9_.]+$/
 
@@ -44,6 +46,13 @@ export const TOP_FIELDS: FieldDoc[] = [
     what: 'Max SID depth of every router',
     rule: `Whole number ${MIN_MSD} to ${MAX_MSD}: the most labels a router can put on a packet (RFC 8491). Left out = no limit. A TI-LFA repair with more labels is flagged and not counted.`,
     example: 'msd: 3',
+  },
+  {
+    key: 'lfa_policy',
+    required: false,
+    what: 'How every router picks its LFA',
+    rule: 'Optional fields node_protecting and downstream (see "LFA policy" below). Left out = prefer both.',
+    example: 'lfa_policy: { node_protecting: require, downstream: ignore }',
   },
   {
     key: 'nodes',
@@ -85,11 +94,38 @@ export const NODE_FIELDS: FieldDoc[] = [
     example: 'msd: 2',
   },
   {
+    key: 'lfa_exclude',
+    required: false,
+    what: 'Neighbors this router never uses as an LFA',
+    rule: 'A list of router ids (not the router itself). Its links to them are skipped (RFC 7916).',
+    example: 'lfa_exclude: [B]',
+  },
+  {
     key: 'pos',
     required: false,
     what: 'Place on the diagram',
     rule: 'Two numbers, x and y. Left out = placed for you.',
     example: 'pos: { x: 120, y: 40 }',
+  },
+]
+
+const prefRule = `One of ${LFA_PREFERENCES.join(', ')}. Default prefer.`
+
+/** The fields under `lfa_policy` (RFC 7916 §6.2, D45). */
+export const LFA_POLICY_FIELDS: FieldDoc[] = [
+  {
+    key: 'node_protecting',
+    required: false,
+    what: 'Use LFAs whose path avoids the next-hop router',
+    rule: `${prefRule} prefer = rank them first; require = use no other; ignore = don't care.`,
+    example: 'node_protecting: require',
+  },
+  {
+    key: 'downstream',
+    required: false,
+    what: 'Use LFAs closer to the destination than the router',
+    rule: `${prefRule} Ranked after node_protecting.`,
+    example: 'downstream: ignore',
   },
 ]
 
@@ -162,6 +198,12 @@ export const KEY_ALIASES: Record<string, string> = {
   adj_sid: 'adj_sid_ab',
   max_sid_depth: 'msd',
   bmi_msd: 'msd',
+  policy: 'lfa_policy',
+  lfa: 'lfa_policy',
+  exclude: 'lfa_exclude',
+  lfa_excludes: 'lfa_exclude',
+  node_protection: 'node_protecting',
+  node_protect: 'node_protecting',
 }
 
 /** A small file that loads, shown first in the guide. */

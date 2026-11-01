@@ -3,6 +3,7 @@ import { parseTopology, serializeTopology } from '../io/yaml'
 import {
   BLOCK_STYLE_YAML,
   DEFAULT_SRGB_BASE,
+  LFA_POLICY_FIELDS,
   LINK_FIELDS,
   MAX_LABEL,
   MAX_METRIC,
@@ -151,6 +152,7 @@ export function YamlGuide() {
           <FieldTable title="Top level" fields={TOP_FIELDS} />
           <FieldTable title="Each router (under nodes)" fields={NODE_FIELDS} />
           <FieldTable title="Each link (under links)" fields={LINK_FIELDS} />
+          <FieldTable title="LFA policy (under lfa_policy)" fields={LFA_POLICY_FIELDS} />
 
           <section>
             <h3 className="mb-1 font-semibold">Rules</h3>
