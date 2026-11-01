@@ -311,11 +311,20 @@ Things that fit the "learn and check FRR" goal and stay offline / no backend.
 
 ---
 
+## Learn guide (D60)
+
+- [x] `docs/learn/`: 14 chapters (start here, IS-IS, SPF, convergence, LFA, Remote LFA, SR primer, TI-LFA, comparison, router and multiple failures, design checks, advanced topics, using LFA Lab, practice exercises) and 4 appendices (glossary, formula cheat sheet, RFC reading guide, examples index)
+- [x] Diagrams drawn from the examples by the engine (`src/learn/diagram.ts`); `npm run learn:diagrams` writes `docs/learn/img/`; a test keeps the files in step with the engine
+- [x] **📖 Learn** in the top bar: the chapters in a panel beside the diagram; "Try it" links load the example, open the row and fail links or routers
+- [x] Tests: Markdown reader, every guide link / anchor / row / picture, diagrams up to date, the panel in the UI
+
+---
+
 ## Phase 10 – Launch (1–2 days)
 
 > **Do this last:** launch only after Phase 9 and the other planned work are done.
 
-- [ ] Pick Vercel or GitHub Pages; log it in `DECISIONS.md` (next entry: D60)
+- [ ] Pick Vercel or GitHub Pages; log it in `DECISIONS.md` (next entry: D61)
 - [ ] For GitHub Pages only: set `base` in `vite.config.ts` to the repo path so the built files load
 - [ ] Deploy the static build; check it still works offline after first load
 - [ ] Record a demo GIF; take screenshots

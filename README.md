@@ -27,6 +27,9 @@ Learning these is hard: textbooks show one or two static diagrams, and vendor to
 4. Get a **coverage report**, e.g. "LFA protects 60% of destinations, TI-LFA protects 100%".
 5. **Explain mode** shows the real numbers behind each decision, e.g. `dist(N,D)=10 < dist(N,S)+dist(S,D)=35 ✓`.
 
+## Learn the protocol
+New to Fast Reroute? Start with the **[Learn guide](docs/learn/00-start-here.md)**: IS-IS, SPF, LFA, Remote LFA, Segment Routing and TI-LFA explained from zero, with diagrams, worked examples and exercises to try in the app. In the app, the same guide opens with **📖 Learn**.
+
 ## Docs (read in this order)
 | File | What's in it |
 |---|---|
@@ -35,6 +38,7 @@ Learning these is hard: textbooks show one or two static diagrams, and vendor to
 | [docs/03-architecture.md](docs/03-architecture.md) | Tech stack, folder layout, data model, YAML format, UI layout |
 | [docs/04-roadmap.md](docs/04-roadmap.md) | Phases with checklists (the build order) |
 | [docs/05-testing.md](docs/05-testing.md) | Test plan and expected results to check the engine against |
+| [docs/learn/](docs/learn/00-start-here.md) | The Learn guide for users: the protocol from zero, with exercises (D60) |
 | [TODO.md](TODO.md) | Detailed task list to work through, phase by phase |
 | [DECISIONS.md](DECISIONS.md) | Decision log: what was chosen and why |
 | [CLAUDE.md](CLAUDE.md) | Rules for AI coding agents working in this repo |

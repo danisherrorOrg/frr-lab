@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 616 446.4" width="616" height="446.4" role="img" aria-label="Example 6 with router E down: S's LFA is N, and N's own path to D goes through E." font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+<title>Example 6 with router E down: S's LFA is N, and N's own path to D goes through E.</title>
+<defs><linearGradient id="pq-both" x1="0" x2="1" y1="0" y2="0"><stop offset="50%" stop-color="#bfdbfe"/><stop offset="50%" stop-color="#bbf7d0"/></linearGradient>
+<marker id="arrow-primary" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+<marker id="arrow-lfa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/></marker>
+<marker id="arrow-rlfa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#a16207"/></marker>
+<marker id="arrow-tilfa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker>
+<marker id="arrow-extra" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>
+</defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<polyline points="48,68 308,68" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="308,68 568,68" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="48,68 178,296.8" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="178,296.8 308,68" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="178,296.8 464,338.4" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="464,338.4 568,68" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="68,65 308,65 548,65" fill="none" stroke="#2563eb" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-primary)" opacity="0.9"/>
+<polyline points="55.3,86.9 175.4,298.3 310.6,69.5 548,70.9" fill="none" stroke="#ea580c" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="9 5" marker-end="url(#arrow-lfa)" opacity="0.9"/>
+<rect x="170.5" y="59" width="15" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="178" y="72" text-anchor="middle" font-size="12" fill="#475569">1</text>
+<rect x="430.5" y="59" width="15" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="438" y="72" text-anchor="middle" font-size="12" fill="#475569">1</text>
+<rect x="105.5" y="173.4" width="15" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="113" y="186.4" text-anchor="middle" font-size="12" fill="#475569">1</text>
+<rect x="235.5" y="173.4" width="15" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="243" y="186.4" text-anchor="middle" font-size="12" fill="#475569">1</text>
+<rect x="310" y="308.6" width="22" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="321" y="321.6" text-anchor="middle" font-size="12" fill="#475569">10</text>
+<rect x="505" y="194.2" width="22" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="516" y="207.2" text-anchor="middle" font-size="12" fill="#475569">10</text>
+<circle cx="48" cy="68" r="18" fill="#e2e8f0" stroke="#1d4ed8" stroke-width="4"/>
+<text x="48" y="73" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">S</text>
+<circle cx="308" cy="68" r="18" fill="#cbd5e1" stroke="#dc2626" stroke-width="2" stroke-dasharray="4 3"/>
+<text x="308" y="73" text-anchor="middle" font-size="14" font-weight="bold" fill="#64748b">E</text>
+<text x="326" y="54" font-size="18" font-weight="bold" fill="#dc2626">✕</text>
+<circle cx="178" cy="296.8" r="18" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+<text x="178" y="301.8" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">N</text>
+<circle cx="464" cy="338.4" r="18" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+<text x="464" y="343.4" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">M</text>
+<circle cx="568" cy="68" r="18" fill="#e2e8f0" stroke="#c2410c" stroke-width="4"/>
+<text x="568" y="73" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">D</text>
+<g transform="translate(16,390.4)"><line x1="0" y1="9" x2="28" y2="9" stroke="#2563eb" stroke-width="4"/><text x="36" y="13" font-size="12" fill="#0f172a">Primary path</text></g><g transform="translate(153.6,390.4)"><line x1="0" y1="9" x2="28" y2="9" stroke="#ea580c" stroke-width="4" stroke-dasharray="9 5"/><text x="36" y="13" font-size="12" fill="#0f172a">LFA backup</text></g><g transform="translate(277.6,390.4)"><circle cx="14" cy="9" r="7" fill="#e2e8f0" stroke="#1d4ed8" stroke-width="3"/><text x="36" y="13" font-size="12" fill="#0f172a">Source S</text></g><g transform="translate(388,390.4)"><circle cx="14" cy="9" r="7" fill="#e2e8f0" stroke="#c2410c" stroke-width="3"/><text x="36" y="13" font-size="12" fill="#0f172a">Destination D</text></g><g transform="translate(16,414.4)"><line x1="0" y1="9" x2="28" y2="9" stroke="#dc2626" stroke-width="4" stroke-dasharray="3 4"/><text x="36" y="13" font-size="12" fill="#0f172a">Failed</text></g>
+</svg>

@@ -38,6 +38,7 @@ A static single-page app. Two halves that never mix:
 LFA LAB/
 ├── README.md  DECISIONS.md  CLAUDE.md
 ├── docs/                    planning docs (this folder)
+│   └── learn/               the Learn guide for users (D60); img/ = SVGs from `npm run learn:diagrams`
 ├── examples/                sample topologies (YAML)
 ├── src/
 │   ├── engine/              PURE: no React, no DOM
@@ -74,6 +75,12 @@ LFA LAB/
 │   │   ├── csv.ts           coverage report → CSV text
 │   │   ├── frr.ts           FRR "show isis database detail" text → topology (§5.1)
 │   │   └── share-url.ts
+│   ├── learn/               the Learn guide in the app (D60)
+│   │   ├── markdown.ts      small Markdown reader → a block tree (no HTML strings)
+│   │   ├── chapters.ts      docs/learn/*.md bundled as text, in order
+│   │   ├── links.ts         chapter links and "Try it" links (#source=…&dest=…&fail=…)
+│   │   ├── diagram.ts       an example + highlights → SVG, from the engine's results
+│   │   └── diagrams.ts      the guide's diagrams (one spec per docs/learn/img/ file)
 │   ├── worker/
 │   │   ├── engine.worker.ts thin worker: passes messages to protocol.ts
 │   │   ├── protocol.ts      request/response messages + handler (testable in Node)
@@ -105,6 +112,7 @@ LFA LAB/
 │   │   ├── WhatIf.tsx       what-if diff: try a metric on a link or a router's overload bit, coverage before → after
 │   │   ├── WeakSpots.tsx    weakest spots: links and routers ranked by the traffic their failure leaves unprotected
 │   │   ├── Quiz.tsx         quiz mode: ten questions on this network, with the reasoning
+│   │   ├── LearnGuide.tsx   📖 Learn: the guide's chapters in a panel beside the diagram (D60)
 │   │   ├── CoverageReport.tsx
 │   │   └── PropertiesPanel.tsx  edit selected node/link
 │   ├── App.tsx  main.tsx

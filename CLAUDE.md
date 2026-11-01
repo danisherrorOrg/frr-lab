@@ -16,6 +16,7 @@ Read `README.md`, then the `docs/` files in number order, before changing anythi
 - `npm test`: unit + property tests
 - `npm run lint && npm run typecheck`
 - `npm run build`: static build into `dist/`
+- `npm run learn:diagrams`: redraw the Learn guide's SVGs in `docs/learn/img/` after an engine or example change
 
 ## Testing in the browser
 - You can use the Claude in Chrome extension (`mcp__claude-in-chrome__*` tools) to test UI changes in a real browser.

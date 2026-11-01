@@ -6,6 +6,7 @@ import type { RepairMode } from '../engine/simulate'
 import { flexTopology } from '../engine/flex-algo'
 import { levelTopology, mergeLevel, type LevelKey } from '../engine/levels'
 import type { NodeId, Topology } from '../engine/types'
+import type { TryIt } from '../learn/links'
 import * as edit from './edit'
 import { EXAMPLES, exampleTopology } from './examples'
 import { autoLayout } from './layout'
@@ -90,6 +91,8 @@ export interface AppState {
   tour: number | null
   /** The "YAML format" guide is open. */
   yamlGuide: boolean
+  /** The Learn guide (D60): open or not, and the chapter it shows (kept when closed). */
+  learn: { open: boolean; slug: string }
   /** The random topology generator dialog is open (D50). */
   generator: boolean
   /** The FRR `show isis database detail` import dialog is open (D52). */
@@ -162,6 +165,10 @@ export interface AppState {
   setNotice: (n: Notice | null) => void
   setTour: (step: number | null) => void
   setYamlGuide: (open: boolean) => void
+  /** Open or close the Learn guide, optionally at a chapter. */
+  setLearn: (open: boolean, slug?: string) => void
+  /** A "Try it" link in the guide: load the example, pick the row, fail things (D60). */
+  tryIt: (t: TryIt) => void
   setGenerator: (open: boolean) => void
   setFrrImport: (open: boolean) => void
   /** Show one IS-IS level (D56), or the whole network (null). Clears undo and failures. */
@@ -289,6 +296,7 @@ export const useStore = create<AppState>()((set, get) => {
     notice: null,
     tour: null,
     yamlGuide: false,
+    learn: { open: false, slug: '00-start-here' },
     generator: false,
     frrImport: false,
     level: null,
@@ -512,6 +520,22 @@ export const useStore = create<AppState>()((set, get) => {
     setNotice: (notice) => set({ notice }),
     setTour: (tour) => set({ tour }),
     setYamlGuide: (yamlGuide) => set({ yamlGuide }),
+    setLearn: (open, slug) => set({ learn: { open, slug: slug ?? get().learn.slug } }),
+    tryIt: (t) => {
+      const ex = EXAMPLES.find((e) => e.file === t.file)
+      if (!ex) return
+      get().loadExample(ex.key)
+      const st = get()
+      if (t.source !== undefined && st.topology.nodes.some((n) => n.id === t.source))
+        st.setSource(t.source)
+      if (t.row) get().selectRow(t.row)
+      if (t.failLinks.length > 0 || t.failNodes.length > 0) {
+        get().failOnly({ links: t.failLinks, nodes: t.failNodes })
+        // The failure view draws the row's destination (as a row click does then).
+        if (t.row) get().setSimDest(t.row.dest)
+      }
+      if (t.mode) get().setSimMode(t.mode)
+    },
     setGenerator: (generator) => set({ generator }),
     setFrrImport: (frrImport) => set({ frrImport }),
     setAlgo: (algo) => {

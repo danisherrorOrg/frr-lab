@@ -556,3 +556,13 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Not modelled:** uSID / compressed SIDs, H.Insert vs H.Encaps differences, End.X without a preceding End SID (RFC 9855 §7.2), an SRv6 packet walk (the walk and simulation labels stay SR-MPLS, and the panel says so).
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D60 – Learn guide: protocol docs in the repo and in the app (2026-11-01)
+- **Why:** goal 1 is *teach*. The app shows the numbers, but a newcomer also needs the protocol explained from zero (IS-IS, SPF, convergence, LFA, Remote LFA, Segment Routing, TI-LFA) with exercises to practise on in the app.
+- **What:** `docs/learn/`: 14 chapters and 4 appendices in Markdown, each with a diagram, a worked example with real numbers, "Try it in LFA Lab" links and self-check questions with hidden answers. **📖 Learn** in the top bar opens the same files in a panel beside the diagram (narrow or wide), so the diagram stays usable while reading.
+- **One copy:** the Markdown is bundled as text (`import.meta.glob(…, ?raw)`, like the examples) and read by a small Markdown reader (`src/learn/markdown.ts`) that turns it into React elements, never raw HTML. It knows only what the guide uses: headings, paragraphs, lists, tables, code, quotes, `<details>`, images, links.
+- **Diagrams from the engine:** `src/learn/diagram.ts` draws an example as SVG with the engine's own paths, P / Q spaces, PQ node and segment labels (`computeForSource`, `protectionPaths`). The app draws them on the fly (works offline); `npm run learn:diagrams` writes the same SVGs to `docs/learn/img/` for GitHub, and a test fails when a file no longer matches the engine.
+- **Links work in both places:** chapter links are plain `NN-name.md` (GitHub) and turn the page in the app; "Try it" links point at `../../examples/<file>.yaml` (GitHub opens the file) with `#source=…&dest=…&via=…&fail=…&down=…&mode=…`, which the app uses to load the example, open the row and fail things. A test checks every link, anchor, row, link id and picture.
+- **Other options considered:** a Markdown library such as `marked` (a new dependency, and its HTML output needs `dangerouslySetInnerHTML` plus rewriting links afterwards); screenshots of the app as diagrams (go stale when the engine or styling changes); Mermaid diagrams (needs a large library in the app, and can't show the engine's results).
+- **No new dependencies.**
+- **Status:** Accepted.

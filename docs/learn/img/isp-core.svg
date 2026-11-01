@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 616 324" width="616" height="324" role="img" aria-label="Example 4, a small ISP core: PE1 and PE2 joined through four P routers; P1–P4 costs 20 one way and 40 the other." font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+<title>Example 4, a small ISP core: PE1 and PE2 joined through four P routers; P1–P4 costs 20 one way and 40 the other.</title>
+<defs><linearGradient id="pq-both" x1="0" x2="1" y1="0" y2="0"><stop offset="50%" stop-color="#bfdbfe"/><stop offset="50%" stop-color="#bbf7d0"/></linearGradient>
+<marker id="arrow-primary" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+<marker id="arrow-lfa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/></marker>
+<marker id="arrow-rlfa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#a16207"/></marker>
+<marker id="arrow-tilfa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker>
+<marker id="arrow-extra" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>
+</defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<polyline points="48,172 204,68" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="48,172 204,276" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="204,68 204,276" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="204,68 412,68" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="204,276 412,276" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="412,68 412,276" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="204,68 412,276" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="412,68 568,172" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="412,276 568,172" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<rect x="115" y="111" width="22" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="126" y="124" text-anchor="middle" font-size="12" fill="#475569">10</text>
+<rect x="115" y="215" width="22" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="126" y="228" text-anchor="middle" font-size="12" fill="#475569">10</text>
+<rect x="193" y="163" width="22" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="204" y="176" text-anchor="middle" font-size="12" fill="#475569">30</text>
+<rect x="297" y="59" width="22" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="308" y="72" text-anchor="middle" font-size="12" fill="#475569">10</text>
+<rect x="297" y="267" width="22" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="308" y="280" text-anchor="middle" font-size="12" fill="#475569">10</text>
+<rect x="401" y="163" width="22" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="412" y="176" text-anchor="middle" font-size="12" fill="#475569">30</text>
+<rect x="279.5" y="163" width="57" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="308" y="176" text-anchor="middle" font-size="12" fill="#475569">20 / 40</text>
+<rect x="479" y="111" width="22" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="490" y="124" text-anchor="middle" font-size="12" fill="#475569">10</text>
+<rect x="479" y="215" width="22" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="490" y="228" text-anchor="middle" font-size="12" fill="#475569">10</text>
+<circle cx="48" cy="172" r="18" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+<text x="48" y="177" text-anchor="middle" font-size="11" font-weight="bold" fill="#0f172a">PE1</text>
+<circle cx="204" cy="68" r="18" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+<text x="204" y="73" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">P1</text>
+<circle cx="204" cy="276" r="18" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+<text x="204" y="281" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">P2</text>
+<circle cx="412" cy="68" r="18" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+<text x="412" y="73" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">P3</text>
+<circle cx="412" cy="276" r="18" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+<text x="412" y="281" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">P4</text>
+<circle cx="568" cy="172" r="18" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+<text x="568" y="177" text-anchor="middle" font-size="11" font-weight="bold" fill="#0f172a">PE2</text>
+
+</svg>

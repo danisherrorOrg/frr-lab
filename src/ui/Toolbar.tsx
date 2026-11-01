@@ -49,6 +49,8 @@ export function Toolbar() {
   const redo = useStore((s) => s.redo)
   const setTour = useStore((s) => s.setTour)
   const setYamlGuide = useStore((s) => s.setYamlGuide)
+  const learnOpen = useStore((s) => s.learn.open)
+  const setLearn = useStore((s) => s.setLearn)
   const setGenerator = useStore((s) => s.setGenerator)
 
   const importFile = async (file: File) => {
@@ -148,9 +150,13 @@ export function Toolbar() {
       <button
         type="button"
         className={`${button} ml-auto`}
-        onClick={() => setTour(0)}
-        title="Guided tour"
+        onClick={() => setLearn(!learnOpen)}
+        aria-pressed={learnOpen}
+        title="Learn LFA, Remote LFA and TI-LFA, with examples to try"
       >
+        📖 Learn
+      </button>
+      <button type="button" className={button} onClick={() => setTour(0)} title="Guided tour">
         ? Tour
       </button>
       <button

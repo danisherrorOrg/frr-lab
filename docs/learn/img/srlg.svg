@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 596 476" width="596" height="476" role="img" aria-label="Example 9 with SRLG protection and the duct failed: the LFA and the TI-LFA repair go via C." font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+<title>Example 9 with SRLG protection and the duct failed: the LFA and the TI-LFA repair go via C.</title>
+<defs><linearGradient id="pq-both" x1="0" x2="1" y1="0" y2="0"><stop offset="50%" stop-color="#bfdbfe"/><stop offset="50%" stop-color="#bbf7d0"/></linearGradient>
+<marker id="arrow-primary" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+<marker id="arrow-lfa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/></marker>
+<marker id="arrow-rlfa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#a16207"/></marker>
+<marker id="arrow-tilfa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker>
+<marker id="arrow-extra" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>
+</defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<polyline points="48,218 298,68" fill="none" stroke="#dc2626" stroke-width="3" stroke-dasharray="3 4"/>
+<polyline points="298,68 548,218" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="48,218 198,218" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="198,218 398,218" fill="none" stroke="#dc2626" stroke-width="3" stroke-dasharray="3 4"/>
+<polyline points="398,218 548,218" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="48,218 298,368" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="298,368 548,218" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="66.7,225.7 299.5,365.4 529.4,225.8" fill="none" stroke="#ea580c" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="9 5" marker-end="url(#arrow-lfa)" opacity="0.9"/>
+<polyline points="63.6,230.9 296.5,370.6 532.3,230.8" fill="none" stroke="#16a34a" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4 4" marker-end="url(#arrow-tilfa)" opacity="0.9"/>
+<rect x="165.5" y="134" width="15" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="173" y="147" text-anchor="middle" font-size="12" fill="#475569">1</text>
+<text x="173" y="129" text-anchor="middle" font-size="18" font-weight="bold" fill="#dc2626">✕</text>
+<rect x="415.5" y="134" width="15" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="423" y="147" text-anchor="middle" font-size="12" fill="#475569">1</text>
+<rect x="115.5" y="209" width="15" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="123" y="222" text-anchor="middle" font-size="12" fill="#475569">1</text>
+<rect x="290.5" y="209" width="15" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="298" y="222" text-anchor="middle" font-size="12" fill="#475569">1</text>
+<text x="298" y="204" text-anchor="middle" font-size="18" font-weight="bold" fill="#dc2626">✕</text>
+<rect x="465.5" y="209" width="15" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="473" y="222" text-anchor="middle" font-size="12" fill="#475569">1</text>
+<rect x="165.5" y="284" width="15" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="173" y="297" text-anchor="middle" font-size="12" fill="#475569">3</text>
+<rect x="415.5" y="284" width="15" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="423" y="297" text-anchor="middle" font-size="12" fill="#475569">3</text>
+<circle cx="48" cy="218" r="18" fill="#e2e8f0" stroke="#1d4ed8" stroke-width="4"/>
+<text x="48" y="223" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">S</text>
+<circle cx="298" cy="68" r="18" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+<text x="298" y="73" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">E</text>
+<circle cx="198" cy="218" r="18" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+<text x="198" y="223" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">A</text>
+<circle cx="398" cy="218" r="18" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+<text x="398" y="223" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">B</text>
+<circle cx="298" cy="368" r="18" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+<text x="298" y="373" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">C</text>
+<circle cx="548" cy="218" r="18" fill="#e2e8f0" stroke="#c2410c" stroke-width="4"/>
+<text x="548" y="223" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">D</text>
+<g transform="translate(16,420)"><line x1="0" y1="9" x2="28" y2="9" stroke="#ea580c" stroke-width="4" stroke-dasharray="9 5"/><text x="36" y="13" font-size="12" fill="#0f172a">LFA backup</text></g><g transform="translate(140,420)"><line x1="0" y1="9" x2="28" y2="9" stroke="#16a34a" stroke-width="4" stroke-dasharray="4 4"/><text x="36" y="13" font-size="12" fill="#0f172a">TI-LFA backup</text></g><g transform="translate(284.4,420)"><circle cx="14" cy="9" r="7" fill="#e2e8f0" stroke="#1d4ed8" stroke-width="3"/><text x="36" y="13" font-size="12" fill="#0f172a">Source S</text></g><g transform="translate(394.8,420)"><circle cx="14" cy="9" r="7" fill="#e2e8f0" stroke="#c2410c" stroke-width="3"/><text x="36" y="13" font-size="12" fill="#0f172a">Destination D</text></g><g transform="translate(16,444)"><line x1="0" y1="9" x2="28" y2="9" stroke="#dc2626" stroke-width="4" stroke-dasharray="3 4"/><text x="36" y="13" font-size="12" fill="#0f172a">Failed</text></g>
+</svg>

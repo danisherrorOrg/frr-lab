@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 456 476" width="456" height="476" role="img" aria-label="Example 7: two links between S and E (10 and 20). For S → E the LFA is the other link, S-E#2." font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+<title>Example 7: two links between S and E (10 and 20). For S → E the LFA is the other link, S-E#2.</title>
+<defs><linearGradient id="pq-both" x1="0" x2="1" y1="0" y2="0"><stop offset="50%" stop-color="#bfdbfe"/><stop offset="50%" stop-color="#bbf7d0"/></linearGradient>
+<marker id="arrow-primary" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+<marker id="arrow-lfa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/></marker>
+<marker id="arrow-rlfa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#a16207"/></marker>
+<marker id="arrow-tilfa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker>
+<marker id="arrow-extra" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>
+</defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<polyline points="48,68 70.5,65.7 93,63.6 115.5,61.9 138,60.5 160.5,59.4 183,58.6 205.5,58.2 228,58 250.5,58.2 273,58.6 295.5,59.4 318,60.5 340.5,61.9 363,63.6 385.5,65.7 408,68" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="48,68 70.5,70.3 93,72.4 115.5,74.1 138,75.5 160.5,76.6 183,77.4 205.5,77.8 228,78 250.5,77.8 273,77.4 295.5,76.6 318,75.5 340.5,74.1 363,72.4 385.5,70.3 408,68" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="408,68 410.3,86.8 412.4,105.5 414.1,124.3 415.5,143 416.6,161.8 417.4,180.5 417.8,199.3 418,218 417.8,236.8 417.4,255.5 416.6,274.3 415.5,293 414.1,311.8 412.4,330.5 410.3,349.3 408,368" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="408,68 405.7,86.8 403.6,105.5 401.9,124.3 400.5,143 399.4,161.8 398.6,180.5 398.2,199.3 398,218 398.2,236.8 398.6,255.5 399.4,274.3 400.5,293 401.9,311.8 403.6,330.5 405.7,349.3 408,368" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="48,68 48,368" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="48,368 408,368" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<polyline points="59.3,63.8 70.5,62.7 93,60.6 115.5,58.9 138,57.5 160.5,56.4 183,55.6 205.5,55.2 228,55 250.5,55.2 273,55.6 295.5,56.4 318,57.5 340.5,58.9 363,60.6 385.5,62.7 396.8,63.8" fill="none" stroke="#2563eb" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-primary)" opacity="0.9"/>
+<polyline points="59.3,72.2 70.5,73.3 93,75.4 115.5,77.1 138,78.5 160.5,79.6 183,80.4 205.5,80.8 228,81 250.5,80.8 273,80.4 295.5,79.6 318,78.5 340.5,77.1 363,75.4 385.5,73.3 396.8,72.2" fill="none" stroke="#ea580c" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="9 5" marker-end="url(#arrow-lfa)" opacity="0.9"/>
+<rect x="217" y="49" width="22" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="228" y="62" text-anchor="middle" font-size="12" fill="#475569">10</text>
+<rect x="217" y="69" width="22" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="228" y="82" text-anchor="middle" font-size="12" fill="#475569">20</text>
+<rect x="407" y="209" width="22" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="418" y="222" text-anchor="middle" font-size="12" fill="#475569">10</text>
+<rect x="387" y="209" width="22" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="398" y="222" text-anchor="middle" font-size="12" fill="#475569">10</text>
+<rect x="37" y="209" width="22" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="48" y="222" text-anchor="middle" font-size="12" fill="#475569">15</text>
+<rect x="217" y="359" width="22" height="18" rx="4" fill="#ffffff" stroke="none"/><text x="228" y="372" text-anchor="middle" font-size="12" fill="#475569">10</text>
+<circle cx="48" cy="68" r="18" fill="#e2e8f0" stroke="#1d4ed8" stroke-width="4"/>
+<text x="48" y="73" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">S</text>
+<circle cx="408" cy="68" r="18" fill="#e2e8f0" stroke="#c2410c" stroke-width="4"/>
+<text x="408" y="73" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">E</text>
+<circle cx="408" cy="368" r="18" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+<text x="408" y="373" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">D</text>
+<circle cx="48" cy="368" r="18" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+<text x="48" y="373" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f172a">A</text>
+<g transform="translate(16,420)"><line x1="0" y1="9" x2="28" y2="9" stroke="#2563eb" stroke-width="4"/><text x="36" y="13" font-size="12" fill="#0f172a">Primary path</text></g><g transform="translate(153.6,420)"><line x1="0" y1="9" x2="28" y2="9" stroke="#ea580c" stroke-width="4" stroke-dasharray="9 5"/><text x="36" y="13" font-size="12" fill="#0f172a">LFA backup</text></g><g transform="translate(277.6,420)"><circle cx="14" cy="9" r="7" fill="#e2e8f0" stroke="#1d4ed8" stroke-width="3"/><text x="36" y="13" font-size="12" fill="#0f172a">Source S</text></g><g transform="translate(16,444)"><circle cx="14" cy="9" r="7" fill="#e2e8f0" stroke="#c2410c" stroke-width="3"/><text x="36" y="13" font-size="12" fill="#0f172a">Destination E</text></g>
+</svg>
