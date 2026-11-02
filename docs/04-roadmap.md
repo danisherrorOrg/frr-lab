@@ -85,7 +85,7 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 
 > **Do this last:** launch only after Phase 9 and the other planned work are done.
 
-- [ ] Pick a host (Vercel / GitHub Pages), log it in DECISIONS.md, deploy
+- [x] Pick a host (Vercel / GitHub Pages), log it in DECISIONS.md, deploy *(Vercel, D61)*
 - [ ] README with a live link, demo GIF, screenshots and how to run locally
 - [ ] Set version `0.2.0` and tag release `v0.2.0`
 - [ ] Blog / LinkedIn post: "TI-LFA explained with pictures" (use Examples 2 and 3)

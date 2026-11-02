@@ -38,12 +38,18 @@ self.addEventListener('fetch', (event) => {
     // Share links keep their settings after '#', so every page is '/'.
     event.respondWith(
       fetch(request).catch(() =>
-        caches.match('/index.html').then((hit) => hit || caches.match('/')),
+        caches
+          .match('/index.html', { ignoreVary: true })
+          .then((hit) => hit || caches.match('/', { ignoreVary: true })),
       ),
     )
     return
   }
 
   // Built files have a hash in their name, so a saved copy is never out of date.
-  event.respondWith(caches.match(request).then((hit) => hit || fetch(request)))
+  // ignoreVary: the page loads its script with `crossorigin`, which adds an Origin
+  // header; a server that sends `Vary: Origin` would otherwise make every lookup miss.
+  event.respondWith(
+    caches.match(request, { ignoreVary: true }).then((hit) => hit || fetch(request)),
+  )
 })
