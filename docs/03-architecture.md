@@ -286,7 +286,8 @@ lans:                                         # optional broadcast LANs (D55)
 │ [Coverage report]                                            │
 └──────────────────────────────────────────────────────────────┘
 ```
-- Phone width: canvas on top, results as cards below.
+- Phone width: canvas on top, results as cards below. The top bar is one row that scrolls sideways.
+- Screens at least 768 px wide **and** 600 px tall (iPads, laptops; not a phone on its side): the app fills the window. The tools panel and the results panel scroll on their own, can be hidden ("Hide tools" / "Hide results" in the top bar) and resized by dragging the bar beside them (arrow keys too; double-click resets). The results panel starts at about a third of the window height. The layout is saved in this browser only (`src/ui/panels.ts`), never in the topology or share link.
 - Line styles + icons as well as colors (accessibility).
 
 ## 7. Performance plan

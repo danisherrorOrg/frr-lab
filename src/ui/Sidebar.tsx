@@ -25,7 +25,7 @@ const TOOLS: { tool: Tool; label: string; key: string; hint: string }[] = [
     tool: 'fail-router',
     label: 'Fail router',
     key: 'D',
-    hint: 'Click routers to take them down or bring them back (or right-click a router)',
+    hint: 'Click routers to take them down or bring them back (or right-click or long-press a router)',
   },
 ]
 
@@ -225,15 +225,19 @@ export function Sidebar({ className = '' }: { className?: string }) {
   return (
     <aside
       aria-label="Tools and settings"
-      className={`flex w-full flex-col gap-4 overflow-y-auto border-slate-200 p-3 md:border-r dark:border-slate-700 ${className}`}
+      className={`flex w-full flex-col gap-4 overflow-y-auto border-slate-200 p-3 wide:border-r dark:border-slate-700 ${className}`}
     >
       <fieldset>
         <legend className="mb-1 text-sm font-semibold">Tools</legend>
         <p className="mb-1 text-xs text-slate-500">
-          Drag a router to move it, with any tool. Right-click a router or link for more.
+          Drag a router to move it, with any tool. Right-click or long-press a router or link for
+          more.
         </p>
         {TOOLS.map((t) => (
-          <label key={t.tool} className="flex items-baseline gap-2 py-0.5 text-sm">
+          <label
+            key={t.tool}
+            className="flex items-baseline gap-2 py-0.5 text-sm pointer-coarse:py-2"
+          >
             <input
               type="radio"
               name="tool"
@@ -242,7 +246,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
             />
             <span>
               {t.label}{' '}
-              <kbd className="rounded border border-slate-300 px-1 text-xs text-slate-500 dark:border-slate-600">
+              <kbd className="rounded border border-slate-300 px-1 text-xs pointer-coarse:hidden text-slate-500 dark:border-slate-600">
                 {t.key}
               </kbd>
               {tool === t.tool && <span className="block text-xs text-slate-500">{t.hint}</span>}

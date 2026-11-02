@@ -5,6 +5,7 @@ import { EXAMPLES } from '../state/examples'
 import { fullTopology, useStore } from '../state/store'
 import { downloadText } from './download'
 import { fileName } from './format'
+import { usePanels } from './panels'
 import { applyTheme, currentTheme, type Theme } from './theme'
 
 const button =
@@ -36,6 +37,7 @@ async function share() {
 /** Top bar: examples, import, export, share, undo / redo, tour, theme. */
 export function Toolbar() {
   const fileInput = useRef<HTMLInputElement>(null)
+  const panels = usePanels()
   const [theme, setTheme] = useState<Theme>(currentTheme)
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark'
@@ -76,98 +78,128 @@ export function Toolbar() {
   return (
     <header className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-4 py-2 dark:border-slate-700">
       <h1 className="mr-4 text-lg font-bold">LFA Lab</h1>
-      <select
-        aria-label="Load an example"
-        className={button}
-        value=""
-        onChange={(e) => e.target.value && loadExample(e.target.value)}
-      >
-        <option value="">Examples…</option>
-        {EXAMPLES.map((ex) => (
-          <option key={ex.key} value={ex.key}>
-            {ex.title}
-          </option>
-        ))}
-      </select>
-      <button
-        type="button"
-        className={button}
-        onClick={() => setGenerator(true)}
-        title="Make a ring, grid, leaf-spine or random mesh of any size"
-      >
-        Generate…
-      </button>
-      <button type="button" className={button} onClick={() => fileInput.current?.click()}>
-        Import YAML
-      </button>
-      <button
-        type="button"
-        className={button}
-        onClick={() => useStore.getState().setFrrImport(true)}
-        title='Paste FRR "show isis database detail" output'
-      >
-        Import FRR…
-      </button>
-      <input
-        ref={fileInput}
-        type="file"
-        accept=".yaml,.yml,text/yaml"
-        className="hidden"
-        data-testid="import-file"
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          e.target.value = '' // so the same file can be picked again
-          if (file) void importFile(file)
-        }}
-      />
-      <button type="button" className={button} onClick={exportFile}>
-        Export YAML
-      </button>
-      <button
-        type="button"
-        className={button}
-        onClick={() => setYamlGuide(true)}
-        title="What a topology file looks like, and a checker"
-      >
-        YAML format
-      </button>
-      <button type="button" className={button} onClick={() => void share()}>
-        🔗 Share
-      </button>
-      <span className="mx-2 h-5 w-px bg-slate-300 dark:bg-slate-600" />
-      <button type="button" className={button} onClick={undo} disabled={!canUndo} title="Ctrl+Z">
-        ↶ Undo
-      </button>
-      <button
-        type="button"
-        className={button}
-        onClick={redo}
-        disabled={!canRedo}
-        title="Ctrl+Shift+Z"
-      >
-        ↷ Redo
-      </button>
-      <button
-        type="button"
-        className={`${button} ml-auto`}
-        onClick={() => setLearn(!learnOpen)}
-        aria-pressed={learnOpen}
-        title="Learn LFA, Remote LFA and TI-LFA, with examples to try"
-      >
-        📖 Learn
-      </button>
-      <button type="button" className={button} onClick={() => setTour(0)} title="Guided tour">
-        ? Tour
-      </button>
-      <button
-        type="button"
-        className={button}
-        onClick={toggleTheme}
-        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-      >
-        {theme === 'dark' ? '☀' : '☾'}
-      </button>
+      {/* Small screens: one row of buttons that scrolls sideways, so the diagram
+          isn't pushed off the screen by rows of wrapped buttons. */}
+      <div className="flex basis-full gap-2 overflow-x-auto pb-1 wide:contents [&>*]:shrink-0">
+        <select
+          aria-label="Load an example"
+          className={`${button} max-w-full narrow:max-w-44`}
+          value=""
+          onChange={(e) => e.target.value && loadExample(e.target.value)}
+        >
+          <option value="">Examples…</option>
+          {EXAMPLES.map((ex) => (
+            <option key={ex.key} value={ex.key}>
+              {ex.title}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className={button}
+          onClick={() => setGenerator(true)}
+          title="Make a ring, grid, leaf-spine or random mesh of any size"
+        >
+          Generate…
+        </button>
+        <button type="button" className={button} onClick={() => fileInput.current?.click()}>
+          Import YAML
+        </button>
+        <button
+          type="button"
+          className={button}
+          onClick={() => useStore.getState().setFrrImport(true)}
+          title='Paste FRR "show isis database detail" output'
+        >
+          Import FRR…
+        </button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".yaml,.yml,text/yaml"
+          className="hidden"
+          data-testid="import-file"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            e.target.value = '' // so the same file can be picked again
+            if (file) void importFile(file)
+          }}
+        />
+        <button type="button" className={button} onClick={exportFile}>
+          Export YAML
+        </button>
+        <button
+          type="button"
+          className={button}
+          onClick={() => setYamlGuide(true)}
+          title="What a topology file looks like, and a checker"
+        >
+          YAML format
+        </button>
+        <button type="button" className={button} onClick={() => void share()}>
+          🔗 Share
+        </button>
+        <span className="mx-2 h-5 w-px bg-slate-300 dark:bg-slate-600" />
+        <button
+          type="button"
+          className={button}
+          aria-pressed={panels.sidebarOpen}
+          onClick={() => panels.set({ sidebarOpen: !panels.sidebarOpen })}
+          title={
+            panels.sidebarOpen
+              ? 'Hide the tools and settings panel'
+              : 'Show the tools and settings panel'
+          }
+        >
+          {panels.sidebarOpen ? 'Hide tools' : 'Show tools'}
+        </button>
+        <button
+          type="button"
+          className={button}
+          aria-pressed={panels.resultsOpen}
+          onClick={() => panels.set({ resultsOpen: !panels.resultsOpen })}
+          title={
+            panels.resultsOpen
+              ? 'Hide the results panel under the diagram'
+              : 'Show the results panel under the diagram'
+          }
+        >
+          {panels.resultsOpen ? 'Hide results' : 'Show results'}
+        </button>
+        <button type="button" className={button} onClick={undo} disabled={!canUndo} title="Ctrl+Z">
+          ↶ Undo
+        </button>
+        <button
+          type="button"
+          className={button}
+          onClick={redo}
+          disabled={!canRedo}
+          title="Ctrl+Shift+Z"
+        >
+          ↷ Redo
+        </button>
+        <button
+          type="button"
+          className={`${button} ml-auto`}
+          onClick={() => setLearn(!learnOpen)}
+          aria-pressed={learnOpen}
+          title="Learn LFA, Remote LFA and TI-LFA, with examples to try"
+        >
+          📖 Learn
+        </button>
+        <button type="button" className={button} onClick={() => setTour(0)} title="Guided tour">
+          ? Tour
+        </button>
+        <button
+          type="button"
+          className={button}
+          onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        >
+          {theme === 'dark' ? '☀' : '☾'}
+        </button>
+      </div>
     </header>
   )
 }

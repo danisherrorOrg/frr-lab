@@ -10,6 +10,7 @@ import { downloadBlob, downloadText } from './download'
 import { diagramPng, diagramSvg } from './export-image'
 import { fileName, heatLines, heatMarks, tooltipLines } from './format'
 import { MetricEditor } from './MetricEditor'
+import { usePanels } from './panels'
 
 /** Something placed at a spot inside the canvas box. */
 interface At {
@@ -18,7 +19,7 @@ interface At {
 }
 
 const control =
-  'h-8 min-w-8 rounded border border-slate-300 bg-white/90 px-2 text-sm shadow-sm hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/90 dark:hover:bg-slate-700'
+  'h-8 min-w-8 whitespace-nowrap rounded border border-slate-300 bg-white/90 px-2 text-sm shadow-sm hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/90 dark:hover:bg-slate-700'
 
 /** What a Cytoscape event hit: a router, a link, or nothing. */
 function targetOf(ev: cytoscape.EventObject, cy: cytoscape.Core): Target | null {
@@ -175,6 +176,22 @@ export function GraphCanvas({
   useEffect(() => {
     cyRef.current?.resize()
   }, [notice])
+  // Hiding or showing a panel changes the box a lot; fit the network to the new size
+  // (not on the first render, which has its own fit).
+  const sidebarOpen = usePanels((s) => s.sidebarOpen)
+  const resultsOpen = usePanels((s) => s.resultsOpen)
+  const panelsSeen = useRef(false)
+  useEffect(() => {
+    if (!panelsSeen.current) {
+      panelsSeen.current = true
+      return
+    }
+    const frame = requestAnimationFrame(() => {
+      cyRef.current?.resize()
+      cyRef.current?.fit(undefined, 40)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [sidebarOpen, resultsOpen])
   /** Before every click, in case something else moved the box. */
   const remeasure = () => cyRef.current?.resize()
 
@@ -254,7 +271,7 @@ export function GraphCanvas({
       <div
         role="toolbar"
         aria-label="Diagram view"
-        className="absolute top-2 right-2 z-10 flex gap-1"
+        className="absolute top-2 right-2 left-2 z-10 flex flex-wrap justify-end gap-1 pointer-events-none [&>*]:pointer-events-auto"
       >
         <button
           type="button"
