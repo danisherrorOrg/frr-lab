@@ -30,6 +30,17 @@ import { YamlGuide } from './ui/YamlGuide'
 import { LearnGuide } from './ui/LearnGuide'
 import { FrrImportDialog } from './ui/FrrImportDialog'
 import { GenerateDialog } from './ui/GenerateDialog'
+import {
+  clampResults,
+  autoResultsHeight,
+  clampSidebar,
+  DEFAULT_PANELS,
+  RESULTS_MIN,
+  SIDEBAR_MIN,
+  usePanels,
+  useViewport,
+} from './ui/panels'
+import { Splitter } from './ui/Splitter'
 import { isFirstVisit, markTourSeen } from './ui/tour-steps'
 import { useHeatMap } from './ui/useHeatMap'
 import { useResults } from './ui/useResults'
@@ -139,6 +150,13 @@ export function App() {
   const allModes = useAllModes(topology, source, failedLinks, failedNodes, extended)
   const setSimMode = useStore((s) => s.setSimMode)
   const heat = useHeatMap(topology)
+  const panels = usePanels()
+  const viewport = useViewport()
+  const sidebarWidth = clampSidebar(panels.sidebarWidth, viewport.w)
+  const resultsHeight = clampResults(
+    panels.resultsHeight ?? autoResultsHeight(viewport.h),
+    viewport.h,
+  )
   const heatShown = useMemo(
     () => (heat.mode !== null && heat.map ? { map: heat.map, mode: heat.mode } : undefined),
     [heat.mode, heat.map],
@@ -316,116 +334,160 @@ export function App() {
   ])
 
   return (
-    <div className="flex min-h-screen flex-col bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+    <div className="flex min-h-screen flex-col bg-white wide:h-screen wide:min-h-0 wide:overflow-hidden text-slate-900 dark:bg-slate-900 dark:text-slate-100">
       <Toolbar />
       <NoticeBox />
-      {/* Phone: canvas, then tools, then results. Wider: tools on the left. */}
-      <div className="flex flex-1 flex-col md:grid md:grid-cols-[16rem_minmax(0,1fr)] md:grid-rows-[auto_1fr]">
-        <div className="order-1 md:col-start-2 md:row-start-1">
-          <div className="h-[50vh] min-h-72 border-b border-slate-200 bg-slate-50 md:h-[55vh] dark:border-slate-700 dark:bg-slate-800">
-            <GraphCanvas highlight={highlight} onRouterTap={routerTap} heat={heatShown} />
+      {/* Phone: canvas, then tools, then results, one page that scrolls. Wider: the app
+          fills the window; tools on the left and results below the diagram scroll on their
+          own, and both can be hidden or resized. */}
+      <div
+        className="flex flex-1 flex-col wide:min-h-0 wide:flex-row"
+        style={
+          {
+            '--sidebar-w': `${sidebarWidth}px`,
+            '--results-h': `${resultsHeight}px`,
+          } as React.CSSProperties
+        }
+      >
+        {panels.sidebarOpen && (
+          <>
+            <Sidebar className="order-2 wide:order-none wide:w-[var(--sidebar-w)] wide:shrink-0" />
+            <Splitter
+              orientation="vertical"
+              label="Tools panel width"
+              className="hidden wide:block"
+              value={sidebarWidth}
+              min={SIDEBAR_MIN}
+              max={clampSidebar(Infinity, viewport.w)}
+              onChange={(w) => panels.set({ sidebarWidth: clampSidebar(w, viewport.w) })}
+              onReset={() => panels.set({ sidebarWidth: DEFAULT_PANELS.sidebarWidth })}
+            />
+          </>
+        )}
+        <div className="contents wide:flex wide:min-h-0 wide:min-w-0 wide:flex-1 wide:flex-col">
+          <div className="order-1 wide:order-none wide:flex wide:min-h-0 wide:flex-1 wide:flex-col">
+            <div className="h-[50vh] min-h-72 border-b border-slate-200 bg-slate-50 wide:h-auto wide:min-h-0 wide:flex-1 dark:border-slate-700 dark:bg-slate-800">
+              <GraphCanvas highlight={highlight} onRouterTap={routerTap} heat={heatShown} />
+            </div>
+            <Legend heat={heat} />
           </div>
-          <Legend heat={heat} />
-        </div>
-        <Sidebar className="order-2 md:col-start-1 md:row-span-2 md:row-start-1" />
-        <main className="order-3 flex min-w-0 flex-col gap-4 p-3 md:col-start-2 md:row-start-2">
-          {anyFailed && allSources && <FailureByDut />}
-          {anyFailed && source !== null && (
-            <FailurePanel
-              source={source}
-              simulation={sim.simulation}
-              error={sim.error}
-              {...(flowTrace && { walk: flowTrace })}
-              walkStep={flowStep}
-              onWalkStep={setFlowStep}
-              onPhp={setPhp}
-              walkOnCanvas={walkOnCanvas}
-              onWalkOnCanvas={setWalkOnCanvas}
+          {panels.resultsOpen && (
+            <Splitter
+              orientation="horizontal"
+              label="Results panel height"
+              className="hidden wide:block"
+              invert
+              value={resultsHeight}
+              min={RESULTS_MIN}
+              max={clampResults(Infinity, viewport.h)}
+              onChange={(h) => panels.set({ resultsHeight: clampResults(h, viewport.h) })}
+              onReset={() => panels.set({ resultsHeight: null })}
             />
           )}
-          <div className="grid gap-4 lg:grid-cols-2">
-            {allSources ? (
-              <AllResults
+          {panels.resultsOpen && (
+            <main
+              aria-label="Results"
+              className="order-3 flex min-w-0 flex-col gap-4 p-3 wide:order-none wide:h-[var(--results-h)] wide:shrink-0 wide:overflow-y-auto"
+            >
+              {anyFailed && allSources && <FailureByDut />}
+              {anyFailed && source !== null && (
+                <FailurePanel
+                  source={source}
+                  simulation={sim.simulation}
+                  error={sim.error}
+                  {...(flowTrace && { walk: flowTrace })}
+                  walkStep={flowStep}
+                  onWalkStep={setFlowStep}
+                  onPhp={setPhp}
+                  walkOnCanvas={walkOnCanvas}
+                  onWalkOnCanvas={setWalkOnCanvas}
+                />
+              )}
+              <div className="grid gap-4 lg:grid-cols-2">
+                {allSources ? (
+                  <AllResults
+                    onSelect={(dut, r) => {
+                      pickRow(dut, r)
+                      if (anyFailed) setSimDest(r.dest)
+                    }}
+                  />
+                ) : (
+                  <ResultsTable
+                    source={source}
+                    results={results}
+                    loading={loading}
+                    error={error}
+                    onSelect={(r) => {
+                      toggleRow(r)
+                      if (anyFailed) setSimDest(r.dest)
+                    }}
+                  />
+                )}
+                <div>
+                  {selected && source !== null ? (
+                    <DetailPanel
+                      source={source}
+                      result={selected.result}
+                      protection={selected.protection}
+                      paths={selected.paths}
+                      backup={backup}
+                      drawn={selected.drawn?.kind ?? null}
+                      onBackup={setBackup}
+                      onClose={() => selectRow(null)}
+                      {...(walk && !anyFailed && { walk })}
+                      walkInFailurePanel={anyFailed}
+                      walkStep={walkStep}
+                      onWalkStep={(step) => setWalkStep(step)}
+                      {...(hasTilfa && { walkPath, onWalkPath: pickWalkPath })}
+                      onPhp={setPhp}
+                      walkOnCanvas={walkOnCanvas}
+                      onWalkOnCanvas={setWalkOnCanvas}
+                      space={space}
+                      onSpace={setSpace}
+                      spacesOff={anyFailed}
+                    />
+                  ) : (
+                    <p className="text-sm text-slate-500">
+                      Pick a row in the results table to see its LFA candidates, P and Q spaces,
+                      segment list and the numbers behind each check.
+                    </p>
+                  )}
+                </div>
+              </div>
+              {anyFailed
+                ? shownFlow &&
+                  allModes &&
+                  source !== null && (
+                    <CompareFailure
+                      source={source}
+                      dest={shownFlow.dest}
+                      sims={allModes}
+                      mode={simMode}
+                      onMode={setSimMode}
+                      downLinks={downLinks}
+                    />
+                  )
+                : selected && (
+                    <CompareView
+                      comparison={selected.comparison}
+                      paths={selected.paths}
+                      drawn={selected.drawn?.kind ?? null}
+                      onBackup={setBackup}
+                    />
+                  )}
+              <LinkView
                 onSelect={(dut, r) => {
                   pickRow(dut, r)
                   if (anyFailed) setSimDest(r.dest)
                 }}
               />
-            ) : (
-              <ResultsTable
-                source={source}
-                results={results}
-                loading={loading}
-                error={error}
-                onSelect={(r) => {
-                  toggleRow(r)
-                  if (anyFailed) setSimDest(r.dest)
-                }}
-              />
-            )}
-            <div>
-              {selected && source !== null ? (
-                <DetailPanel
-                  source={source}
-                  result={selected.result}
-                  protection={selected.protection}
-                  paths={selected.paths}
-                  backup={backup}
-                  drawn={selected.drawn?.kind ?? null}
-                  onBackup={setBackup}
-                  onClose={() => selectRow(null)}
-                  {...(walk && !anyFailed && { walk })}
-                  walkInFailurePanel={anyFailed}
-                  walkStep={walkStep}
-                  onWalkStep={(step) => setWalkStep(step)}
-                  {...(hasTilfa && { walkPath, onWalkPath: pickWalkPath })}
-                  onPhp={setPhp}
-                  walkOnCanvas={walkOnCanvas}
-                  onWalkOnCanvas={setWalkOnCanvas}
-                  space={space}
-                  onSpace={setSpace}
-                  spacesOff={anyFailed}
-                />
-              ) : (
-                <p className="text-sm text-slate-500">
-                  Pick a row in the results table to see its LFA candidates, P and Q spaces, segment
-                  list and the numbers behind each check.
-                </p>
-              )}
-            </div>
-          </div>
-          {anyFailed
-            ? shownFlow &&
-              allModes &&
-              source !== null && (
-                <CompareFailure
-                  source={source}
-                  dest={shownFlow.dest}
-                  sims={allModes}
-                  mode={simMode}
-                  onMode={setSimMode}
-                  downLinks={downLinks}
-                />
-              )
-            : selected && (
-                <CompareView
-                  comparison={selected.comparison}
-                  paths={selected.paths}
-                  drawn={selected.drawn?.kind ?? null}
-                  onBackup={setBackup}
-                />
-              )}
-          <LinkView
-            onSelect={(dut, r) => {
-              pickRow(dut, r)
-              if (anyFailed) setSimDest(r.dest)
-            }}
-          />
-          <WhatIf />
-          <WeakSpots />
-          <Quiz />
-          <CoverageReport source={source} />
-        </main>
+              <WhatIf />
+              <WeakSpots />
+              <Quiz />
+              <CoverageReport source={source} />
+            </main>
+          )}
+        </div>
       </div>
       <Tour />
       <YamlGuide />

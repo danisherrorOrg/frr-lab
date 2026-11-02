@@ -4,6 +4,38 @@
    (not only the OS setting) controls the theme. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* wide: the app fills the window with panels beside and under the diagram. It needs
+   height as well as width, or a phone on its side gets a diagram a few pixels tall;
+   such screens get the phone layout (one page that scrolls). narrow is the opposite. */
+@custom-variant wide (@media (min-width: 768px) and (min-height: 600px));
+@custom-variant narrow (@media not all and (min-width: 768px) and (min-height: 600px));
+
 body {
   font-family: system-ui, sans-serif;
+}
+
+/* Touch screens: fingers need bigger targets (~44 px, Apple HIG / WCAG 2.5.5),
+   and iOS Safari zooms the page into any field whose text is under 16 px.
+   Unlayered rules beat Tailwind's utility layer, so this covers every
+   component without touching each class list. Mouse users see no change. */
+@media (pointer: coarse) {
+  button,
+  select,
+  summary,
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='hidden']) {
+    min-height: 44px;
+  }
+  button {
+    min-width: 44px;
+  }
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: 20px;
+    height: 20px;
+  }
 }
