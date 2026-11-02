@@ -566,3 +566,11 @@ Newest at the bottom. Format: **Decision** · Why · Other options considered ·
 - **Other options considered:** a Markdown library such as `marked` (a new dependency, and its HTML output needs `dangerouslySetInnerHTML` plus rewriting links afterwards); screenshots of the app as diagrams (go stale when the engine or styling changes); Mermaid diagrams (needs a large library in the app, and can't show the engine's results).
 - **No new dependencies.**
 - **Status:** Accepted.
+
+### D61 – Host on Vercel; a service worker for offline use (2026-11-02)
+- **Why:** Phase 10. Vercel is free for this, builds and deploys on every push to `main`, and gives each pull request its own preview link. The site sits at the domain root, so Vite's `base` stays `/`.
+- **Settings:** framework preset Vite, `npm run build`, output `dist/`, no environment variables. Vercel Analytics and Speed Insights stay **off** (CLAUDE.md rule 5). No `vercel.json`: share links keep their settings after `#`, so there are no routes to rewrite.
+- **Offline after first load** (`01-requirements.md` goal 4): a hand-written service worker, `public/sw.js`. At build time a small Vite plugin in `vite.config.ts` writes the list of built files into `dist/sw.js` (`src/offline/precache.ts`), with a hash of the list as the cache name. So each deploy gets a new `sw.js`, the browser installs it, and older caches are deleted. Built files are served from the cache (their names carry a hash); the page itself tries the network first, then the saved copy. The worker is only registered in the built site, never in `npm run dev`.
+- **Other options considered:** GitHub Pages (also free, but serves from `/<repo>/`, so `base` must change, and deploying needs a workflow file); `vite-plugin-pwa` / Workbox (a new dependency and far more than one page with six files needs).
+- **No new dependencies.**
+- **Status:** Accepted.

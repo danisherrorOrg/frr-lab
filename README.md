@@ -45,7 +45,7 @@ New to Fast Reroute? Start with the **[Learn guide](docs/learn/00-start-here.md)
 | [examples/](examples/) | Sample topologies used by the docs and the tests |
 
 ## Tech stack (short)
-TypeScript · React · Vite · Cytoscape.js (graph drawing) · Zustand (state) · Vitest (tests) · deployed as a static site (Vercel or GitHub Pages). **No backend.** Everything runs in the browser.
+TypeScript · React · Vite · Cytoscape.js (graph drawing) · Zustand (state) · Vitest (tests) · deployed as a static site on Vercel. **No backend.** Everything runs in the browser.
 
 ## Author
 Danish Mahajan ([github.com/danisherror](https://github.com/danisherror)). Built from experience implementing IS-IS-SR LFA / RLFA / TI-LFA in router software.
