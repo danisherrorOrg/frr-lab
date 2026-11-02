@@ -80,6 +80,13 @@ Other commands:
 ## Learn the protocol
 New to Fast Reroute? Start with the **[Learn guide](docs/learn/00-start-here.md)**: IS-IS, SPF, LFA, Remote LFA, Segment Routing and TI-LFA explained from zero, with diagrams, worked examples and exercises to try in the app. In the app, the same guide opens with **📖 Learn**.
 
+## Blog posts
+A three-part series on Medium, with pictures and worked numbers from LFA Lab (sources in [docs/blog/](docs/blog/)):
+
+1. [LFA Explained with Pictures](https://medium.com/@danisherror/lfa-explained-with-pictures-b7ba3098ede6): the three LFA inequalities, and why rings break LFA.
+2. [Remote LFA Explained with Pictures](https://medium.com/@danisherror/remote-lfa-explained-with-pictures-fd083866aa97): P-space, Q-space and PQ nodes, and where Remote LFA fails.
+3. [TI-LFA Explained with Pictures](https://medium.com/@danisherror/ti-lfa-explained-with-pictures-3d6973ced37c): the post-convergence path, Prefix-SIDs and Adj-SIDs, and a packet walk.
+
 ## Docs (read in this order)
 | File | What's in it |
 |---|---|
@@ -89,6 +96,7 @@ New to Fast Reroute? Start with the **[Learn guide](docs/learn/00-start-here.md)
 | [docs/04-roadmap.md](docs/04-roadmap.md) | Phases with checklists (the build order) |
 | [docs/05-testing.md](docs/05-testing.md) | Test plan and expected results to check the engine against |
 | [docs/learn/](docs/learn/00-start-here.md) | The Learn guide for users: the protocol from zero, with exercises (D60) |
+| [docs/blog/](docs/blog/) | Sources and images of the Medium blog posts |
 | [TODO.md](TODO.md) | Detailed task list to work through, phase by phase |
 | [DECISIONS.md](DECISIONS.md) | Decision log: what was chosen and why |
 | [CLAUDE.md](CLAUDE.md) | Rules for AI coding agents working in this repo |
