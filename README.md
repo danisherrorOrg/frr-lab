@@ -1,8 +1,12 @@
 # LFA Lab
 
-A free, open-source browser tool that **computes and shows backup paths for IS-IS networks**: LFA, Remote LFA and TI-LFA. You can also break a link to see where traffic goes.
+A free, open-source browser tool that **computes and shows backup paths for IS-IS networks**: LFA, Remote LFA and TI-LFA. You can also break a link or a router to see where traffic goes.
 
-> **Status:** MVP feature-complete (2026-10-31, Milestone B), plus the Phase 9 feedback work and the whole "Later (v0.2+)" list (2026-11-01): node protection (RFC 8102 / TI-LFA), import from FRR, SRLGs, a quiz for students, LAN pseudonodes and IS-IS levels, a microloop view, Flex-Algo and SRv6. Next: launch (Phase 10).
+**Live: [lfa-lab.vercel.app](https://lfa-lab.vercel.app)**. No sign-up, no backend; it works offline after the first visit.
+
+![LFA Lab demo: pick a destination, fail link S–E, watch traffic move to the backup path, then converge](docs/img/demo.gif)
+
+> **Status:** v0.2.0, live (2026-11-02). The MVP, the Phase 9 feedback work, the ideas backlog and the whole "Later (v0.2+)" list are done, plus the Learn guide. See [TODO.md](TODO.md) for what is left.
 
 ## The problem
 Routers use Fast Reroute (FRR) to switch traffic onto a pre-computed backup path within about 50 ms when a link or node fails. There are three main types:
@@ -20,12 +24,58 @@ Learning these is hard: textbooks show one or two static diagrams, and vendor to
 - **Network engineers** checking protection coverage before a design or change.
 - **Interview prep** for network software roles.
 
-## What it will do (MVP)
-1. Draw a topology (routers, links, metrics, SIDs) or load one from a YAML file.
-2. Pick a source router and see every destination's primary path, LFA, RLFA and TI-LFA backups (including the SR label stack).
-3. **Fail a link or a router** and watch traffic move to the backup path, and see which backups break when a whole router goes down.
-4. Get a **coverage report**, e.g. "LFA protects 60% of destinations, TI-LFA protects 100%".
-5. **Explain mode** shows the real numbers behind each decision, e.g. `dist(N,D)=10 < dist(N,S)+dist(S,D)=35 ✓`.
+## What it does
+**Build a network**
+- Draw routers and links (metrics, one per direction if you want; Prefix-SIDs and Adj-SIDs), with undo / redo, drag, right-click menus and auto layout.
+- Or load one: 11 built-in examples, a YAML file, a random generator (ring, grid, leaf-spine, mesh), or FRR `show isis database detail` output.
+- Parallel links, LAN links (pseudonodes), IS-IS levels L1 / L2, the overload bit, SRLGs, Flex-Algo and SRv6.
+- Share a network as a link (the topology is packed into the URL; nothing is uploaded). Export YAML, PNG or SVG.
+
+**See every backup path**
+- Pick a source router (or **All routers**) and get, for each destination: the primary path, LFA, Remote LFA and TI-LFA, with the SR label stack.
+- Click a row to draw the paths, P-space, Q-space and the chosen PQ node, and to see **the numbers behind each check**, e.g. `dist(N,D)=10 < dist(N,S)+dist(S,D)=35 ✓`.
+- Compare LFA, Remote LFA and TI-LFA side by side; link or node protection; LFA policy knobs (RFC 7916); max SID depth checks.
+
+**Break things**
+- Fail one or more links, or a whole router, and watch traffic move to the repair path; then press **Converge** to see the final path and any microloops.
+- Packet walk: step through the repair hop by hop with the label stack at each router.
+
+**Check a design**
+- Coverage report for one source or all of them ("LFA 50%, TI-LFA 100%"), with the unprotected list and CSV export.
+- Coverage heat map on the diagram, per-link view, weakest spots, and a what-if diff when you change a metric.
+
+**Learn**
+- **📖 Learn**: a 14-chapter guide from IS-IS basics to TI-LFA, with "Try it" links that set up the app for you, a guided tour and a quiz.
+
+## Screenshots
+| | |
+|---|---|
+| ![Remote LFA for S→E on the ring: backup via PQ node B, with P-space and Q-space](docs/img/main.png) | ![Link S–E failed: traffic takes the repair path S→A→B→C](docs/img/fail-link.png) |
+| **Remote LFA:** backup path, PQ node and the numbers behind it | **Fail a link:** repair path, then converge |
+| ![TI-LFA on the high-metric ring: label stack with an Adj-SID](docs/img/tilfa.png) | ![Coverage report for the small ISP core](docs/img/coverage.png) |
+| **TI-LFA:** the label stack, here with an Adj-SID | **Coverage report** for a source or all sources |
+| ![The Learn guide open beside the diagram](docs/img/learn.png) | ![LFA Lab on a phone](docs/img/mobile.png) |
+| **Learn guide** beside the diagram | **Phone layout** |
+
+## Run it locally
+You need [Node.js](https://nodejs.org) 22 or later.
+
+```sh
+git clone https://github.com/danisherrorOrg/frr-lab.git lfa-lab
+cd lfa-lab
+npm ci
+npm run dev        # open the URL it prints (usually http://localhost:5173)
+```
+
+Other commands:
+
+| Command | What it does |
+|---|---|
+| `npm test` | Unit and property tests |
+| `npm run lint && npm run typecheck` | Lint, format check and type check |
+| `npm run build` | Static build into `dist/` |
+| `npm run preview` | Serve the build locally |
+| `npm run learn:diagrams` | Redraw the Learn guide's pictures after an engine or example change |
 
 ## Learn the protocol
 New to Fast Reroute? Start with the **[Learn guide](docs/learn/00-start-here.md)**: IS-IS, SPF, LFA, Remote LFA, Segment Routing and TI-LFA explained from zero, with diagrams, worked examples and exercises to try in the app. In the app, the same guide opens with **📖 Learn**.
@@ -45,7 +95,7 @@ New to Fast Reroute? Start with the **[Learn guide](docs/learn/00-start-here.md)
 | [examples/](examples/) | Sample topologies used by the docs and the tests |
 
 ## Tech stack (short)
-TypeScript · React · Vite · Cytoscape.js (graph drawing) · Zustand (state) · Vitest (tests) · deployed as a static site on Vercel. **No backend.** Everything runs in the browser.
+TypeScript · React · Vite · Cytoscape.js (graph drawing) · Zustand (state) · Vitest (tests) · deployed as a static site on Vercel, with a small service worker for offline use. **No backend.** Everything runs in the browser.
 
 ## Author
 Danish Mahajan ([github.com/danisherror](https://github.com/danisherror)). Built from experience implementing IS-IS-SR LFA / RLFA / TI-LFA in router software.

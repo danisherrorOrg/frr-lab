@@ -328,9 +328,9 @@ Things that fit the "learn and check FRR" goal and stay offline / no backend.
 - [x] Import the GitHub repo in Vercel: framework preset Vite, build `npm run build`, output `dist/`; no env vars. Leave Vercel Analytics and Speed Insights **off** (rule 5: no analytics)
 - [x] Add a small hand-written service worker (`public/sw.js`, no new dependency) that caches the built files, so the app works offline after the first load (today there is none, see `docs/05-testing.md`)
 - [x] Deploy to production; on the live link check the console is clean, a share link (`#source=…`) loads, and with the network off in DevTools a reload still works. Live: https://lfa-lab.vercel.app
-- [ ] Record a demo GIF; take screenshots
-- [ ] Update the README: status, live link, GIF, screenshots, a "how to run locally" section, and replace "What it will do (MVP)" with what the app does now
-- [ ] Set `version` in `package.json` to `0.2.0` and tag release `v0.2.0` (MVP + Phase 9 + ideas backlog + Later list)
+- [x] Record a demo GIF; take screenshots *(`docs/img/`: demo GIF of Example 2 (row, fail S–E, converge) and 6 screenshots, taken from the live site)*
+- [x] Update the README: status, live link, GIF, screenshots, a "how to run locally" section, and replace "What it will do (MVP)" with what the app does now
+- [x] Set `version` in `package.json` to `0.2.0` and tag release `v0.2.0` (MVP + Phase 9 + ideas backlog + Later list)
 - [ ] Blog / LinkedIn post: "TI-LFA explained with pictures" (use Examples 2 and 3)
 - [ ] Add `projects/lfa-lab.md` + a row in `projects/INDEX.md` in `Profiles/DanishMahajan/`; add an LFA Lab bullet to the resume
 
