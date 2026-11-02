@@ -31,7 +31,7 @@ A static single-page app. Two halves that never mix:
 | Tests | Vitest (+ fast-check for property tests) | Same toolchain as Vite |
 | Lint/format | ESLint + Prettier | |
 | CI | GitHub Actions: lint, typecheck, test, build | |
-| Hosting | Vercel or GitHub Pages (static) | Free |
+| Hosting | Vercel (static), service worker for offline (D61) | Free |
 
 ## 3. Folder layout (planned)
 ```

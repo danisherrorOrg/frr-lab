@@ -324,9 +324,10 @@ Things that fit the "learn and check FRR" goal and stay offline / no backend.
 
 > **Do this last:** launch only after Phase 9 and the other planned work are done.
 
-- [ ] Pick Vercel or GitHub Pages; log it in `DECISIONS.md` (next entry: D61)
-- [ ] For GitHub Pages only: set `base` in `vite.config.ts` to the repo path so the built files load
-- [ ] Deploy the static build; check it still works offline after first load
+- [ ] Log **Vercel** as the host in `DECISIONS.md` (D61): why (free, deploys on every push to `main`, preview link per PR, site at the domain root so `base` stays `/`), and GitHub Pages as the option considered
+- [ ] Import the GitHub repo in Vercel: framework preset Vite, build `npm run build`, output `dist/`; no env vars. Leave Vercel Analytics and Speed Insights **off** (rule 5: no analytics)
+- [ ] Add a small hand-written service worker (`public/sw.js`, no new dependency) that caches the built files, so the app works offline after the first load (today there is none, see `docs/05-testing.md`)
+- [ ] Deploy to production; on the live link check the console is clean, a share link (`#source=…`) loads, and with the network off in DevTools a reload still works
 - [ ] Record a demo GIF; take screenshots
 - [ ] Update the README: status, live link, GIF, screenshots, a "how to run locally" section, and replace "What it will do (MVP)" with what the app does now
 - [ ] Set `version` in `package.json` to `0.2.0` and tag release `v0.2.0` (MVP + Phase 9 + ideas backlog + Later list)
