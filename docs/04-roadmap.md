@@ -89,6 +89,6 @@ Build order: **engine first, fully tested, then UI**. Tick boxes as you go. Roug
 - [x] README with a live link, demo GIF, screenshots and how to run locally
 - [x] Set version `0.2.0` and tag release `v0.2.0`
 - [x] Blog / LinkedIn post: "TI-LFA explained with pictures" (use Examples 2 and 3) *(Medium, 2026-11-02: LFA, Remote LFA and TI-LFA posts; sources in `docs/blog/`)*
-- [ ] Add `projects/lfa-lab.md` + an `INDEX.md` row in the profile folder; add an LFA Lab resume bullet
+- [x] Add `projects/lfa-lab.md` + an `INDEX.md` row in the profile folder; add an LFA Lab resume bullet
 
 **Total MVP estimate:** about 3–4 weeks part-time.

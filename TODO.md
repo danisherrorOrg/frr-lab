@@ -332,6 +332,6 @@ Things that fit the "learn and check FRR" goal and stay offline / no backend.
 - [x] Update the README: status, live link, GIF, screenshots, a "how to run locally" section, and replace "What it will do (MVP)" with what the app does now
 - [x] Set `version` in `package.json` to `0.2.0` and tag release `v0.2.0` (MVP + Phase 9 + ideas backlog + Later list)
 - [x] Blog / LinkedIn post: "TI-LFA explained with pictures" (use Examples 2 and 3) *(Medium, 2026-11-02)*
-- [ ] Add `projects/lfa-lab.md` + a row in `projects/INDEX.md` in `Profiles/DanishMahajan/`; add an LFA Lab bullet to the resume
+- [x] Add `projects/lfa-lab.md` + a row in `projects/INDEX.md` in `Profiles/DanishMahajan/`; add an LFA Lab bullet to the resume *(4 resume bullets in the write-up; priority high)*
 
 **Done when:** the live link loads and works offline, the README shows it, and the `v0.2.0` tag is pushed.
