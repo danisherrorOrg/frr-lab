@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 -30 1700 1274" width="1700" height="1274">
+<defs>
+<marker id="ah0" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L10,4 L0,8 z" fill="#1971c2"/></marker>
+<marker id="ah1" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L10,4 L0,8 z" fill="#e8590c"/></marker>
+<marker id="ah2" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L10,4 L0,8 z" fill="#2f9e44"/></marker>
+</defs>
+<rect x="-30" y="-30" width="1700" height="1274" fill="#ffffff"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="40" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="0" y="38">A19 · SRLG: links that fail together</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="0" y="75.1">§18 of docs/02-algorithms.md  ·  RFC 4202 §2.3, RFC 9855 §1, RFC 7916 §6.2.4.1  ·  code: src/engine/srlg.ts, lfa.ts, tilfa.ts</tspan></text>
+<rect x="0" y="110" width="600" height="634" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="18" y="148.9">Example 9: one duct, two links</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="591.2">All metrics 1, except S–C and C–D = 3. S–E and A–B run in</tspan><tspan x="18" y="611.2">duct-1: one backhoe cuts both.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="641.2">Blue: S’s normal path S→E→D (2). Red dashed: duct-1.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#e8590c" text-anchor="start" xml:space="preserve"><tspan x="18" y="671.2">Orange: link protection, LFA A: S→A→B→D (3), straight into the</tspan><tspan x="18" y="691.2">duct.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="start" xml:space="preserve"><tspan x="18" y="721.2">Green: SRLG protection, LFA C and TI-LFA: S→C→D (6).</tspan></text>
+<rect x="620" y="110" width="1020" height="634" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="148.9">How it works: the protected link brings its shared links along</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="182.15">A link lists its groups (srlg: [duct-1]). For S–E, the shared links are the other links with a group in</tspan><tspan x="638" y="203.4">common: here A–B. Both directions fail.</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="234.2">avoids shared link u→v:  dist(X,Y) &lt; dist(X,u) + c(u,v) + dist(v,Y)</tspan><tspan x="638" y="254.2">(a tie counts as &quot;may use it&quot;, as in B1)</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="285.15">•  TI-LFA (RFC 9855 §1): the post-convergence SPF also removes A–B; every segment must avoid it too.</tspan><tspan x="638" y="306.4">•  LFA (RFC 7916 §6.2.4.1): SRLG-disjoint candidates rank first (S→N is not shared, and N’s path avoids</tspan><tspan x="638" y="327.65">   every shared link), then the usual order (B7). A candidate in the SRLG is still an LFA for the link</tspan><tspan x="638" y="348.9">   alone.</tspan><tspan x="638" y="370.15">•  Remote LFA: the PQ node is picked as usual (RFC 7490 has no SRLG rule), then checked. If the tunnel</tspan><tspan x="638" y="391.4">   and the PQ node’s path avoid A–B, it also counts as SRLG protection.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="425.05">S → D: the two candidates</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="14" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="454.3">N  Loop-free         Node-protecting        SRLG-disjoint                                  Cost</tspan><tspan x="638" y="471.8">-  ----------------  ---------------------  ---------------------------------------------  ----</tspan><tspan x="638" y="489.3">A  2 &lt; 1+2  ✓        2 &lt; 2+1  ✓             A’s path A-B-D uses A–B  ✗                     3</tspan><tspan x="638" y="506.8">C  3 &lt; 3+2  ✓        3 &lt; 4+1  ✓             3 &lt; dist(C,A)+1+dist(B,D) = 4+1+1 = 6  ✓       6</tspan><tspan x="638" y="524.3">                                            3 &lt; dist(C,B)+1+dist(A,D) = 4+1+2 = 7  ✓</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="15" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="553.25">protection: link   LFA A   TI-LFA S-A-B-D  [Prefix B, Prefix D] = 16004 16006</tspan><tspan x="638" y="572">protection: srlg   LFA C   TI-LFA S-C-D    [Prefix D]           = 16006</tspan></text>
+<ellipse cx="58" cy="366" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="4"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="58" y="373.8">S</tspan></text>
+<ellipse cx="318" cy="216" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="318" y="223.8">E</tspan></text>
+<ellipse cx="208" cy="366" rx="32" ry="32" fill="#ffffff" stroke="#e8590c" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#e8590c" text-anchor="middle" xml:space="preserve"><tspan x="208" y="373.8">A</tspan></text>
+<ellipse cx="408" cy="366" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="408" y="373.8">B</tspan></text>
+<ellipse cx="318" cy="516" rx="32" ry="32" fill="#ffffff" stroke="#2f9e44" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="318" y="523.8">C</tspan></text>
+<ellipse cx="548" cy="366" rx="32" ry="32" fill="#ffffff" stroke="#7048e8" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#7048e8" text-anchor="middle" xml:space="preserve"><tspan x="548" y="373.8">D</tspan></text>
+<polyline points="89,348 287,234" fill="none" stroke="#e03131" stroke-width="3" stroke-dasharray="10 7" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#e03131" text-anchor="middle" xml:space="preserve"><tspan x="164.5" y="258">1  duct-1</tspan></text>
+<polyline points="244,366 372,366" fill="none" stroke="#e03131" stroke-width="3" stroke-dasharray="10 7" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#e03131" text-anchor="middle" xml:space="preserve"><tspan x="308.5" y="350">1  duct-1</tspan></text>
+<polyline points="348,236 518,347" fill="none" stroke="#1971c2" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="446" y="278">1</tspan></text>
+<polyline points="94,366 172,366" fill="none" stroke="#e8590c" stroke-width="3" stroke-linecap="round" marker-end="url(#ah1)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="133" y="350">1</tspan></text>
+<polyline points="444,366 512,366" fill="none" stroke="#e8590c" stroke-width="3" stroke-linecap="round" marker-end="url(#ah1)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="478" y="350">1</tspan></text>
+<polyline points="89,384 287,498" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah2)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="176" y="468">3</tspan></text>
+<polyline points="348,496 518,385" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah2)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="446" y="467">3</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#7048e8" text-anchor="middle" xml:space="preserve"><tspan x="542.5" y="423.2">destination</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="62" y="319.2">source</tspan></text>
+<rect x="0" y="764" width="533" height="279" rx="16" fill="#fff5f5" stroke="#e03131" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#e03131" text-anchor="start" xml:space="preserve"><tspan x="18" y="802.9">Fail the whole duct</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="836.15">Failing an SRLG is the multi-failure of A9 with</tspan><tspan x="18" y="857.4">every link of the group down: &quot;Fail SRLG duct-1 (2</tspan><tspan x="18" y="878.65">links)&quot;.</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="15" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="908.25">link: S → A, A hits A–B,</tspan><tspan x="18" y="927">      A repairs again → loops</tspan><tspan x="18" y="945.75">srlg: S → C → D (6), delivered,</tspan><tspan x="18" y="964.5">      repaired by S alone</tspan></text>
+<rect x="553" y="764" width="533" height="279" rx="16" fill="#fff4e6" stroke="#e8590c" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#e8590c" text-anchor="start" xml:space="preserve"><tspan x="571" y="802.9">Fallback, one step at a time</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="15" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="571" y="834.25">srlg:       SRLG → link</tspan><tspan x="571" y="853">node-srlg:  node + SRLG → node</tspan><tspan x="571" y="871.75">            → SRLG → link</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="571" y="903.15">The first that reaches D is installed; protects says</tspan><tspan x="571" y="924.4">which, fallback says why.</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="14" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="571" y="953.3">S → E, node-srlg: D = E, so SRLG only</tspan><tspan x="571" y="970.8">S-C-D-E (7), dest-is-next-hop</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="571" y="1000.2">With C–D also in duct-1, D can’t be reached: link</tspan><tspan x="571" y="1020.2">protection, fallback none.</tspan></text>
+<rect x="1107" y="764" width="533" height="279" rx="16" fill="#ebfbee" stroke="#2f9e44" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#2f9e44" text-anchor="start" xml:space="preserve"><tspan x="1125" y="802.9">Coverage from S</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="1125" y="836.15">Coverage adds srlg: pairs whose link has shared</tspan><tspan x="1125" y="857.4">links, and how many backups avoid them all.</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="15" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="1125" y="887.25">SRLG pairs                 2  (D, E over S–E)</tspan><tspan x="1125" y="906">SRLG-safe LFA or RLFA      1  (D: LFA C)</tspan><tspan x="1125" y="924.75">SRLG-safe TI-LFA           2</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="1125" y="955.2">E’s PQ node B is reached over S-A-B, through the duct.</tspan><tspan x="1125" y="975.2">A link with no SRLG: SRLG protection = link protection.</tspan></text>
+<rect x="0" y="1063" width="1640" height="117" rx="16" fill="#fff9db" stroke="#f08c00" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#f08c00" text-anchor="start" xml:space="preserve"><tspan x="18" y="1101.9">Takeaway</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="1135.15">Links in the same SRLG fail together, so a backup for one of them must avoid all of them. With protection: srlg, TI-LFA removes the whole group and LFA prefers a</tspan><tspan x="18" y="1156.4">neighbor whose path stays out of it. In Example 9 that moves the repair from S-A-B-D, which runs into the duct, to S-C-D.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="0" y="1209.2">Sources: docs/02-algorithms.md §18  ·  docs/learn/09-router-and-multiple-failures.md  ·  examples/09-srlg.yaml  ·  checked with the engine (results, coverage, simulation)</tspan></text>
+</svg>

@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 -30 1700 1435" width="1700" height="1435">
+<defs>
+<marker id="ah0" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L10,4 L0,8 z" fill="#2f9e44"/></marker>
+</defs>
+<rect x="-30" y="-30" width="1700" height="1435" fill="#ffffff"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="40" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="0" y="38">A7 · Packet walk: the label stack hop by hop</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="0" y="75.1">§4.5 of docs/02-algorithms.md  ·  RFC 8660, RFC 9855 §5  ·  follow one packet along the TI-LFA repair  ·  code: src/engine/packet-walk.ts</tspan></text>
+<rect x="0" y="110" width="1640" height="424" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="18" y="148.9">Example 3: S → E after S–E fails. Repair [16004, 24005, 16002] out to A, PHP on</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="481.2">Under each link: the label stack on the wire, top first. Blue = Prefix-SID, orange = Adj-SID, purple = the destination’s own label (16002 = E).</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="511.2">Under each router: what it does with the top label. Green arrows: the repair path (cost 1 + 1 + 10 + 1 = 13). Red dashed: the failed link S–E.</tspan></text>
+<ellipse cx="138" cy="296" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="4"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="138" y="303.8">S</tspan></text>
+<ellipse cx="468" cy="296" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="468" y="303.8">A</tspan></text>
+<ellipse cx="798" cy="296" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="798" y="303.8">B</tspan></text>
+<ellipse cx="1128" cy="296" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="1128" y="303.8">C</tspan></text>
+<ellipse cx="1458" cy="296" rx="32" ry="32" fill="#ffffff" stroke="#7048e8" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#7048e8" text-anchor="middle" xml:space="preserve"><tspan x="1458" y="303.8">E</tspan></text>
+<polyline points="138,260 138,208 1458,208 1458,260" fill="none" stroke="#e03131" stroke-width="3" stroke-dasharray="10 7" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#e03131" text-anchor="middle" xml:space="preserve"><tspan x="798" y="193.15">failed link S–E (metric 1)</tspan></text>
+<polyline points="174,296 432,296" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="303" y="280">1</tspan></text>
+<polyline points="504,296 762,296" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="633" y="280">1</tspan></text>
+<polyline points="834,296 1092,296" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#e8590c" text-anchor="middle" xml:space="preserve"><tspan x="963.5" y="280">10</tspan></text>
+<polyline points="1164,296 1422,296" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="1293" y="280">1</tspan></text>
+<rect x="251" y="340" width="104" height="32" rx="0" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="18" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="303" y="362.1">16004</tspan></text>
+<rect x="251" y="377" width="104" height="32" rx="0" fill="#fff4e6" stroke="#e8590c" stroke-width="2"/>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="18" fill="#e8590c" text-anchor="middle" xml:space="preserve"><tspan x="303" y="399.1">24005</tspan></text>
+<rect x="251" y="414" width="104" height="32" rx="0" fill="#f3f0ff" stroke="#7048e8" stroke-width="2"/>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="18" fill="#7048e8" text-anchor="middle" xml:space="preserve"><tspan x="303" y="436.1">16002</tspan></text>
+<rect x="581" y="340" width="104" height="32" rx="0" fill="#fff4e6" stroke="#e8590c" stroke-width="2"/>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="18" fill="#e8590c" text-anchor="middle" xml:space="preserve"><tspan x="633" y="362.1">24005</tspan></text>
+<rect x="581" y="377" width="104" height="32" rx="0" fill="#f3f0ff" stroke="#7048e8" stroke-width="2"/>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="18" fill="#7048e8" text-anchor="middle" xml:space="preserve"><tspan x="633" y="399.1">16002</tspan></text>
+<rect x="911" y="340" width="104" height="32" rx="0" fill="#f3f0ff" stroke="#7048e8" stroke-width="2"/>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="18" fill="#7048e8" text-anchor="middle" xml:space="preserve"><tspan x="963" y="362.1">16002</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="1293.5" y="361.15">plain IP</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="60" y="359.2">gets 16002</tspan><tspan x="60" y="379.2">push 16004, 24005</tspan><tspan x="60" y="399.2">out to A</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="390" y="359.2">16004 = B: to B</tspan><tspan x="390" y="379.2">1 + 0 = 1 ✓</tspan><tspan x="390" y="399.2">PHP: pop 16004</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="720" y="359.2">own Adj-SID 24005:</tspan><tspan x="720" y="379.2">pop, send on</tspan><tspan x="720" y="399.2">B → C</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="1050" y="359.2">16002 = E: to E</tspan><tspan x="1050" y="379.2">1 + 0 = 1 ✓</tspan><tspan x="1050" y="399.2">PHP: pop 16002</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="1380" y="359.2">no labels left</tspan><tspan x="1380" y="379.2">deliver</tspan></text>
+<rect x="0" y="554" width="880" height="389" rx="16" fill="#e3fafc" stroke="#0c8599" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#0c8599" text-anchor="start" xml:space="preserve"><tspan x="18" y="592.9">Hop by hop (what packetWalk() records)</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="15" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="624.25">Router  Arrives with        Does                                      Leaves with</tspan><tspan x="18" y="643">------  ------------------  ----------------------------------------  -----------------</tspan><tspan x="18" y="661.75">S       16002               push 16004, 24005; out of the repair      16004 24005 16002</tspan><tspan x="18" y="680.5">                            link to A (S doesn’t read the top label)</tspan><tspan x="18" y="699.25">A       16004 24005 16002   16004 is B’s: forward to B,               24005 16002</tspan><tspan x="18" y="718">                            c(A,B) + dist(B,B) = 1 + 0 = dist(A,B) ✓</tspan><tspan x="18" y="736.75">                            next router is B, so PHP pops 16004</tspan><tspan x="18" y="755.5">B       24005 16002         its own Adj-SID: pop, send on B→C (10)    16002</tspan><tspan x="18" y="774.25">C       16002               16002 is E’s: forward to E, 1 + 0 = 1 ✓   no labels</tspan><tspan x="18" y="793">                            next router is E, so PHP pops 16002</tspan><tspan x="18" y="811.75">E       no labels           deliver                                   –</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="842.2">Total 1 + 1 + 10 + 1 = 13: exactly the post-convergence cost of A5.</tspan></text>
+<rect x="900" y="554" width="740" height="389" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="918" y="592.9">The rules each router follows</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="918" y="628.05">At S (the repairing router)</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="918" y="660.15">The packet already carries D’s label. S pushes the rest of the segment</tspan><tspan x="918" y="681.4">list on top and sends it out of the repair link (RFC 9855 §5).</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="918" y="715.05">Every other router R reads the top label</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="918" y="747.15">•  its own Prefix-SID: pop it, read the next one</tspan><tspan x="918" y="768.4">•  its own Adj-SID R→X: pop it, send on that link, whatever its table</tspan><tspan x="918" y="789.65">   says (RFC 8402 §3.4)</tspan><tspan x="918" y="810.9">•  router Y’s Prefix-SID: forward on its normal table, checked by</tspan><tspan x="918" y="832.15">   c(R,next) + dist(next,Y) = dist(R,Y)</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="918" y="866.05">PHP (on by default)</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="918" y="898.15">If the top label is the next router’s own Prefix-SID, pop it before</tspan><tspan x="918" y="919.4">sending (RFC 8660 §2). So D gets a plain IP packet.</tspan></text>
+<rect x="0" y="963" width="533" height="241" rx="16" fill="#fff4e6" stroke="#e8590c" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#e8590c" text-anchor="start" xml:space="preserve"><tspan x="18" y="1001.9">With PHP off</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="1035.15">Each segment’s end router pops its own label:</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="1067.15">•  A sends all three labels to B.</tspan><tspan x="18" y="1088.4">•  B pops 16004 (its own), then its Adj-SID 24005.</tspan><tspan x="18" y="1109.65">•  C forwards 16002 to E.</tspan><tspan x="18" y="1130.9">•  E pops 16002 and delivers.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="1161.2">Same path, same cost 13.</tspan></text>
+<rect x="553" y="963" width="533" height="241" rx="16" fill="#ebfbee" stroke="#2f9e44" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#2f9e44" text-anchor="start" xml:space="preserve"><tspan x="571" y="1001.9">Primary path walk (Example 2, S → C)</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="571" y="1035.15">Nothing has failed, so every router, S too, forwards</tspan><tspan x="571" y="1056.4">on D’s Prefix-SID.</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="15" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="571" y="1086.25">S: 16005 → E   1 + 1 = 2 = dist(S,C) ✓</tspan><tspan x="571" y="1105">E: next is C → PHP pop 16005</tspan><tspan x="571" y="1123.75">C: plain packet, delivered    total 2</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="571" y="1154.2">The detail panel lets you pick &quot;Primary path&quot; or</tspan><tspan x="571" y="1174.2">&quot;TI-LFA backup&quot;.</tspan></text>
+<rect x="1107" y="963" width="533" height="241" rx="16" fill="#f8f9fa" stroke="#495057" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="1125" y="1001.9">What the walk is and isn’t</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="1125" y="1035.15">A teaching view: it changes no result. It ends at D</tspan><tspan x="1125" y="1056.4">with no labels left.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="1125" y="1088.15">With ECMP a real router may pick another equal-cost</tspan><tspan x="1125" y="1109.4">next hop; the walk shows the one on the</tspan><tspan x="1125" y="1130.65">post-convergence path.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="1125" y="1161.2">Labels: Prefix-SID = 16000 + index, Adj-SIDs from 24000</tspan><tspan x="1125" y="1181.2">(B18).</tspan></text>
+<rect x="0" y="1224" width="1640" height="117" rx="16" fill="#fff9db" stroke="#f08c00" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#f08c00" text-anchor="start" xml:space="preserve"><tspan x="18" y="1262.9">Takeaway</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="1296.15">Only S does anything special: it pushes the labels. Every other router just reads the top label and uses its normal table (or its own Adj-SID). The labels do the</tspan><tspan x="18" y="1317.4">steering, and the metrics walked add up to the post-convergence cost.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="0" y="1370.2">Sources: docs/02-algorithms.md §4.5  ·  docs/learn/06-segment-routing.md, 07-ti-lfa.md  ·  examples/03-ring5-highmetric.yaml, 02-ring5.yaml</tspan></text>
+</svg>

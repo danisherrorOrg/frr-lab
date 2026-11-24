@@ -96,6 +96,7 @@ A three-part series on Medium, with pictures and worked numbers from LFA Lab (so
 | [docs/04-roadmap.md](docs/04-roadmap.md) | Phases with checklists (the build order) |
 | [docs/05-testing.md](docs/05-testing.md) | Test plan and expected results to check the engine against |
 | [docs/learn/](docs/learn/00-start-here.md) | The Learn guide for users: the protocol from zero, with exercises (D60) |
+| [docs/algorithms-and-rules.md](docs/algorithms-and-rules.md) | One-page index of every algorithm and rule, each with an Excalidraw diagram ([docs/excalidraw/](docs/excalidraw/)) |
 | [docs/blog/](docs/blog/) | Sources and images of the Medium blog posts |
 | [TODO.md](TODO.md) | Detailed task list to work through, phase by phase |
 | [DECISIONS.md](DECISIONS.md) | Decision log: what was chosen and why |

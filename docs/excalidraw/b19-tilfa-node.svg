@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 -30 1700 1357" width="1700" height="1357">
+<defs>
+<marker id="ah0" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L10,4 L0,8 z" fill="#2f9e44"/></marker>
+</defs>
+<rect x="-30" y="-30" width="1700" height="1357" fill="#ffffff"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="40" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="0" y="38">B19 · TI-LFA node mode: plan for router E failing, not just the link</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="0" y="75.1">§4.4 of docs/02-algorithms.md  ·  RFC 9855 §2.1 (node protection), Appendix A  ·  DECISIONS.md D51  ·  code: src/engine/tilfa.ts</tspan></text>
+<rect x="0" y="110" width="520" height="527" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="18" y="148.9">Link mode: only S–E fails</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="492.15">Remove link S–E. Post-convergence path S → N → B →</tspan><tspan x="18" y="513.4">E → D, cost 2 + 3 + 1 + 2 = 8.</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="16" fill="#2f9e44" text-anchor="start" xml:space="preserve"><tspan x="18" y="544.2">[PrefixSID(B), PrefixSID(D)]</tspan><tspan x="18" y="564.2">= 16004, 16006   out via N</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="start" xml:space="preserve"><tspan x="18" y="594.2">The repair still goes through E. If router E dies,</tspan><tspan x="18" y="614.2">this repair dies with it.</tspan></text>
+<rect x="540" y="110" width="520" height="527" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="558" y="148.9">Node mode: router E fails</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="558" y="492.15">Remove router E and all 4 of its links. Path S → N</tspan><tspan x="558" y="513.4">→ B → C → D, cost 2 + 3 + 3 + 3 = 11.</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="16" fill="#2f9e44" text-anchor="start" xml:space="preserve"><tspan x="558" y="544.2">[PrefixSID(C), PrefixSID(D)]</tspan><tspan x="558" y="564.2">= 16005, 16006   out via N</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="start" xml:space="preserve"><tspan x="558" y="594.2">E is on no segment, so the repair survives E failing.</tspan></text>
+<rect x="1080" y="110" width="560" height="527" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="1098" y="148.9">The rule: remove the router, not the link</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="15" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="1098" y="180.25">link mode   remove link S–E</tspan><tspan x="1098" y="199">  (b): dist(X,Y) &lt; dist(X,S) + c(S,E) + dist(E,Y)</tspan><tspan x="1098" y="217.75"> </tspan><tspan x="1098" y="236.5">node mode   remove router E (all its links)</tspan><tspan x="1098" y="255.25">  (b): dist(X,Y) &lt; dist(X,E) + dist(E,Y)</tspan><tspan x="1098" y="274">       (dist through E is ∞ if E is overloaded)</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="1098" y="305.15">•  Turned on by protection: node in the file (one</tspan><tspan x="1098" y="326.4">   setting for the whole network, like Remote LFA in</tspan><tspan x="1098" y="347.65">   A4).</tspan><tspan x="1098" y="368.9">•  The rest of the walk is the same: furthest valid</tspan><tspan x="1098" y="390.15">   Prefix-SID, else an Adj-SID (B15), clean-up (B16),</tspan><tspan x="1098" y="411.4">   end with PrefixSID(D) (B17).</tspan><tspan x="1098" y="432.65">•  E is not on the path, so it never ends a segment and</tspan><tspan x="1098" y="453.9">   no Adj-SID names one of its links. (b) for E also</tspan><tspan x="1098" y="475.15">   rules out the link S–E.</tspan></text>
+<ellipse cx="58" cy="392" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="4"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="58" y="399.8">S</tspan></text>
+<ellipse cx="258" cy="392" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="258" y="399.8">E</tspan></text>
+<ellipse cx="58" cy="216" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="58" y="223.8">N</tspan></text>
+<ellipse cx="258" cy="216" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="258" y="223.8">B</tspan></text>
+<ellipse cx="458" cy="216" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="458" y="223.8">C</tspan></text>
+<ellipse cx="458" cy="392" rx="32" ry="32" fill="#ffffff" stroke="#7048e8" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#7048e8" text-anchor="middle" xml:space="preserve"><tspan x="458" y="399.8">D</tspan></text>
+<polyline points="94,392 222,392" fill="none" stroke="#e03131" stroke-width="3" stroke-dasharray="10 7" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="158" y="421">2</tspan></text>
+<polyline points="58,356 58,252" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="42" y="311">2</tspan></text>
+<polyline points="94,216 222,216" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="158" y="200">3</tspan></text>
+<polyline points="258,252 258,356" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="274" y="311">1</tspan></text>
+<polyline points="294,392 422,392" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="358" y="421">2</tspan></text>
+<polyline points="294,216 422,216" fill="none" stroke="#495057" stroke-width="2" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="358" y="200">3</tspan></text>
+<polyline points="458,252 458,356" fill="none" stroke="#495057" stroke-width="2" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="442" y="311">3</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="58" y="447.2">source</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#7048e8" text-anchor="middle" xml:space="preserve"><tspan x="458.5" y="447.2">destination</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle" xml:space="preserve"><tspan x="258.5" y="447.2">link S–E down</tspan></text>
+<ellipse cx="598" cy="392" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="4"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="598" y="399.8">S</tspan></text>
+<ellipse cx="798" cy="392" rx="32" ry="32" fill="#ffffff" stroke="#e03131" stroke-width="2" stroke-dasharray="10 7"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#e03131" text-anchor="middle" xml:space="preserve"><tspan x="798" y="399.8">E</tspan></text>
+<ellipse cx="598" cy="216" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="598" y="223.8">N</tspan></text>
+<ellipse cx="798" cy="216" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="798" y="223.8">B</tspan></text>
+<ellipse cx="998" cy="216" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="998" y="223.8">C</tspan></text>
+<ellipse cx="998" cy="392" rx="32" ry="32" fill="#ffffff" stroke="#7048e8" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#7048e8" text-anchor="middle" xml:space="preserve"><tspan x="998" y="399.8">D</tspan></text>
+<polyline points="634,392 762,392" fill="none" stroke="#e03131" stroke-width="3" stroke-dasharray="10 7" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="698" y="421">2</tspan></text>
+<polyline points="598,356 598,252" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="582" y="311">2</tspan></text>
+<polyline points="634,216 762,216" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="698" y="200">3</tspan></text>
+<polyline points="798,356 798,252" fill="none" stroke="#e03131" stroke-width="3" stroke-dasharray="10 7" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="814" y="311">1</tspan></text>
+<polyline points="834,392 962,392" fill="none" stroke="#e03131" stroke-width="3" stroke-dasharray="10 7" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="898" y="421">2</tspan></text>
+<polyline points="834,216 962,216" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="898" y="200">3</tspan></text>
+<polyline points="998,252 998,356" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="982" y="311">3</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="598" y="447.2">source</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#7048e8" text-anchor="middle" xml:space="preserve"><tspan x="998.5" y="447.2">destination</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle" xml:space="preserve"><tspan x="798.5" y="447.2">router down</tspan></text>
+<rect x="0" y="657" width="1060" height="247" rx="16" fill="#fff5f5" stroke="#e03131" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#e03131" text-anchor="start" xml:space="preserve"><tspan x="18" y="695.9">The walk in node mode, check by check (S → D)</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="14" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="726.3">From  Try      (a) dist = path cost?        (b) dist(X,Y) &lt; dist(X,E) + dist(E,Y)   Result</tspan><tspan x="18" y="743.8">----  -------  ---------------------------  -------------------------------------   ---------------</tspan><tspan x="18" y="761.3">S     D, C, B  ✗  e.g. dist(S,B)=3, path 5                                           –</tspan><tspan x="18" y="778.8">S     N        ✓  2 = 2                     2 &lt; 2 + 4  ✓                             P(N), dropped</tspan><tspan x="18" y="796.3">N     D        ✗  dist(N,D)=6, path 9                                                –</tspan><tspan x="18" y="813.8">N     C        ✓  6 = 6                     6 &lt; 4 + 4  ✓                             P(C)</tspan><tspan x="18" y="831.3">C     D        ✓  3 = 3                     3 &lt; 4 + 2  ✓                             P(D)</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="861.2">P = PrefixSID. dist() is the normal (pre-failure) distance: the other routers still use their old tables. P(N)</tspan><tspan x="18" y="881.2">only reaches the first hop, so the clean-up drops it (B16). Result: [P(C), P(D)] = 16005, 16006.</tspan></text>
+<rect x="1080" y="657" width="560" height="247" rx="16" fill="#fff4e6" stroke="#e8590c" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#e8590c" text-anchor="start" xml:space="preserve"><tspan x="1098" y="695.9">Can’t avoid E? Fall back to link</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="1098" y="729.15">•  D = E. S → E can’t avoid E. The engine installs the</tspan><tspan x="1098" y="750.4">   link repair [P(B), P(E)] = 16004, 16002, marked</tspan><tspan x="1098" y="771.65">   fallback: dest-is-next-hop.</tspan><tspan x="1098" y="792.9">•  E is the only way to D. Example 10 in node mode, R3</tspan><tspan x="1098" y="814.15">   → R5: R5 hangs off R4, so the repair is the link</tspan><tspan x="1098" y="835.4">   one, fallback: none. RFC 9855 has no rule here;</tspan><tspan x="1098" y="856.65">   falling back still covers the link failure (D51).</tspan></text>
+<rect x="0" y="924" width="533" height="202" rx="16" fill="#f3f0ff" stroke="#7048e8" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#7048e8" text-anchor="start" xml:space="preserve"><tspan x="18" y="962.9">It can cost more</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="996.15">Node mode also avoids E, so the repair can cost more</tspan><tspan x="18" y="1017.4">than S’s final path after a link failure: 11 instead</tspan><tspan x="18" y="1038.65">of 8 here. In node mode &quot;TI-LFA is always the same</tspan><tspan x="18" y="1059.9">as the final path&quot; no longer holds (§8, §10).</tspan></text>
+<rect x="553" y="924" width="533" height="202" rx="16" fill="#ebfbee" stroke="#2f9e44" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#2f9e44" text-anchor="start" xml:space="preserve"><tspan x="571" y="962.9">Coverage (A8)</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="571" y="996.15">Example 8, every router as source: 33 pairs, 19 with</tspan><tspan x="571" y="1017.4">D ≠ E. Against E failing, TI-LFA protects all 19 and</tspan><tspan x="571" y="1038.65">Remote LFA 16. From S alone: 3 pairs (B, C, D via</tspan><tspan x="571" y="1059.9">E), 3 and 3.</tspan></text>
+<rect x="1107" y="924" width="533" height="202" rx="16" fill="#f8f9fa" stroke="#495057" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="1125" y="962.9">Related</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="1125" y="996.15">•  Same idea for LFA (B5) and Remote LFA (B12): the</tspan><tspan x="1125" y="1017.4">   backup must avoid router E.</tspan><tspan x="1125" y="1038.65">•  Router failure simulation (A9) shows what really</tspan><tspan x="1125" y="1059.9">   happens when E dies.</tspan><tspan x="1125" y="1081.15">•  With SRLGs the engine falls back one step at a</tspan><tspan x="1125" y="1102.4">   time (A19).</tspan></text>
+<rect x="0" y="1146" width="1640" height="117" rx="16" fill="#fff9db" stroke="#f08c00" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#f08c00" text-anchor="start" xml:space="preserve"><tspan x="18" y="1184.9">Takeaway</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="1218.15">Node mode plans for the whole next-hop router failing: remove router E, then run the same walk with the check dist(X,Y) &lt; dist(X,E) + dist(E,Y). In Example 8 the link</tspan><tspan x="18" y="1239.4">repair 16004, 16006 goes through E; the node repair 16005, 16006 goes around it, at cost 11 instead of 8.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="0" y="1292.2">Sources: docs/02-algorithms.md §4.4, §5, §16  ·  docs/learn/07-ti-lfa.md (Node protection)  ·  DECISIONS.md D51  ·  examples/08-node-protection.yaml, 10-lan-levels.yaml</tspan></text>
+</svg>

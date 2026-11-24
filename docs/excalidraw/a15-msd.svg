@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 -30 1700 1316" width="1700" height="1316">
+<defs>
+<marker id="ah0" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L10,4 L0,8 z" fill="#2f9e44"/></marker>
+</defs>
+<rect x="-30" y="-30" width="1700" height="1316" fill="#ffffff"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="40" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="0" y="38">A15 · Max SID depth: is the label stack too deep?</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="0" y="75.1">§14 of docs/02-algorithms.md  ·  RFC 8491 (BMI-MSD), RFC 9855 §3  ·  code: src/engine/msd.ts</tspan></text>
+<rect x="0" y="110" width="600" height="634" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="18" y="148.9">Example 3, msd: 2, S → E</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="591.2">All metrics 1, except C–B = 10. Every router can impose 2</tspan><tspan x="18" y="611.2">labels.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="start" xml:space="preserve"><tspan x="18" y="641.2">Red dashed: the failed link S–E.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="start" xml:space="preserve"><tspan x="18" y="671.2">Green: the TI-LFA repair S→A→B→C→E (13).</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="701.2">Right: the stack S would have to impose, top first, before</tspan><tspan x="18" y="721.2">PHP.</tspan></text>
+<rect x="620" y="110" width="1020" height="634" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="148.9">How it works: count every label S imposes, compare with S’s MSD</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="184.05">1. Which MSD?</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="215.2">msdOf(S) = S’s own msd, else the network’s msd, else no limit</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="638" y="245.2">RFC 8491 also has a per-link MSD; LFA Lab models only the node value. Range 2 to 255 (one octet).</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="278.05">2. How deep is the repair?</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="310.15">Labels imposed = labels swapped + labels pushed (RFC 8491 §1.1). S swaps D’s own label and pushes the</tspan><tspan x="638" y="331.4">repair list, so the whole stack of A5 counts:</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="362.2">depth = labelStack.length = extra labels + 1</tspan><tspan x="638" y="382.2">too deep  ⇔  depth &gt; msd</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="16" fill="#e03131" text-anchor="start" xml:space="preserve"><tspan x="638" y="412.2">S → E:  [16004, 24005, 16002]</tspan><tspan x="638" y="432.2">        3 labels (1 swapped + 2 pushed) &gt; MSD 2 of S  ✗</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="465.05">3. What &quot;too deep&quot; changes</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="497.15">•  The repair is still worked out and shown, marked tooDeep, but S can’t install it.</tspan><tspan x="638" y="518.4">•  It isn’t counted as TI-LFA; it is counted apart as tooDeep (tilfa + tooDeep = TI-LFA with no limit).</tspan><tspan x="638" y="539.65">•  &quot;Protected by&quot; skips it, and so do the heat map (A13) and what-if (A14).</tspan><tspan x="638" y="560.9">•  Simulation, TI-LFA mode: no backup, traffic dropped with reason too-deep.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="638" y="591.2">No limit (the default) changes nothing: every earlier result stays the same.</tspan></text>
+<ellipse cx="58" cy="296" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="4"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="58" y="303.8">S</tspan></text>
+<ellipse cx="198" cy="206" rx="32" ry="32" fill="#ffffff" stroke="#7048e8" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#7048e8" text-anchor="middle" xml:space="preserve"><tspan x="198" y="213.8">E</tspan></text>
+<ellipse cx="338" cy="296" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="338" y="303.8">C</tspan></text>
+<ellipse cx="278" cy="496" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="278" y="503.8">B</tspan></text>
+<ellipse cx="108" cy="496" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="108" y="503.8">A</tspan></text>
+<polyline points="88,277 167,226" fill="none" stroke="#e03131" stroke-width="3" stroke-dasharray="10 7" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="141" y="277">1</tspan></text>
+<polyline points="67,331 100,461" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="101" y="398">1</tspan></text>
+<polyline points="144,496 242,496" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="193" y="525">1</tspan></text>
+<polyline points="288,462 327,331" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="331.5" y="410">10</tspan></text>
+<polyline points="308,277 229,226" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="281" y="238">1</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="288.5" y="553.25">Adj-SID B→C 24005</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="498" y="185.15">Stack at S</tspan></text>
+<rect x="418" y="206" width="160" height="52" rx="0" fill="#ebfbee" stroke="#2f9e44" stroke-width="2"/>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="18" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="498" y="227.1">16004</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="498.5" y="249.3">Prefix B</tspan></text>
+<rect x="418" y="268" width="160" height="52" rx="0" fill="#ebfbee" stroke="#2f9e44" stroke-width="2"/>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="18" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="498" y="289.1">24005</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="498.5" y="311.3">Adj B→C</tspan></text>
+<rect x="418" y="330" width="160" height="52" rx="0" fill="#f3f0ff" stroke="#7048e8" stroke-width="2"/>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="18" fill="#7048e8" text-anchor="middle" xml:space="preserve"><tspan x="498" y="351.1">16002</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="498.5" y="373.3">Prefix E</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="498.5" y="410.1">3 labels</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="20" fill="#e03131" text-anchor="middle" xml:space="preserve"><tspan x="498" y="437">&gt; MSD 2 ✗</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle" xml:space="preserve"><tspan x="498.5" y="469.2">too deep:</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle" xml:space="preserve"><tspan x="498.5" y="491.2">not installed</tspan></text>
+<rect x="0" y="764" width="1087" height="321" rx="16" fill="#fff5f5" stroke="#e03131" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#e03131" text-anchor="start" xml:space="preserve"><tspan x="18" y="802.9">Example 3, msd: 2: the 6 too-deep repairs</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="15" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="834.25">PLR  D  Link  Label stack              Depth</tspan><tspan x="18" y="853">---  -  ----  -----------------------  -----</tspan><tspan x="18" y="871.75">S    A  A–S   16005  24006  16003      3 &gt; 2</tspan><tspan x="18" y="890.5">S    B  A–S   16005  24006  16004      3 &gt; 2</tspan><tspan x="18" y="909.25">S    C  S–E   16004  24005  16005      3 &gt; 2</tspan><tspan x="18" y="928">S    E  S–E   16004  24005  16002      3 &gt; 2</tspan><tspan x="18" y="946.75">A    B  B–A   16005  24006  16004      3 &gt; 2</tspan><tspan x="18" y="965.5">E    C  E–C   16004  24005  16005      3 &gt; 2</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="15" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="994.25">msd 2:            TI-LFA 14/20, too deep 6 (S 4, A 1, E 1)   LFA, Remote LFA 8/20 unchanged</tspan><tspan x="18" y="1013">msd 3:            TI-LFA 20/20, nothing too deep</tspan><tspan x="18" y="1031.75">msd 3, S msd 2:   TI-LFA 16/20, too deep 4 (all S’s)</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="1062.2">Simulation, S–E down, TI-LFA mode: traffic from S to C and to E is dropped at S, reason too-deep.</tspan></text>
+<rect x="1107" y="764" width="533" height="321" rx="16" fill="#f8f9fa" stroke="#495057" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="1125" y="802.9">Edge cases</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="1125" y="836.15">•  LFA and Remote LFA always fit: at most 2 labels</tspan><tspan x="1125" y="857.4">   (PQ label + D’s label). That is why MSD 1 isn’t</tspan><tspan x="1125" y="878.65">   modelled.</tspan><tspan x="1125" y="899.9">•  No shorter list is tried. The greedy walk (B15)</tspan><tspan x="1125" y="921.15">   already takes the furthest Prefix-SID at each</tspan><tspan x="1125" y="942.4">   step; LFA Lab always repairs along the</tspan><tspan x="1125" y="963.65">   post-convergence path (B14).</tspan><tspan x="1125" y="984.9">•  SRv6 (A25): the same repair is 2 SIDs and fits</tspan><tspan x="1125" y="1006.15">   MSD 2.</tspan></text>
+<rect x="0" y="1105" width="1640" height="117" rx="16" fill="#fff9db" stroke="#f08c00" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#f08c00" text-anchor="start" xml:space="preserve"><tspan x="18" y="1143.9">Takeaway</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="1177.15">A TI-LFA repair only counts if the router can push it. If the label stack is longer than the router’s MSD, the repair is shown but marked &quot;too deep&quot; and counted as</tspan><tspan x="18" y="1198.4">unprotected. In Example 3 with MSD 2, 6 of 20 pairs need 3 labels, so TI-LFA coverage drops from 100% to 70%.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="0" y="1251.2">Sources: docs/02-algorithms.md §14  ·  docs/learn/06, 07, 10  ·  examples/03-ring5-highmetric.yaml  ·  checked with computeCoverage(), simulateFailure()</tspan></text>
+</svg>

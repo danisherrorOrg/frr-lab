@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 -30 1700 1177" width="1700" height="1177">
+<defs>
+<marker id="ah0" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L10,4 L0,8 z" fill="#2f9e44"/></marker>
+</defs>
+<rect x="-30" y="-30" width="1700" height="1177" fill="#ffffff"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="40" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="0" y="38">B2 · ECMP-protected: the other next hop is the backup</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="0" y="75.1">§1.4 of docs/02-algorithms.md  ·  RFC 5286 §3.4 (other primary next hops)  ·  code: src/engine/lfa.ts (ecmpProtectorLinks)</tspan></text>
+<rect x="0" y="110" width="600" height="614" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="18" y="148.9">Example 5: L1 → L2, link L1–SP1 fails</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="551.2">Leaf-spine, every link 10. L1 reaches L2 over SP1 and over</tspan><tspan x="18" y="571.2">SP2, both 20: two primary next hops.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="start" xml:space="preserve"><tspan x="18" y="601.2">Red dashed: the failed link L1–SP1.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="18" y="631.2">Blue: SP1→L2, the rest of the primary path L1 can no longer</tspan><tspan x="18" y="651.2">reach.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="start" xml:space="preserve"><tspan x="18" y="681.2">Green: the other primary next hop, L1→SP2→L2, keeps</tspan><tspan x="18" y="701.2">forwarding. Nothing new is installed.</tspan></text>
+<rect x="620" y="110" width="1020" height="614" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="148.9">The rule: another primary next hop that avoids the failed link</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="182.15">D is ECMP-protected against the failure of primary link S→E when S has another primary next hop N (on a</tspan><tspan x="638" y="203.4">shortest path to D) whose own path to D avoids S→E (B1, with X = N, Y = D):</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="234.2">N ≠ the failed link’s next hop, and   dist(N,D) &lt; dist(N,S) + c(S,E) + dist(E,D)</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="14" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="262.3">L1 → L2, fail L1–SP1:  other next hop SP2</tspan><tspan x="638" y="279.8">   dist(SP2,L2) = 10 &lt; dist(SP2,L1) + c(L1,SP1) + dist(SP1,L2) = 10 + 10 + 10 = 30   ✓</tspan><tspan x="638" y="297.3">L1 → L2, fail L1–SP2:  other next hop SP1</tspan><tspan x="638" y="314.8">   dist(SP1,L2) = 10 &lt; dist(SP1,L1) + c(L1,SP2) + dist(SP2,L2) = 10 + 10 + 10 = 30   ✓</tspan><tspan x="638" y="332.3">L1 → SP1, fail L1–SP1: only one next hop (dist(L1,SP1) = 10, via SP2 it is 30)   ✗</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="365.05">Why it comes first</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="397.15">S already forwards over N. When S→E fails, S just stops using it: no tunnel, no labels, no switch to a</tspan><tspan x="638" y="418.4">pre-computed backup. So the results table credits a pair to ECMP before LFA, Remote LFA and TI-LFA</tspan><tspan x="638" y="439.65">(B20). In coverage it counts as LFA too.</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="15" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="469.25">L1 as the source:   8 pairs, ECMP 6 (L2, L3, L4 × 2 links),</tspan><tspan x="638" y="488">                    the 2 spines need Remote LFA (PQ L2) or TI-LFA</tspan><tspan x="638" y="506.75">Every router:      48 pairs, ECMP 32</tspan></text>
+<ellipse cx="188" cy="236" rx="34" ry="34" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="188.5" y="243.8">SP1</tspan></text>
+<ellipse cx="418" cy="236" rx="34" ry="34" fill="#ffffff" stroke="#2f9e44" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="418.5" y="243.8">SP2</tspan></text>
+<ellipse cx="58" cy="456" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="4"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="58.5" y="463.8">L1</tspan></text>
+<ellipse cx="228" cy="456" rx="32" ry="32" fill="#ffffff" stroke="#7048e8" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#7048e8" text-anchor="middle" xml:space="preserve"><tspan x="228.5" y="463.8">L2</tspan></text>
+<ellipse cx="388" cy="456" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="388.5" y="463.8">L3</tspan></text>
+<ellipse cx="538" cy="456" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="538.5" y="463.8">L4</tspan></text>
+<polyline points="76,425 168,269" fill="none" stroke="#e03131" stroke-width="3" stroke-dasharray="10 7" stroke-linecap="round"/>
+<polyline points="89,437 386,256" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<polyline points="393,265 251,429" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<polyline points="195,273 222,420" fill="none" stroke="#1971c2" stroke-width="3" stroke-linecap="round"/>
+<polyline points="214,264 364,429" fill="none" stroke="#495057" stroke-width="2" stroke-linecap="round"/>
+<polyline points="413,274 393,421" fill="none" stroke="#495057" stroke-width="2" stroke-linecap="round"/>
+<polyline points="220,256 507,437" fill="none" stroke="#495057" stroke-width="2" stroke-linecap="round"/>
+<polyline points="436,269 521,424" fill="none" stroke="#495057" stroke-width="2" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="58" y="513.2">source</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#7048e8" text-anchor="middle" xml:space="preserve"><tspan x="228.5" y="513.2">destination</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="422" y="187.2">other next hop</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle" xml:space="preserve"><tspan x="188.5" y="187.2">failed next hop</tspan></text>
+<rect x="0" y="744" width="533" height="202" rx="16" fill="#ebfbee" stroke="#2f9e44" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#2f9e44" text-anchor="start" xml:space="preserve"><tspan x="18" y="782.9">Also an LFA</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="816.15">RFC 5286 §3.4: other primary next hops count as LFA</tspan><tspan x="18" y="837.4">candidates too. For L1 → L2 over L1–SP1, SP2 is also</tspan><tspan x="18" y="858.65">the best LFA. The table still says ECMP, the simpler</tspan><tspan x="18" y="879.9">of the two (B20).</tspan></text>
+<rect x="553" y="744" width="533" height="202" rx="16" fill="#fff5f5" stroke="#e03131" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#e03131" text-anchor="start" xml:space="preserve"><tspan x="571" y="782.9">When it fails</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="571" y="816.15">•  Only one primary next hop (L1 → SP1).</tspan><tspan x="571" y="837.4">•  The other next hop is on the same LAN: it goes</tspan><tspan x="571" y="858.65">   down with S’s interface (A21).</tspan><tspan x="571" y="879.9">•  The other next hop’s path crosses S→E (B1 gives a</tspan><tspan x="571" y="901.15">   tie or worse).</tspan></text>
+<rect x="1107" y="744" width="533" height="202" rx="16" fill="#f8f9fa" stroke="#495057" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="1125" y="782.9">Edge cases</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="1125" y="816.15">•  Parallel links (A10): another equal-cost link to</tspan><tspan x="1125" y="837.4">   E itself counts.</tspan><tspan x="1125" y="858.65">•  An excluded neighbor (A16) still counts: ECMP is</tspan><tspan x="1125" y="879.9">   normal forwarding, not an alternate.</tspan><tspan x="1125" y="901.15">•  Overload bit (A17): no change; an overloaded</tspan><tspan x="1125" y="922.4">   router is a next hop only for its own address.</tspan></text>
+<rect x="0" y="966" width="1640" height="117" rx="16" fill="#fff9db" stroke="#f08c00" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#f08c00" text-anchor="start" xml:space="preserve"><tspan x="18" y="1004.9">Takeaway</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="1038.15">If S already has two equal-cost next hops for D and one of them doesn’t use the failed link, the traffic keeps flowing over that one with nothing to compute or install.</tspan><tspan x="18" y="1059.4">That is the simplest protection there is, so it is credited first.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="0" y="1112.2">Sources: docs/02-algorithms.md §1.4, §5  ·  docs/learn/02-shortest-paths.md (ECMP)  ·  examples/05-leaf-spine.yaml  ·  checked with computeForSource(), computeCoverage()</tspan></text>
+</svg>

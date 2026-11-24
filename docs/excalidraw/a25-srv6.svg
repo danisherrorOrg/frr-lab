@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 -30 1700 1209" width="1700" height="1209">
+<defs>
+<marker id="ah0" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L10,4 L0,8 z" fill="#2f9e44"/></marker>
+</defs>
+<rect x="-30" y="-30" width="1700" height="1209" fill="#ffffff"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="40" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="0" y="38">A25 · SRv6: the same repair, written as IPv6 SIDs</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="0" y="75.1">§24 of docs/02-algorithms.md  ·  RFC 9855 §7.2, RFC 8986 §3.1, §4.1, §4.2, §5 (H.Encaps), RFC 9352 §4  ·  code: src/engine/srv6.ts</tspan></text>
+<rect x="0" y="110" width="600" height="604" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="18" y="148.9">Example 3, dataplane: srv6, S → E</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="591.2">All metrics 1, except C–B = 10. Red dashed: the failed link</tspan><tspan x="18" y="611.2">S–E.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="start" xml:space="preserve"><tspan x="18" y="641.2">Green: the TI-LFA repair S→A→B→C→E (13), the same path as</tspan><tspan x="18" y="661.2">SR-MPLS (A5).</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="691.2">Right: what S sends on SRv6, top first.</tspan></text>
+<rect x="620" y="110" width="1020" height="604" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="148.9">How it works: same segments, other encoding</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="182.15">RFC 9855 §7.2: &quot;the TI-LFA path computation algorithm is the same&quot;. Only the encoding changes: each</tspan><tspan x="638" y="203.4">segment becomes an IPv6 address (a SID) from a router’s locator.</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="14" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="232.3">locator   router’s locator, else fc00:0:&lt;SID index in hex&gt;::/48   B:   fc00:0:4::/48</tspan><tspan x="638" y="249.8">End       node segment      = locator + function 1              B:   fc00:0:4::1</tspan><tspan x="638" y="267.3">End.X     adjacency segment = locator + 0x40 + the link’s place  B→A: fc00:0:4::40</tspan><tspan x="638" y="284.8">          among the router’s links (Adj-SID order: by neighbor, B→C: fc00:0:4::41</tspan><tspan x="638" y="302.3">          then link id)</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="335.05">The repair list drops the destination’s own segment</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="367.15">With H.Encaps, S puts the original packet inside a new IPv6 header. D stays the inner packet’s address,</tspan><tspan x="638" y="388.4">so PrefixSID(D) isn’t needed in the list.</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="15" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="418.25">segments    [PrefixSID(B), AdjSID(B→C), PrefixSID(E)]</tspan><tspan x="638" y="437">SR-MPLS     16004  24005  16002                 3 labels</tspan><tspan x="638" y="455.75">SRv6        [fc00:0:4::1, fc00:0:4::41]         2 SIDs, E stays the inner destination</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="489.05">Max SID depth counts SIDs pushed (RFC 9352 §4)</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="15" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="519.25">Example 3, msd: 2     SR-MPLS: TI-LFA 14/20, too deep 6</tspan><tspan x="638" y="538">                      SRv6:    TI-LFA 20/20, too deep 0</tspan></text>
+<ellipse cx="58" cy="296" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="4"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="58" y="303.8">S</tspan></text>
+<ellipse cx="198" cy="206" rx="32" ry="32" fill="#ffffff" stroke="#7048e8" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#7048e8" text-anchor="middle" xml:space="preserve"><tspan x="198" y="213.8">E</tspan></text>
+<ellipse cx="338" cy="296" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="338" y="303.8">C</tspan></text>
+<ellipse cx="278" cy="496" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="278" y="503.8">B</tspan></text>
+<ellipse cx="108" cy="496" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="108" y="503.8">A</tspan></text>
+<polyline points="88,277 167,226" fill="none" stroke="#e03131" stroke-width="3" stroke-dasharray="10 7" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="141" y="277">1</tspan></text>
+<polyline points="67,331 100,461" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="101" y="398">1</tspan></text>
+<polyline points="144,496 242,496" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="193" y="525">1</tspan></text>
+<polyline points="288,462 327,331" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="331.5" y="410">10</tspan></text>
+<polyline points="308,277 229,226" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="281" y="238">1</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="278" y="553.25">End.X B→C ::41</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="493" y="183.2">What S sends</tspan></text>
+<rect x="408" y="202" width="170" height="50" rx="0" fill="#ebfbee" stroke="#2f9e44" stroke-width="2"/>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="14" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="493.5" y="221.3">fc00:0:4::1</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="493.5" y="244.35">End of B</tspan></text>
+<rect x="408" y="260" width="170" height="50" rx="0" fill="#ebfbee" stroke="#2f9e44" stroke-width="2"/>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="14" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="493.5" y="279.3">fc00:0:4::41</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="493" y="302.35">End.X B→C</tspan></text>
+<rect x="408" y="318" width="170" height="50" rx="0" fill="#f3f0ff" stroke="#7048e8" stroke-width="2"/>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="17" fill="#7048e8" text-anchor="middle" xml:space="preserve"><tspan x="493.5" y="338.15">dst E</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="493" y="360.35">inner packet</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="493.5" y="393.25">2 SIDs</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="493.5" y="415.25">MSD 2: fits</tspan></text>
+<rect x="0" y="734" width="533" height="244" rx="16" fill="#fff4e6" stroke="#e8590c" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#e8590c" text-anchor="start" xml:space="preserve"><tspan x="18" y="772.9">SR-MPLS label stack</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="805.2">16004   Prefix-SID B</tspan><tspan x="18" y="825.2">24005   Adj-SID B→C</tspan><tspan x="18" y="845.2">16002   Prefix-SID E</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="876.15">3 labels imposed: 1 swapped (E’s label) + 2 pushed.</tspan><tspan x="18" y="897.4">Too deep for MSD 2 (A15).</tspan></text>
+<rect x="553" y="734" width="533" height="244" rx="16" fill="#ebfbee" stroke="#2f9e44" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#2f9e44" text-anchor="start" xml:space="preserve"><tspan x="571" y="772.9">SRv6 SID list</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="571" y="805.2">fc00:0:4::1    End of B</tspan><tspan x="571" y="825.2">fc00:0:4::41   End.X B→C</tspan><tspan x="571" y="845.2">inner dst      E</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="571" y="876.15">S pushes 2 SIDs: fits MSD 2. B’s links in Adj-SID</tspan><tspan x="571" y="897.4">order are to A (0x40), then to C (0x41).</tspan></text>
+<rect x="1107" y="734" width="533" height="244" rx="16" fill="#f8f9fa" stroke="#495057" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="1125" y="772.9">Edge cases</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="1125" y="806.15">•  Empty list: the outgoing interface is enough (the</tspan><tspan x="1125" y="827.4">   LFA case). Example 1, S → D: &quot;no SIDs needed&quot;.</tspan><tspan x="1125" y="848.65">•  Flex-Algo (A24): each algorithm has its own</tspan><tspan x="1125" y="869.9">   locator (RFC 9350 §14).</tspan><tspan x="1125" y="891.15">•  An End.X SID needs no node SID before it (RFC</tspan><tspan x="1125" y="912.4">   9855 §7.2): that could save a SID; not modelled.</tspan><tspan x="1125" y="933.65">•  The packet walk (A7) and the simulation’s labels</tspan><tspan x="1125" y="954.9">   stay SR-MPLS.</tspan></text>
+<rect x="0" y="998" width="1640" height="117" rx="16" fill="#fff9db" stroke="#f08c00" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#f08c00" text-anchor="start" xml:space="preserve"><tspan x="18" y="1036.9">Takeaway</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="1070.15">On SRv6, TI-LFA computes exactly the same repair; only the encoding changes. Segments become IPv6 SIDs from each router’s locator, and the destination stays the inner</tspan><tspan x="18" y="1091.4">packet’s address. In Example 3 the 3-label MPLS stack becomes 2 SIDs, which fits an MSD of 2.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="0" y="1144.2">Sources: docs/02-algorithms.md §24  ·  docs/learn/11-advanced-topics.md (SRv6)  ·  examples/03-ring5-highmetric.yaml, 01-square.yaml  ·  checked with the engine</tspan></text>
+</svg>

@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 -30 1700 1302" width="1700" height="1302">
+<defs>
+</defs>
+<rect x="-30" y="-30" width="1700" height="1302" fill="#ffffff"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="40" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="0" y="38">A14 · What-if diff: try a change before making it</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="0" y="75.1">§13 of docs/02-algorithms.md  ·  coverage of two versions of the network, side by side; nothing new is decided  ·  code: src/engine/what-if.ts</tspan></text>
+<rect x="0" y="110" width="600" height="704" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="18" y="148.9">Example 3: change C–B from 10 to 1</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="661.2">All other metrics are 1. The new metric turns Example 3 into</tspan><tspan x="18" y="681.2">Example 2.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#e8590c" text-anchor="start" xml:space="preserve"><tspan x="18" y="711.2">Orange: the link being changed.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="741.2">Tags: each router’s own coverage as the source, before →</tspan><tspan x="18" y="761.2">after, out of its 4 pairs.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="791.2">Green: better in that mode. Red: worse.</tspan></text>
+<rect x="620" y="110" width="1020" height="704" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="148.9">How it works: whatIf(before, after)</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="184.05">1. Totals and per router</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="216.15">Each side is the all-sources coverage of A8. The UI shows each mode as &quot;before → after&quot; and the change</tspan><tspan x="638" y="237.4">in points.</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="268.2">LFA          8/20 = 40%  →  10/20 =  50%   (+10 points)</tspan><tspan x="638" y="288.2">LFA + RLFA   8/20 = 40%  →  20/20 = 100%   (+60 points)</tspan><tspan x="638" y="308.2">TI-LFA      20/20 = 100% → 20/20 = 100%   (no change)</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="341.05">2. Per destination: (S, D) is listed if its pairs differ</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="373.15">For each (S, D), each side gives a list of (primary link, simplest method). Strength follows the repair</tspan><tspan x="638" y="394.4">modes:</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="425.2">LFA or ECMP = 3   Remote LFA = 2   TI-LFA = 1   none = 0</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="456.15">•  better / worse: the weakest pair’s strength went up / down</tspan><tspan x="638" y="477.4">•  rerouted: other primary links, same weakest strength</tspan><tspan x="638" y="498.65">•  ECMP ↔ LFA is not a change: both are protected in every mode</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="532.05">Worked: 12 better, 4 worse, 2 rerouted</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="15" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="562.25">S→E  better    S–E TI-LFA (1)    →  S–E Remote LFA (2)</tspan><tspan x="638" y="581">S→C  better    S–E TI-LFA (1)    →  S–E LFA (3)</tspan><tspan x="638" y="599.75">B→A  worse     B–A LFA C (3)     →  B–A Remote LFA (2)</tspan><tspan x="638" y="618.5">               C no longer loop-free:  dist(C,A)=2 &lt; dist(C,B)+dist(B,A) = 1+1 = 2 ✗</tspan><tspan x="638" y="637.25">               (before: 3 &lt; 10+1 ✓)</tspan><tspan x="638" y="656">B→E  rerouted  B–A LFA (3)       →  C–B LFA (3)   B now goes B→C→E (2 &lt; 3)</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="638" y="686.2">Worse: B→A, B→C, C→B, C→E. Rerouted: B→E, C→A. The other 12 are better.</tspan></text>
+<ellipse cx="88" cy="366" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="88" y="373.8">S</tspan></text>
+<ellipse cx="288" cy="276" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="288" y="283.8">E</tspan></text>
+<ellipse cx="498" cy="366" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="498" y="373.8">C</tspan></text>
+<ellipse cx="408" cy="536" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="408" y="543.8">B</tspan></text>
+<ellipse cx="168" cy="536" rx="32" ry="32" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="168" y="543.8">A</tspan></text>
+<polyline points="121,351 255,291" fill="none" stroke="#495057" stroke-width="2" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="198" y="349">1</tspan></text>
+<polyline points="321,290 465,352" fill="none" stroke="#495057" stroke-width="2" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="384" y="349">1</tspan></text>
+<polyline points="481,398 425,504" fill="none" stroke="#e8590c" stroke-width="6" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#e8590c" text-anchor="middle" xml:space="preserve"><tspan x="412" y="436">10 → 1</tspan></text>
+<polyline points="372,536 204,536" fill="none" stroke="#495057" stroke-width="2" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="288" y="565">1</tspan></text>
+<polyline points="153,503 104,398" fill="none" stroke="#495057" stroke-width="2" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="147" y="449">1</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="88.5" y="273.2">LFA 0 → 2</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="88" y="297.2">RLFA 0 → 4</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="288.5" y="183.2">LFA 0 → 2</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="288" y="207.2">RLFA 0 → 4</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle" xml:space="preserve"><tspan x="498.5" y="273.2">LFA 4 → 2</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="498" y="297.2">RLFA 4 → 4</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle" xml:space="preserve"><tspan x="408.5" y="589.2">LFA 4 → 2</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="408" y="613.2">RLFA 4 → 4</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="168.5" y="589.2">LFA 0 → 2</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="168" y="613.2">RLFA 0 → 4</tspan></text>
+<rect x="0" y="834" width="533" height="237" rx="16" fill="#fff5f5" stroke="#e03131" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#e03131" text-anchor="start" xml:space="preserve"><tspan x="18" y="872.9">A change can make it worse</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="906.15">Example 2, S–E from 1 to 3:</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="937.2">LFA          50% →  50%</tspan><tspan x="18" y="957.2">LFA + RLFA  100% →  80%</tspan><tspan x="18" y="977.2">TI-LFA      100% → 100%</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="1007.2">Worse: A→C, B→A, B→C, B→E, B→S, C→A.</tspan></text>
+<rect x="553" y="834" width="533" height="237" rx="16" fill="#f3f0ff" stroke="#7048e8" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#7048e8" text-anchor="start" xml:space="preserve"><tspan x="571" y="872.9">What-if: overload a router</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="571" y="906.15">The same diff for setting one router’s overload bit</tspan><tspan x="571" y="927.4">(A17). Example 4, P1 overloaded:</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="16" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="571" y="958.2">pairs        35 → 31</tspan><tspan x="571" y="978.2">LFA          27 → 13</tspan><tspan x="571" y="998.2">LFA + RLFA   35 → 15</tspan><tspan x="571" y="1018.2">TI-LFA       35 → 21</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="571" y="1048.2">16 destinations worse, 2 rerouted.</tspan></text>
+<rect x="1107" y="834" width="533" height="237" rx="16" fill="#f8f9fa" stroke="#495057" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="1125" y="872.9">What it doesn’t do</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="1125" y="906.15">•  It compares the plan on the full network, like</tspan><tspan x="1125" y="927.4">   the coverage report. Links and routers failed in</tspan><tspan x="1125" y="948.65">   the simulation are not taken out.</tspan><tspan x="1125" y="969.9">•  A D with no pairs on one side (unreachable) is</tspan><tspan x="1125" y="991.15">   &quot;rerouted&quot;. A metric change never causes this.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="1125" y="1022.2">Swapping before and after swaps &quot;better&quot; and &quot;worse&quot; (a</tspan><tspan x="1125" y="1042.2">property test).</tspan></text>
+<rect x="0" y="1091" width="1640" height="117" rx="16" fill="#fff9db" stroke="#f08c00" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#f08c00" text-anchor="start" xml:space="preserve"><tspan x="18" y="1129.9">Takeaway</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="1163.15">The what-if diff runs the coverage report on the network before and after one change, and lists every source and destination whose protection got better or worse. In</tspan><tspan x="18" y="1184.4">Example 3, one metric change (C–B 10 → 1) lets Remote LFA cover the whole ring, but 4 destinations lose their LFA.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="0" y="1237.2">Sources: docs/02-algorithms.md §13  ·  docs/learn/10-design-checks.md (What-if)  ·  examples/03-ring5-highmetric.yaml, 02-ring5.yaml, 04-isp-core.yaml  ·  checked with whatIf()</tspan></text>
+</svg>

@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 -30 1700 1264" width="1700" height="1264">
+<defs>
+<marker id="ah0" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L10,4 L0,8 z" fill="#2f9e44"/></marker>
+</defs>
+<rect x="-30" y="-30" width="1700" height="1264" fill="#ffffff"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="40" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="0" y="38">B8 · P-space: where S can send without the failed link</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="0" y="75.1">§3 of docs/02-algorithms.md  ·  RFC 7490 §5.2.1.1  ·  DECISIONS.md D17  ·  code: src/engine/rlfa.ts (computeRlfa → pSpace)</tspan></text>
+<rect x="0" y="110" width="600" height="681" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="18" y="148.9">Example 4: the ISP core, PE1 protects link</tspan><tspan x="18" y="176.4">PE1–P1</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="start" xml:space="preserve"><tspan x="18" y="618.2">Red dashed: the protected link PE1–P1 (S = PE1, E = P1, c =</tspan><tspan x="18" y="638.2">10).</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="start" xml:space="preserve"><tspan x="18" y="668.2">Green: P(PE1) = {P2, P4}. PE1’s shortest paths to them start</tspan><tspan x="18" y="688.2">with PE1–P2.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="718.2">Gray: P3 and PE2 tie. PE1’s shortest path to each goes over</tspan><tspan x="18" y="738.2">PE1–P1, so they are out.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="768.2">Diagonal P1–P4: 20 from P1 to P4, 40 back.</tspan></text>
+<rect x="620" y="110" width="1020" height="681" rx="16" fill="#e7f5ff" stroke="#1971c2" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="148.9">The rule: S’s own shortest path to Y doesn’t start with S–E</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="18" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="183.1">Y ∈ P(S)   ⇔   dist(S,Y)  &lt;  c(S,E) + dist(E,Y)</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="215.15">•  The right side is the cheapest path from S to Y that starts with the link S–E.</tspan><tspan x="638" y="236.4">•  Strictly cheaper ⇒ no shortest path from S to Y uses S–E. It is B1 with X = S.</tspan><tspan x="638" y="257.65">•  A tie means one of S’s shortest paths to Y is the one over S–E: Y is out.</tspan><tspan x="638" y="278.9">•  After S–E fails, S can still reach every Y in P(S) on its normal table: no tunnel is needed to get</tspan><tspan x="638" y="300.15">   there.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="334.05">Worked checks, Example 4 (from the engine)</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="15" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="364.25">Y     dist(PE1,Y)   c(PE1,P1) + dist(P1,Y)   In P(PE1)?</tspan><tspan x="638" y="383">----  -----------   ----------------------   ------------------------------</tspan><tspan x="638" y="401.75">P2    10            10 + 20 = 30             ✓ 10 &lt; 30</tspan><tspan x="638" y="420.5">P3    20            10 + 10 = 20             ✗ tie: PE1 → P1 → P3 is the path</tspan><tspan x="638" y="439.25">P4    20            10 + 20 = 30             ✓ 20 &lt; 30   (P1 → P4 is 20)</tspan><tspan x="638" y="458">PE2   30            10 + 20 = 30             ✗ tie: PE1 → P1 → P3 → PE2 is one</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="16" fill="#2f9e44" text-anchor="start" xml:space="preserve"><tspan x="638" y="488.2">P(PE1) for link PE1–P1 = {P2, P4}</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="19" fill="#1971c2" text-anchor="start" xml:space="preserve"><tspan x="638" y="521.05">Other examples</tspan></text>
+<text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="15" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="638" y="551.25">Example        Link   P(S)     Out on a tie</tspan><tspan x="638" y="570">-------------  -----  -------  ------------------------------------</tspan><tspan x="638" y="588.75">2  ring        S–E    {A, B}   C: 2 = 1 + 1</tspan><tspan x="638" y="607.5">3  ring, B–C   S–E    {A, B}   C: 2 = 1 + 1</tspan><tspan x="638" y="626.25">8              S–E    {N}      B: 3 = 2 + 1,  C: 6 = 2 + 4,  D: 4 = 2 + 2</tspan></text>
+<ellipse cx="58" cy="388" rx="30" ry="30" fill="#ffffff" stroke="#1971c2" stroke-width="4"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#1971c2" text-anchor="middle" xml:space="preserve"><tspan x="58.5" y="395.8">PE1</tspan></text>
+<ellipse cx="208" cy="263" rx="30" ry="30" fill="#ffffff" stroke="#e03131" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#e03131" text-anchor="middle" xml:space="preserve"><tspan x="208.5" y="270.8">P1</tspan></text>
+<ellipse cx="208" cy="513" rx="30" ry="30" fill="#ffffff" stroke="#2f9e44" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="208.5" y="520.8">P2</tspan></text>
+<ellipse cx="408" cy="263" rx="30" ry="30" fill="#ffffff" stroke="#495057" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="408.5" y="270.8">P3</tspan></text>
+<ellipse cx="408" cy="513" rx="30" ry="30" fill="#ffffff" stroke="#2f9e44" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="408.5" y="520.8">P4</tspan></text>
+<ellipse cx="548" cy="388" rx="30" ry="30" fill="#ffffff" stroke="#495057" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="548.5" y="395.8">PE2</tspan></text>
+<polyline points="84,366 182,285" fill="none" stroke="#e03131" stroke-width="3" stroke-dasharray="10 7" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="115.5" y="311">10</tspan></text>
+<polyline points="84,410 182,491" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="115.5" y="478">10</tspan></text>
+<polyline points="242,513 374,513" fill="none" stroke="#2f9e44" stroke-width="4" stroke-linecap="round" marker-end="url(#ah0)"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="308.5" y="542">10</tspan></text>
+<polyline points="208,297 208,479" fill="none" stroke="#495057" stroke-width="2" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="186.5" y="395">30</tspan></text>
+<polyline points="242,263 374,263" fill="none" stroke="#495057" stroke-width="2" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="308.5" y="247">10</tspan></text>
+<polyline points="408,297 408,479" fill="none" stroke="#495057" stroke-width="2" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="429.5" y="395">30</tspan></text>
+<polyline points="229,290 387,487" fill="none" stroke="#495057" stroke-width="2" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="325.5" y="346.15">20 / 40</tspan></text>
+<polyline points="433,286 522,366" fill="none" stroke="#495057" stroke-width="2" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="495.5" y="312">10</tspan></text>
+<polyline points="433,490 522,410" fill="none" stroke="#495057" stroke-width="2" stroke-linecap="round"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#1e1e1e" text-anchor="middle" xml:space="preserve"><tspan x="495.5" y="477">10</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="58.5" y="343.2">S</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#e03131" text-anchor="middle" xml:space="preserve"><tspan x="208.5" y="218.2">E</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="208.5" y="568.2">P ✓</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#2f9e44" text-anchor="middle" xml:space="preserve"><tspan x="408.5" y="568.2">P ✓</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="408" y="218.2">tie: out</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="middle" xml:space="preserve"><tspan x="548" y="343.2">tie: out</tspan></text>
+<rect x="0" y="811" width="533" height="202" rx="16" fill="#ebfbee" stroke="#2f9e44" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#2f9e44" text-anchor="start" xml:space="preserve"><tspan x="18" y="849.9">One P-space per link, not per D</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="883.15">The test never mentions D. S works out P-space once</tspan><tspan x="18" y="904.4">for each protected link and uses it for every</tspan><tspan x="18" y="925.65">destination behind E (RFC 7490 §5.2.1.3).</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="18" y="956.2">In Example 4, PE1 → P1 and PE1 → P3 both lose PE1–P1</tspan><tspan x="18" y="976.2">and share P(PE1) = {P2, P4}.</tspan></text>
+<rect x="553" y="811" width="533" height="202" rx="16" fill="#fff5f5" stroke="#e03131" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#e03131" text-anchor="start" xml:space="preserve"><tspan x="571" y="849.9">Plain P-space is often too small</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="571" y="883.15">Q(P1) = {P3, PE2} (B10). Plain P ∩ Q = {P2, P4} ∩</tspan><tspan x="571" y="904.4">{P3, PE2} = {}: no PQ node.</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="571" y="936.15">Extended P-space (B9) adds PE2 through neighbor P2,</tspan><tspan x="571" y="957.4">and Remote LFA works. Example 8 is the same: P(S) =</tspan><tspan x="571" y="978.65">{N}, and N is not in Q.</tspan></text>
+<rect x="1107" y="811" width="533" height="202" rx="16" fill="#f8f9fa" stroke="#495057" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="1125" y="849.9">Edge cases</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="1125" y="883.15">•  S and E are never listed: S can’t pass the test,</tspan><tspan x="1125" y="904.4">   E is always a tie (D17).</tspan><tspan x="1125" y="925.65">•  Forward distances from S (forward SPF, A1).</tspan><tspan x="1125" y="946.9">   Metrics can differ per direction.</tspan><tspan x="1125" y="968.15">•  Parallel links (A10): c(S,E) is the metric of the</tspan><tspan x="1125" y="989.4">   protected link, not the bundle.</tspan></text>
+<rect x="0" y="1033" width="1640" height="117" rx="16" fill="#fff9db" stroke="#f08c00" stroke-width="2"/>
+<text font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#f08c00" text-anchor="start" xml:space="preserve"><tspan x="18" y="1071.9">Takeaway</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="17" fill="#1e1e1e" text-anchor="start" xml:space="preserve"><tspan x="18" y="1105.15">P-space is every router S already reaches without the failed link: dist(S,Y) &lt; c(S,E) + dist(E,Y). A tie means the link is on a shortest path, so the router is out. It</tspan><tspan x="18" y="1126.4">is the &quot;S side&quot; of Remote LFA; the &quot;E side&quot; is Q-space (B10), and a router in both is a PQ node (B11).</tspan></text>
+<text font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#495057" text-anchor="start" xml:space="preserve"><tspan x="0" y="1179.2">Sources: docs/02-algorithms.md §3, §6  ·  docs/learn/05-remote-lfa.md (P-space)  ·  examples/04-isp-core.yaml, 02-ring5.yaml, 03-ring5-highmetric.yaml, 08-node-protection.yaml  · </tspan><tspan x="0" y="1199.2">checked with computeForSource()</tspan></text>
+</svg>
